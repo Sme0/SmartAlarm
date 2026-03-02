@@ -15,6 +15,10 @@ app = Flask(
 # Configure SQLAlchemy to use SQLite database
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data.sqlite3'
 
+# Secret key for sessions
+#TODO: Setup .env to store key
+app.config['SECRET_KEY'] = "temp-key"
+
 # Initialisation
 login_manager = LoginManager(app)
 database = SQLAlchemy(app)
