@@ -80,7 +80,8 @@ class Device(db.Model):
         device.user = user
 
         if name is None:
-            device.name = f"Alarm Clock {len(user.devices)}"
+            device_count = Device.query.filter_by(user_id=user.id).count()
+            device.name = f"Alarm Clock {device_count}"
         else:
             device.name = name
 
