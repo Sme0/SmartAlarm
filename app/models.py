@@ -58,7 +58,7 @@ class Device(db.Model):
     """
     Device model representing a physical alarm clock registered by the user.
     """
-    __tablename = 'devices'
+    __tablename__ = 'devices'
     serial_number = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(64), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
