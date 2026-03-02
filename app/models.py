@@ -1,5 +1,5 @@
 """
-This module will contain the database models, only including data that is Flask will rely on,
+This module contains the database models, including only data that Flask relies on,
 and not telemetry data that will be recorded on ThingsBoard.
 """
 from flask_login import UserMixin
