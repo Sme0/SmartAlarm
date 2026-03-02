@@ -1,5 +1,6 @@
 """
-This module will contain the database models, separate to the telemetry data stored on ThingsBoard.
+This module will contain the database models, only including data that is Flask will rely on,
+and not telemetry data that will be recorded on ThingsBoard.
 """
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -12,7 +13,7 @@ class User(UserMixin, db.Model):
 
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
-    email_address = db.Column(db.String(25), nullable=False, index=True, unique=True)
+    email_address = db.Column(db.String(64), nullable=False, index=True, unique=True)
     password_hash = db.Column(db.String(64))
 
     def set_password(self, password):
@@ -49,11 +50,42 @@ class User(UserMixin, db.Model):
 
     @staticmethod
     @lm.user_loader
-    def load_user(user_id: int):
+    def get(user_id: int) -> 'User':
         return User.query.get(int(user_id))
 
 
+class Device(db.Model):
+    """
+    Device model representing a physical alarm clock registered by the user.
+    """
+    __tablename = 'devices'
+    serial_number = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user = db.relationship('User', backref=db.backref('devices', lazy='select'))
 
-# TODO: Other database models (Device, etc.)
-#       This does not include telemetry data that will be stored on ThingsBoard (e.g. sensor readings, data collected from
-#       the alarm), nor per device settings such as max snoozes (will be stored as shared attributes on ThingsBoard)
+    @staticmethod
+    def register(serial_number: int, name: str, user: User) -> 'Device':
+        """
+        Creates a new device associated with the given User, and
+        saves it to the database.
+        :param serial_number: The device's unique identifier (hardcoded into device)
+        :param name: The chosen name for the device
+        :param user: The user who the device belongs to
+        :return: The newly created (and stored) Device object
+        """
+
+        device = Device()
+        device.serial_number = serial_number
+        device.user = user
+
+        if name is None:
+            device.name = f"Alarm Clock {len(user.devices)}"
+        else:
+            device.name = name
+
+        # Save to DB
+        db.session.add(device)
+        db.session.commit()
+
+        return device
