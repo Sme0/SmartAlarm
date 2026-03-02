@@ -1,5 +1,5 @@
 """
-This module will contain the database models, only including data that is Flask will rely on,
+This module contains the database models, including only data that Flask relies on,
 and not telemetry data that will be recorded on ThingsBoard.
 """
 from flask_login import UserMixin
@@ -14,7 +14,7 @@ class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     email_address = db.Column(db.String(64), nullable=False, index=True, unique=True)
-    password_hash = db.Column(db.String(64))
+    password_hash = db.Column(db.String(256))
 
     def set_password(self, password):
         """Hash and store the user's password."""
@@ -58,7 +58,7 @@ class Device(db.Model):
     """
     Device model representing a physical alarm clock registered by the user.
     """
-    __tablename = 'devices'
+    __tablename__ = 'devices'
     serial_number = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(64), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
@@ -80,7 +80,8 @@ class Device(db.Model):
         device.user = user
 
         if name is None:
-            device.name = f"Alarm Clock {len(user.devices)}"
+            device_count = Device.query.filter_by(user_id=user.id).count()
+            device.name = f"Alarm Clock {device_count}"
         else:
             device.name = name
 
