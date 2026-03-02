@@ -14,7 +14,7 @@ class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     email_address = db.Column(db.String(64), nullable=False, index=True, unique=True)
-    password_hash = db.Column(db.String(64))
+    password_hash = db.Column(db.String(256))
 
     def set_password(self, password):
         """Hash and store the user's password."""
