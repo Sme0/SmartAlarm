@@ -40,9 +40,28 @@ class RegistrationForm(FlaskForm):
         Length(min=8)
     ])
 
+class DeactivateAccountForm(FlaskForm):
+    """
+    Form for deactivating accounts.
+    Requires both email and password to ensure the chosen account is the correct
+    one to be deactivated, and that the user is the account's owner.
+    """
+    email_address = EmailField('Email address', validators=[
+        DataRequired(),
+        Email()
+    ])
+    password = PasswordField('Password', validators=[
+        DataRequired(),
+        Length(min=8)
+    ])
+    confirmation = BooleanField('Are you sure?')
+    submit = SubmitField('Deactivate Account')
+
 class DeleteAccountForm(FlaskForm):
     """
     Form for deleting accounts.
+    Requires both email and password to ensure the chosen account is the correct
+    one to be deleted, and that the user is the account's owner.
     """
     email_address = EmailField('Email address', validators=[
         DataRequired(),
@@ -54,3 +73,31 @@ class DeleteAccountForm(FlaskForm):
     ])
     confirmation = BooleanField('Are you sure?')
     submit = SubmitField('Delete Account')
+
+class ResetPasswordForm(FlaskForm):
+    """
+    Form for resetting the user's password.
+    """
+    old_password = PasswordField('Password', validators=[
+        DataRequired(),
+        Length(min=8)
+    ])
+    new_password = PasswordField('New Password', validators=[
+        DataRequired(),
+        Length(min=8)
+    ])
+    submit = SubmitField('Change Password')
+
+class ResetEmailAddress(FlaskForm):
+    """
+    Form for resetting the user's email address.
+    """
+    new_email_address = EmailField('Email address', validators=[
+        DataRequired(),
+        Email()
+    ])
+    password = PasswordField('Password', validators=[
+        DataRequired(),
+        Length(min=8)
+    ])
+    submit = SubmitField('Change Email Address')
