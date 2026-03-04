@@ -26,7 +26,7 @@ database = SQLAlchemy(app)
 # Redirects users to login view if route requires authentication
 login_manager.login_view = 'login'
 
-# Register application routes, database and forms models
+# Register application routes and database models
 # Required to avoid circular imports
 from app import routes
 from app import models
