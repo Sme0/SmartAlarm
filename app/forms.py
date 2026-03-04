@@ -39,6 +39,7 @@ class RegistrationForm(FlaskForm):
         DataRequired(),
         Length(min=8)
     ])
+    submit = SubmitField('Register')
 
 class DeactivateAccountForm(FlaskForm):
     """
