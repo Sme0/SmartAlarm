@@ -30,4 +30,3 @@ login_manager.login_view = 'login'
 # Required to avoid circular imports
 from app import routes
 from app import models
-from app import forms
