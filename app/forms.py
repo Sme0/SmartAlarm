@@ -79,7 +79,7 @@ class ResetPasswordForm(FlaskForm):
     """
     Form for resetting the user's password.
     """
-    old_password = PasswordField('Password', validators=[
+    old_password = PasswordField('Current Password', validators=[
         DataRequired(),
         Length(min=8)
     ])
