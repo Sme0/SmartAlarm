@@ -89,7 +89,7 @@ class ResetPasswordForm(FlaskForm):
     ])
     submit = SubmitField('Change Password')
 
-class ResetEmailAddress(FlaskForm):
+class ResetEmailAddressForm(FlaskForm):
     """
     Form for resetting the user's email address.
     """
