@@ -15,17 +15,20 @@ app = Flask(
     __name__,
     instance_path=os.path.join(os.path.dirname(__file__), 'instance'))
 
+is_development_mode = os.getenv('DEVELOPMENT_MODE', 'false').lower() == 'true'
 db_user = os.getenv('MYSQL_USER')
 db_password = os.getenv('MYSQL_PASSWORD')
 db_host = os.getenv('MYSQL_HOST')
 db_name = os.getenv('MYSQL_DATABASE')
 
-# Use MySQL if env variables exist, else fallback to SQLite for local dev
-if db_user and db_password and db_name:
+# Chooses between Production Mode and Development Mode
+if not is_development_mode and db_user and db_password and db_name and db_host:
     # Hostname inside Docker Compose is 'db'
     app.config['SQLALCHEMY_DATABASE_URI'] = f"mysql+pymysql://{db_user}:{db_password}@{db_host}/{db_name}"
-else:
+elif is_development_mode:
     app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///data.sqlite3"
+else:
+    raise ValueError("Production mode requires all .env fields to be completed.")
 
 # Secret key for sessions (can be set in .env)
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "dev-key")
