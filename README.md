@@ -59,11 +59,11 @@ This file contains configuration values such as:
 - Flask secret key
 
 If running with Docker/in production, you may ignore most of the attributes.
-However, regardless of how this project is being run, ensure you have modified the secret key and database login details
+However, ensure you have modified the secret key and database login details
 from their default values.
 
 If running in Development Mode, ensure you change the secret key attribute from its default, and follow the instructions
-inside the .env file.
+inside the .env file (including changing the `MySQL_HOST` attribute.)
 
 #### Physical Device
 TODO: Instructions on how to configure the project, including any environment variables or configuration files that need to be set.
