@@ -16,7 +16,7 @@ The following software is required to run the project:
 - **Docker Desktop (recommended)** - required for the containerised version.
 - **Python 3.12+** - required for running the application in development mode without Docker.
 - **pip** - required to install dependencies without Docker.
-- **Git (optional)** - for cloning the repository
+- **Git (optional)** - for cloning the repository.
 
 #### Physical Device
 
@@ -85,7 +85,7 @@ open a browser and navigate to:
 ```
 http://localhost:<port>
 ```
-This will however depend on how the docker is being run, and the port you have entered into the .env file.
+This will however depend on where the docker is being run, and the port you have entered into the .env file.
 
 #### Running in Development Mode (Without Docker)
 
