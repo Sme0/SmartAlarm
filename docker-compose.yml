@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "${FLASK_HOST_PORT}:8080"        # maps host 5000 → container 8080 (Gunicorn)
+    env_file:
+      - .env               # load environment variables from .env
+    environment:
+      PYTHONUNBUFFERED: 1
+      MYSQL_HOST: db        # hostname of MySQL container
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.0
+    restart: always
+    env_file:
+      - .env               # load credentials for MySQL
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3306:3306"        # optional, exposes MySQL for external tools
+    volumes:
+      - db_data:/var/lib/mysql   # persist MySQL data across restarts
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${MYSQL_USER}", "-p${MYSQL_PASSWORD}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db_data: {}
