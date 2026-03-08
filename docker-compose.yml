@@ -3,6 +3,7 @@ version: '3.8'
 services:
   web:
     build: .
+    restart: unless-stopped     #Restarts if container crashes
     ports:
       - "${FLASK_HOST_PORT}:8080"        # maps host 5000 → container 8080 (Gunicorn)
     env_file:
