@@ -33,7 +33,9 @@ class InputHandler:
         #     return InputOption.DISARM
 
         self.current_action = InputOption.NONE
-
-        if grovepi.digitalRead(self.disarm_button) == 0:
-            self.current_action = InputOption.DISARM
+        try:
+            if grovepi.digitalRead(self.disarm_button) == 0:
+                self.current_action = InputOption.DISARM
+        except IOError:
+            print("Error")
 
