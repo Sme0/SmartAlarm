@@ -19,6 +19,7 @@ class AlarmController:
 
         # Current alarm state
         self.state : AlarmState = AlarmState.WAITING
+        self.current_triggered_alarm = None
 
     def update(self):
         # Update current time
@@ -44,29 +45,31 @@ class AlarmController:
 
     def trigger_alarm(self, current_alarm):
         self.state = AlarmState.TRIGGERED
+        self.current_triggered_alarm = current_alarm
 
         # TODO: Replace with RPI UI
         print(f"Alarm Triggered: {datetime.now().strftime("%H:%M")}")
 
-        user_input = self.input_handler.check_inputs()
-        if user_input == InputOption.SNOOZE:
-            # TODO: Play game
-            snooze_time = (datetime.now() + timedelta(minutes=5)).strftime("%H:%M") + ":00"
-            self.snooze_alarms.append(snooze_time)
-            self.stop_alarm(current_alarm)
-        elif user_input == InputOption.DISARM:
-            # TODO: Play game
-            self.stop_alarm(current_alarm)
+
+    def disarm_alarm(self):
+        # TODO: Play game
+        self.stop_alarm()
+
+    def snooze_alarm(self):
+        # TODO: Play game
+        snooze_time = (datetime.now() + timedelta(minutes=5)).strftime("%H:%M") + ":00"
+        self.snooze_alarms.append(snooze_time)
+        self.stop_alarm()
 
 
 
-    def stop_alarm(self, current_alarm):
+    def stop_alarm(self):
         if self.state == AlarmState.TRIGGERED:
             print("Alarm Stopped")
             print(f"Active alarms: {self.alarms}, {self.snooze_alarms}")
 
-            if current_alarm in self.snooze_alarms:
-                self.snooze_alarms.remove(current_alarm)
+            if self.current_triggered_alarm in self.snooze_alarms:
+                self.snooze_alarms.remove(self.current_triggered_alarm)
             self.update()
             self.state = AlarmState.WAITING
 
