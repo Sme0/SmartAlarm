@@ -38,7 +38,7 @@ class AlarmController:
         # If there are no alarms triggered
         if self.state == AlarmState.WAITING and current_minute != self.last_displayed_minute:
             self.last_displayed_minute = current_minute
-            print(f"Current Time: {datetime.now().strftime("%H:%M")}")
+            print(f"Current Time: {datetime.now().strftime('%H:%M')}")
 
 
 
@@ -48,7 +48,7 @@ class AlarmController:
         self.current_triggered_alarm = current_alarm
 
         # TODO: Replace with RPI UI
-        print(f"Alarm Triggered: {datetime.now().strftime("%H:%M")}")
+        print(f"Alarm Triggered: {datetime.now().strftime('%H:%M')}")
 
 
     def disarm_alarm(self):
