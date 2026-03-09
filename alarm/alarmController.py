@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
-from alarm.InputHandler import InputHandler, InputOption
-from alarm.alarmState import AlarmState
+from InputHandler import InputHandler, InputOption
+from alarmState import AlarmState
 
 class AlarmController:
     def __init__(self, input_handler : InputHandler):

@@ -4,9 +4,9 @@ and delegating tasks to other modules.
 """
 import time
 
-from alarm.InputHandler import InputHandler, InputOption
-from alarm.alarmController import AlarmController
-from alarm.alarmState import AlarmState
+from InputHandler import InputHandler, InputOption
+from alarmController import AlarmController
+from alarmState import AlarmState
 
 input_handler = InputHandler()
 
