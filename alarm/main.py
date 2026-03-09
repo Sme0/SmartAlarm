@@ -4,12 +4,18 @@ and delegating tasks to other modules.
 """
 import time
 
+from alarm.InputHandler import InputHandler
 from alarm.alarmController import AlarmController
 
-alarm_controller = AlarmController()
-alarm_controller.alarms.append("09:43:00")
+input_handler = InputHandler()
+
+alarm_controller = AlarmController(input_handler)
+alarm_controller.alarms.append("10:22:00")
+alarm_controller.alarms.append("10:23:00")
 
 # Main alarm loop
 while True:
+
     alarm_controller.update()
-    time.sleep(1)
+    alarm_controller.check_alarms()
+    time.sleep(0.1)
