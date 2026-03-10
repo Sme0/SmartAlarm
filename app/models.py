@@ -14,6 +14,7 @@ class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     email_address = db.Column(db.String(64), nullable=False, index=True, unique=True)
+    preferred_name = db.Column(db.String(32), nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
 
     def set_password(self, password):
