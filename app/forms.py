@@ -3,6 +3,7 @@ This module contains all the forms that will be referenced throughout
 the .html files.
 """
 from flask_wtf import FlaskForm
+from nbformat.validator import validators
 from wtforms.fields.simple import EmailField, PasswordField, BooleanField, SubmitField, StringField
 from wtforms.validators import DataRequired, Email, Length
 
@@ -106,3 +107,13 @@ class ResetEmailAddressForm(FlaskForm):
         Length(min=8)
     ])
     submit = SubmitField('Change Email Address')
+
+class PairDeviceForm(FlaskForm):
+    """
+    Form for pairing device to user via 6 digit code
+    """
+    pairing_code = StringField('Pairing code', validators=[
+        DataRequired(),
+        Length(min=6, max=6)
+    ])
+    submit = SubmitField('Confirm Pairing Code')

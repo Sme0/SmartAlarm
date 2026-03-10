@@ -2,6 +2,11 @@
 This module contains the database models, including only data that Flask relies on,
 and not telemetry data that will be recorded on ThingsBoard.
 """
+import random
+import string
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import database as db
@@ -60,13 +65,17 @@ class Device(db.Model):
     Device model representing a physical alarm clock registered by the user.
     """
     __tablename__ = 'devices'
-    serial_number = db.Column(db.Integer, primary_key=True)
+    serial_number = db.Column(db.String, primary_key=True)
     name = db.Column(db.String(64), nullable=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    pairing_code = db.Column(db.String(6), nullable=True, unique=True)
+    pairing_expiry = db.Column(db.DateTime(timezone=True), nullable=True)
+    last_seen = db.Column(db.DateTime(timezone=True), nullable=True)
+
     user = db.relationship('User', backref=db.backref('devices', lazy='select'))
 
     @staticmethod
-    def register(serial_number: int, name: str, user: User) -> 'Device':
+    def register(serial_number: str, name: Optional[str], user: Optional[User]) -> 'Device':
         """
         Creates a new device associated with the given User, and
         saves it to the database.
@@ -79,15 +88,36 @@ class Device(db.Model):
         device = Device()
         device.serial_number = serial_number
         device.user = user
-
-        if name is None:
-            device_count = Device.query.filter_by(user_id=user.id).count()
-            device.name = f"Alarm Clock {device_count}"
-        else:
-            device.name = name
+        device.name = name
 
         # Save to DB
         db.session.add(device)
         db.session.commit()
 
         return device
+
+    def generate_pairing_code(self) -> (str, datetime):
+        while True:
+            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            if not Device.query.filter_by(pairing_code=code).first():
+                break
+
+        self.pairing_code = code
+        self.pairing_expiry = datetime.now(timezone.utc) + timedelta(minutes=5)
+        db.session.commit()
+        return self.pairing_code, self.pairing_expiry
+
+    def pair(self, user_id: int):
+        self.user_id = user_id
+        self.pairing_code = None
+        self.pairing_expiry = None
+        db.session.commit()
+
+    def update_heartbeat(self):
+        self.last_seen = datetime.now(timezone.utc)
+        db.session.commit()
+
+    def is_online(self) -> bool:
+        if not self.last_seen:
+            return False
+        return datetime.now(timezone.utc) - self.last_seen < timedelta(minutes=2)
