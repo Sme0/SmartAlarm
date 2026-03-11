@@ -1,12 +1,12 @@
 """
 This module implements all the routes for the Flask application.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from app import app
-from app.models import User, Device
+from app.models import User, Device, Alarm
 from app.forms import LoginForm, RegistrationForm, PairDeviceForm
 from werkzeug.exceptions import InternalServerError
 
@@ -124,7 +124,7 @@ def pair_device():
 
         if (device is None
                 or not device.pairing_expiry
-                or (device.pairing_expiry < datetime.now())
+                or (device.pairing_expiry < datetime.now(timezone.utc))
         ):
             flash("Invalid pairing code. Enter the code on your device.", "danger")
             return redirect(url_for("pair_device"))
@@ -146,11 +146,17 @@ def pair_device():
 def request_pairing_code():
     data = request.get_json()
     if not data:
-        return jsonify({"response": "invalid request"}), 400
+        return jsonify({
+            "response": "failed",
+            "message": "invalid request"
+        }), 400
 
     serial_number = data.get("serial_number")
     if not serial_number:
-        return jsonify({"response": "missing serial number"}), 400
+        return jsonify({
+            "response": "failed",
+            "message": "missing serial number"
+        }), 400
 
     device = Device.query.get(serial_number)
 
@@ -159,10 +165,11 @@ def request_pairing_code():
 
     if device.user_id is not None:
         return jsonify({
-            "response": "failed"
-        })
+            "response": "failed",
+            "message": "device already paired"
+        }), 400
 
-    if not device.pairing_expiry or device.pairing_expiry < datetime.now():
+    if not device.pairing_expiry or device.pairing_expiry < datetime.now(timezone.utc):
         device.generate_pairing_code()
 
     return jsonify({
@@ -173,50 +180,104 @@ def request_pairing_code():
 def pairing_status():
     data = request.get_json()
     if not data:
-        return jsonify({"response": "invalid request"}), 400
+        return jsonify({
+            "response": "failed",
+            "message": "invalid request"
+        }), 400
 
     serial_number = data.get("serial_number")
     if not serial_number:
-        return jsonify({"response": "missing serial number"}), 400
+        return jsonify({
+            "response": "failed",
+            "message": "missing serial number"
+        }), 400
 
     device = Device.query.get(serial_number)
 
     if device is None:
         return jsonify({
-            "pairing_status": "failed",
-            "reason": "Device never requested pairing code"
-        })
+            "response": "failed",
+            "message": "device never requested pairing code"
+        }), 400
 
     if device.user_id is not None:
         return jsonify({
-            "pairing_status": "paired",
-            "reason": "Device already paired"
+            "response": "paired",
+            "message": "Device already paired"
         })
 
-    if device.pairing_expiry and device.pairing_expiry < datetime.now():
+    if device.pairing_expiry and device.pairing_expiry < datetime.now(timezone.utc):
         return jsonify({
-            "pairing_status": "failed",
-            "reason": "Pairing code has expired. Request a new one"
-        })
+            "response": "failed",
+            "message": "Pairing code has expired. Request a new one"
+        }), 400
 
     return jsonify({
-        "pairing_status": "pairing",
-        "reason": "Waiting for user to enter pairing code"
+        "response": "pairing",
+        "message": "Waiting for user to enter pairing code"
     })
 
 @app.route("/api/device/heartbeat", methods=['POST'])
 def heartbeat():
     data = request.get_json()
     if not data:
-        return jsonify({"response": "invalid request"}), 400
+        return jsonify({
+            "response": "failed",
+            "message": "invalid request"
+        }), 400
 
     serial_number = data.get("serial_number")
     if not serial_number:
-        return jsonify({"response": "missing serial number"}), 400
+        return jsonify({
+            "response": "failed",
+            "message": "missing serial number"
+        }), 400
 
     device = Device.query.get(serial_number)
     if device:
         device.update_heartbeat()
-        return jsonify({"response": "success"})
+        return jsonify({
+            "response": "success",
+            "message": "heartbeat recognised"
+        })
 
-    return jsonify({"response": "failed"}), 400
+    return jsonify({
+        "response": "failed",
+        "message": "invalid serial number"
+    }), 400
+
+@app.route("/api/device/get-alarms", methods=["POST"])
+def get_alarms():
+    data = request.get_json()
+    if not data:
+        return jsonify({
+            "response": "failed",
+            "message": "invalid request"
+        }), 400
+
+    serial_number = data.get("serial_number")
+    if not serial_number:
+        return jsonify({
+            "response": "failed",
+            "message": "missing serial number"
+        }), 400
+
+    device: Device = Device.query.get(serial_number)
+    if device is None or device.user_id is None:
+        return jsonify({
+            "response": "failed",
+            "message": "device not paired"
+        })
+
+    alarms: list[Alarm] = device.get_alarms()
+    return jsonify({
+        "alarms": [
+            {
+                "id": alarm.id,
+                "time": alarm.time.strftime("%H:%M"),
+                "enabled": alarm.enabled
+            }
+            for alarm in alarms
+        ]
+    })
+

@@ -74,6 +74,7 @@ class Device(db.Model):
 
     user = db.relationship('User', backref=db.backref('devices', lazy='select'))
 
+
     @staticmethod
     def register(serial_number: str, name: Optional[str], user: Optional[User]) -> 'Device':
         """
@@ -121,3 +122,19 @@ class Device(db.Model):
         if not self.last_seen:
             return False
         return datetime.now(timezone.utc) - self.last_seen < timedelta(minutes=2)
+
+    def get_alarms(self) -> list['Alarm']:
+        return Alarm.query.filter_by(device_serial=self.serial_number, user_id=self.user_id).all()
+
+
+class Alarm(db.Model):
+    __tablename__ = 'alarms'
+    id = db.Column(db.Integer, primary_key=True)
+    device_serial = db.Column(db.String, db.ForeignKey('devices.serial_number'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    time = db.Column(db.Time, nullable=False)
+    enabled = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    device = db.relationship('Device', backref=db.backref('alarms', lazy='select'))
+    user = db.relationship('User', backref=db.backref('alarms', lazy='select'))
