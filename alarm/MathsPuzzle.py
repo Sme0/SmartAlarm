@@ -29,6 +29,7 @@ class MathsPuzzle (Puzzle):
         return self.problem
     
     def generate_choices(self):
+        #generate incorrect options for answer
         choices = []
         while len(choices) < 3:
             offset = random.randint(-10, 10) #could change to scale to solution?

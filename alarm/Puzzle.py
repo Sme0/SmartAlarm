@@ -37,6 +37,7 @@ class Puzzle(ABC):
         return self.num_snoozes >= self.snooze_cap
 
     def run_puzzle(self):
+        #create and display question and possible answers
         self.set_puzzle()
         choices = self.generate_choices()
         self.display_puzzle(choices)
@@ -44,6 +45,7 @@ class Puzzle(ABC):
         #may need to fix so that timer isn't paused while waiting for input, depends on how inputhandler works
         start_time = time.time()
 
+        #while the user gets the answer correct they may snooze/stop the alarm
         while True:
             if time.time() - start_time > self.time_limit:
                 #display message on screen: game over? time limit reached?
