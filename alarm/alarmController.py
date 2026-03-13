@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from InputHandler import InputHandler, InputOption
 from alarmState import AlarmState
@@ -23,14 +23,14 @@ class AlarmController:
 
     def update(self):
         # Update current time
-        self.current_time = datetime.now().strftime("%H:%M:%S")
+        self.current_time = datetime.utcnow().strftime("%H:%M:%S")
 
 
     def check_alarms(self):
-        current_minute = datetime.now().minute
+        current_minute = datetime.utcnow().minute
 
         # Check each alarm and trigger if needed
-        for alarm in self.alarms:
+        for alarm in (self.alarms + self.snooze_alarms):
             if self.state == AlarmState.WAITING and self.current_time == alarm:
                 self.trigger_alarm(alarm)
                 break
@@ -38,7 +38,7 @@ class AlarmController:
         # If there are no alarms triggered
         if self.state == AlarmState.WAITING and current_minute != self.last_displayed_minute:
             self.last_displayed_minute = current_minute
-            print(f"Current Time: {datetime.now().strftime('%H:%M')}")
+            print(f"Current Time: {datetime.utcnow().strftime('%H:%M')}")
 
 
 
@@ -48,7 +48,7 @@ class AlarmController:
         self.current_triggered_alarm = current_alarm
 
         # TODO: Replace with RPI UI
-        print(f"Alarm Triggered: {datetime.now().strftime('%H:%M')}")
+        print(f"Alarm Triggered: {datetime.utcnow().strftime('%H:%M')}")
 
 
     def disarm_alarm(self):
@@ -57,7 +57,7 @@ class AlarmController:
 
     def snooze_alarm(self):
         # TODO: Play game
-        snooze_time = (datetime.now() + timedelta(minutes=5)).strftime("%H:%M") + ":00"
+        snooze_time = (datetime.utcnow() + timedelta(minutes=5)).strftime("%H:%M") + ":00"
         self.snooze_alarms.append(snooze_time)
         self.stop_alarm()
 

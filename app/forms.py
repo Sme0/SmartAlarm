@@ -3,7 +3,6 @@ This module contains all the forms that will be referenced throughout
 the .html files.
 """
 from flask_wtf import FlaskForm
-from nbformat.validator import validators
 from wtforms.fields.simple import EmailField, PasswordField, BooleanField, SubmitField, StringField
 from wtforms.validators import DataRequired, Email, Length
 

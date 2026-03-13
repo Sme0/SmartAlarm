@@ -35,7 +35,7 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
 
     @staticmethod
-    def register(email_address, password) -> 'User':
+    def register(email_address, password, preferred_name) -> 'User':
         """
         Creates a new user account and saves it to the database.
         :param email_address: The user's unique email address
@@ -47,6 +47,7 @@ class User(UserMixin, db.Model):
         user = User()
         user.email_address = email_address
         user.set_password(password)
+        user.preferred_name = preferred_name
 
         # Save to DB
         db.session.add(user)
@@ -65,7 +66,7 @@ class Device(db.Model):
     Device model representing a physical alarm clock registered by the user.
     """
     __tablename__ = 'devices'
-    serial_number = db.Column(db.String, primary_key=True)
+    serial_number = db.Column(db.String(64), primary_key=True)
     name = db.Column(db.String(64), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     pairing_code = db.Column(db.String(6), nullable=True, unique=True)
@@ -104,7 +105,7 @@ class Device(db.Model):
                 break
 
         self.pairing_code = code
-        self.pairing_expiry = datetime.now(timezone.utc) + timedelta(minutes=5)
+        self.pairing_expiry = datetime.utcnow() + timedelta(minutes=5)
         db.session.commit()
         return self.pairing_code, self.pairing_expiry
 
@@ -115,13 +116,13 @@ class Device(db.Model):
         db.session.commit()
 
     def update_heartbeat(self):
-        self.last_seen = datetime.now(timezone.utc)
+        self.last_seen = datetime.utcnow()
         db.session.commit()
 
     def is_online(self) -> bool:
         if not self.last_seen:
             return False
-        return datetime.now(timezone.utc) - self.last_seen < timedelta(minutes=2)
+        return datetime.utcnow() - self.last_seen < timedelta(minutes=2)
 
     def get_alarms(self) -> list['Alarm']:
         return Alarm.query.filter_by(device_serial=self.serial_number, user_id=self.user_id).all()
@@ -130,11 +131,11 @@ class Device(db.Model):
 class Alarm(db.Model):
     __tablename__ = 'alarms'
     id = db.Column(db.Integer, primary_key=True)
-    device_serial = db.Column(db.String, db.ForeignKey('devices.serial_number'), nullable=False)
+    device_serial = db.Column(db.String(64), db.ForeignKey('devices.serial_number'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     time = db.Column(db.Time, nullable=False)
     enabled = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.utcnow())
 
     device = db.relationship('Device', backref=db.backref('alarms', lazy='select'))
     user = db.relationship('User', backref=db.backref('alarms', lazy='select'))
