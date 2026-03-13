@@ -74,7 +74,7 @@ Instructions on how to run each aspect of the project:
 
 ### Web Application
 
-##### Running with Docker (Recommended)
+#### Running with Docker (Recommended)
 
 From the project root directory, run:
 ```commandline

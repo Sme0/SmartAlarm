@@ -3,7 +3,7 @@ This module contains all the forms that will be referenced throughout
 the .html files.
 """
 from flask_wtf import FlaskForm
-from wtforms.fields.simple import EmailField, PasswordField, BooleanField, SubmitField
+from wtforms.fields.simple import EmailField, PasswordField, BooleanField, SubmitField, StringField
 from wtforms.validators import DataRequired, Email, Length
 
 
@@ -31,11 +31,15 @@ class RegistrationForm(FlaskForm):
         DataRequired(),
         Email()
     ])
+    preferred_name = StringField('Preferred name', validators=[
+        DataRequired(),
+        Length(min=1)
+    ])
     password = PasswordField('Password', validators=[
         DataRequired(),
         Length(min=8)
     ])
-    repeated_password = PasswordField('Repeat Password', validators=[
+    repeated_password = PasswordField('Repeat password', validators=[
         DataRequired(),
         Length(min=8)
     ])
@@ -102,3 +106,13 @@ class ResetEmailAddressForm(FlaskForm):
         Length(min=8)
     ])
     submit = SubmitField('Change Email Address')
+
+class PairDeviceForm(FlaskForm):
+    """
+    Form for pairing device to user via 6 digit code
+    """
+    pairing_code = StringField('Pairing code', validators=[
+        DataRequired(),
+        Length(min=6, max=6)
+    ])
+    submit = SubmitField('Confirm Pairing Code')
