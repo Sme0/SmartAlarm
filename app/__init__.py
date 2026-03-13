@@ -19,8 +19,8 @@ db_password = os.getenv('MYSQL_PASSWORD')
 db_host = os.getenv('MYSQL_HOST')
 db_name = os.getenv('MYSQL_DATABASE')
 
-if is_development_mode:
-    app.instance_path=os.path.join(os.path.dirname(__file__), 'instance')
+# if is_development_mode:
+#     app.instance_path=os.path.join(os.path.dirname(__file__), 'instance')
 
 # Chooses between Production Mode and Development Mode
 if not is_development_mode and db_user and db_password and db_name and db_host:
