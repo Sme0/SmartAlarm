@@ -63,7 +63,7 @@ However, ensure you have modified the secret key and database login details
 from their default values.
 
 If running in Development Mode, ensure you change the secret key attribute from its default, and follow the instructions
-inside the .env file (including changing the `MySQL_HOST` attribute.)
+inside the .env file.
 
 #### Physical Device
 TODO: Instructions on how to configure the project, including any environment variables or configuration files that need to be set.
