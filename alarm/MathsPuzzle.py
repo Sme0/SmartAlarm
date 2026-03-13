@@ -3,6 +3,7 @@ import mathgenerator as mg
 import random
 import time
 from abc import ABC, abstractmethod
+import Puzzle
 
 from joystickDirection import directionRead #will this be part of input handler?
 from InputHandler import InputHandler #update after inputhandler finished
