@@ -1,7 +1,7 @@
 """
 This module implements all the routes for the Flask application.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
@@ -28,6 +28,10 @@ def index():
     - If the user is already logged in -> show the alarm dashboard
     - If not logged in -> show the login/registration page
     """
+
+    # Test User
+    if User.query.filter_by(email_address="test@test.com").first() is None:
+        User.register("test@test.com", "12345", "test")
 
     # If the user is authenticated, show the main alarm dashboard
     if current_user.is_authenticated:
@@ -116,15 +120,19 @@ def logout():
 @app.route("/pair-device", methods=["GET", "POST"])
 @login_required
 def pair_device():
+    """
+    Pair device page where users will enter the code displayed on their device
+    :return: Redirect/template for page
+    """
     pairing_form = PairDeviceForm()
 
-    if pairing_form.validate_on_submit():
+    if pairing_form.validate_on_submit() and pairing_form.pairing_code.data:
         code = pairing_form.pairing_code.data.strip().upper()
         device = Device.query.filter_by(pairing_code=code).first()
 
         if (device is None
                 or not device.pairing_expiry
-                or (device.pairing_expiry < datetime.now(timezone.utc))
+                or (device.pairing_expiry < datetime.utcnow())
         ):
             flash("Invalid pairing code. Enter the code on your device.", "danger")
             return redirect(url_for("pair_device"))
@@ -144,6 +152,10 @@ def pair_device():
 
 @app.route("/api/device/request-pairing-code", methods=["POST"])
 def request_pairing_code():
+    """
+    API route for the device to request a code for pairing.
+    :return: Will return a valid pairing code
+    """
     data = request.get_json()
     if not data:
         return jsonify({
@@ -169,7 +181,7 @@ def request_pairing_code():
             "message": "device already paired"
         }), 400
 
-    if not device.pairing_expiry or device.pairing_expiry < datetime.now(timezone.utc):
+    if not device.pairing_expiry or device.pairing_expiry < datetime.utcnow():
         device.generate_pairing_code()
 
     return jsonify({
@@ -178,6 +190,10 @@ def request_pairing_code():
 
 @app.route("/api/device/pairing-status", methods=['POST'])
 def pairing_status():
+    """
+    API route for the device to get the current status of the pairing process.
+    :return: paired, pairing or failed depending on the pairing status
+    """
     data = request.get_json()
     if not data:
         return jsonify({
@@ -206,7 +222,7 @@ def pairing_status():
             "message": "Device already paired"
         })
 
-    if device.pairing_expiry and device.pairing_expiry < datetime.now(timezone.utc):
+    if device.pairing_expiry and device.pairing_expiry < datetime.utcnow():
         return jsonify({
             "response": "failed",
             "message": "Pairing code has expired. Request a new one"
@@ -219,6 +235,10 @@ def pairing_status():
 
 @app.route("/api/device/heartbeat", methods=['POST'])
 def heartbeat():
+    """
+    API route for the device to send a heartbeat update
+    :return: success or failed depending on outcome
+    """
     data = request.get_json()
     if not data:
         return jsonify({
@@ -248,6 +268,11 @@ def heartbeat():
 
 @app.route("/api/device/get-alarms", methods=["POST"])
 def get_alarms():
+    """
+    API route for device to retrieve the alarms for that device/user
+    :return:
+    """
+
     data = request.get_json()
     if not data:
         return jsonify({
@@ -281,3 +306,36 @@ def get_alarms():
         ]
     })
 
+# Debug routes
+
+@app.route("/debug/pair-device/<code>", methods=["GET", "POST"])
+def pair_device_debug(code=None):
+    """
+    Debug API route for the device to pair with the testing account with the code.
+    Does not rely on any forms or html.
+    :param code:
+    :return:
+    """
+
+    # If code exists
+    if code:
+        code = code.strip().upper()
+        device = Device.query.filter_by(pairing_code=code).first()
+
+        # If device does not exist or code is out of date
+        if (device is None
+                or not device.pairing_expiry
+                or (device.pairing_expiry < datetime.utcnow())):
+            print("Invalid pairing code. Enter the code on your device.")
+            return "Invalid pairing code."
+
+        # Pair device with user
+        user = User.query.filter_by(
+            email_address="test@test.com").first()
+        device.pair(user.id)
+        print("Device paired successfully.")
+        return "Device paired successfully."
+
+    else:
+        print("No code provided.")
+        return "No code provided."
