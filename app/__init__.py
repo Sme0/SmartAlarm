@@ -11,15 +11,16 @@ from dotenv import load_dotenv
 # Load environment variables from .env if present
 load_dotenv()
 
-app = Flask(
-    __name__,
-    instance_path=os.path.join(os.path.dirname(__file__), 'instance'))
+app = Flask(__name__,)
 
 is_development_mode = os.getenv('DEVELOPMENT_MODE', 'false').lower() == 'true'
 db_user = os.getenv('MYSQL_USER')
 db_password = os.getenv('MYSQL_PASSWORD')
 db_host = os.getenv('MYSQL_HOST')
 db_name = os.getenv('MYSQL_DATABASE')
+
+if not is_development_mode:
+    app.instance_path=os.path.join(os.path.dirname(__file__), 'instance')
 
 # Chooses between Production Mode and Development Mode
 if not is_development_mode and db_user and db_password and db_name and db_host:
