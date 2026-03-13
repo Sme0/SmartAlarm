@@ -88,7 +88,7 @@ def index():
         
     # Render the login/register page if user is not authenticated
     return render_template(
-        "index.html",
+        "home.html",
         login_form=login_form,
         register_form=register_form
     )
