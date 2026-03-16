@@ -49,7 +49,7 @@ def interpretCoords(x, y):
 def readDirections(xpin, ypin):
     user_inputs = ["NEUTRAL"]
     direction_values = []
-    while True: #len(direction_values) < 5:
+    while len(direction_values) < 5:
         try:
             x = grovepi.analogRead(xpin)
             y = grovepi.analogRead(ypin)
