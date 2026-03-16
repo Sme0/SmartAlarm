@@ -15,7 +15,7 @@ def interpretCoords(x, y):
             else:
                 return("RIGHT")
         elif y > 645:
-            if x < (770- y):
+            if (x-255) < (y-645):
                 return("UP")
             else:
                 return("LEFT")
@@ -25,15 +25,15 @@ def interpretCoords(x, y):
     #down side values
     elif x > 645:
         if y < 385:
-            if (770- x) < y:
+            if (x-645) < (y-255):
                 return("DOWN")
             else:
                 return ("RIGHT")
         elif y > 645:
-            if (770- x) < (770- y):
-                return("DOWN")
-            else:
+            if (x-645) < (y-645):
                 return("LEFT")
+            else:
+                return("DOWN")
         else:
             return("DOWN")
 
