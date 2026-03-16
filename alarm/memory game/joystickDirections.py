@@ -4,43 +4,44 @@
 # if == 5, returns list of non-neutral directions
 
 import time
+import grovepi
 
 def interpretCoords(x, y):
-    #left side values
-    if x < 256:
-        if y < 256:
+    #up side values
+    if x < 385:
+        if y < 385:
             if x < y:
-                return("LEFT")
-            else:
                 return("UP")
-        elif y > 768:
-            if x < (1023- y):
+            else:
+                return("RIGHT")
+        elif y > 645:
+            if x < (770- y):
+                return("UP")
+            else:
                 return("LEFT")
-            else:
-                return("DOWN")
         else:
-            return("LEFT")
+            return("UP")
 
-    #right side values
-    elif x > 768:
-        if y < 256:
-            if (1023- x) < y:
-                return("RIGHT")
-            else:
-                return ("UP")
-        elif y > 768:
-            if (1023- x) < (1023- y):
-                return("RIGHT")
-            else:
+    #down side values
+    elif x > 645:
+        if y < 385:
+            if (770- x) < y:
                 return("DOWN")
+            else:
+                return ("RIGHT")
+        elif y > 645:
+            if (770- x) < (770- y):
+                return("DOWN")
+            else:
+                return("LEFT")
         else:
-            return("RIGHT")
+            return("DOWN")
 
-    #main section for up and down
-    elif y < 256:
-        return("UP")
-    elif y > 768:
-        return("DOWN")
+    #main section for left and right
+    elif y < 385:
+        return("RIGHT")
+    elif y > 645:
+        return("LEFT")
 
     else:
         return("NEUTRAL")
@@ -56,6 +57,7 @@ def readDirections(xpin, ypin):
             direction = interpretCoords(x, y)
 
             if direction != user_inputs[len(user_inputs)-1]:
+                print(direction)
                 user_inputs.append(direction)
             
             direction_values = [item for item in user_inputs if item != "NEUTRAL"]

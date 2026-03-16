@@ -1,5 +1,6 @@
 import random as rand
 from joystickDirections import *
+import grovepi
 
 def simonSays(xpin, ypin):
     #generates the pattern
