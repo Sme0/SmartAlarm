@@ -3,6 +3,7 @@ This module contains all the forms that will be referenced throughout
 the .html files.
 """
 from flask_wtf import FlaskForm
+from wtforms.fields import SelectField
 from wtforms.fields.simple import EmailField, PasswordField, BooleanField, SubmitField, StringField
 from wtforms.validators import DataRequired, Email, Length
 
@@ -116,3 +117,21 @@ class PairDeviceForm(FlaskForm):
         Length(min=6, max=6)
     ])
     submit = SubmitField('Confirm Pairing Code')
+
+class AlarmForm(FlaskForm):
+    """
+    Form for creating or editing alarms.
+    """
+    device = SelectField('Device', choices=[])
+    time = StringField('Alarm Time', validators=[DataRequired()])
+    day_of_week = SelectField('Day of Week', choices=[
+        ('0', 'Monday'),
+        ('1', 'Tuesday'),
+        ('2', 'Wednesday'),
+        ('3', 'Thursday'),
+        ('4', 'Friday'),
+        ('5', 'Saturday'),
+        ('6', 'Sunday')
+    ], validators=[DataRequired()])
+    puzzle_type = SelectField('Puzzle Type', choices=[('maths', 'Maths'), ('memory', 'Memory'), ('random', 'Random')], validators=[DataRequired()])
+    submit = SubmitField('Save Alarm')

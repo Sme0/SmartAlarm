@@ -5,10 +5,11 @@ from datetime import datetime, timezone
 
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
-from app import app
+from app import app, database as db
 from app.models import User, Device, Alarm
-from app.forms import LoginForm, RegistrationForm, PairDeviceForm
+from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm
 from werkzeug.exceptions import InternalServerError
+
 
 
 @app.route("/status")
@@ -35,7 +36,7 @@ def index():
 
     # If the user is authenticated, show the main alarm dashboard
     if current_user.is_authenticated:
-        return render_template("alarm.html", user=current_user)
+        return redirect(url_for("alarms"))
     
     # Create instances of both forms
     login_form = LoginForm()
@@ -144,6 +145,242 @@ def pair_device():
     # TODO: html file
     return render_template('pair_device.html', form=pairing_form)
 
+
+@app.route("/alarms", methods=["GET", "POST"])
+@login_required
+def alarms():
+    form = AlarmForm()
+    # Populate device choices from current user's devices (for add form)
+    device_choices = []
+    for d in current_user.devices:
+        label = d.name if d.name else d.serial_number
+        device_choices.append((d.serial_number, label))
+    form.device.choices = device_choices
+
+    # Determine which device's alarms to view. Use GET param 'view_device'.
+    view_device_serial = request.args.get('view_device', 'all')
+
+    # Prepare days mapping
+    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    alarms_by_day = {day: [] for day in days}
+
+    if view_device_serial == 'all' or not current_user.devices:
+        # Merge alarms from all devices
+        for device in current_user.devices:
+            device_alarms_by_day = device.get_alarms_by_day()
+            for day in days:
+                alarms_by_day[day].extend(device_alarms_by_day.get(day, []))
+    else:
+        # Find the requested device belonging to the current user
+        device = Device.query.filter_by(serial_number=view_device_serial, user_id=current_user.id).first()
+        if device:
+            alarms_by_day = device.get_alarms_by_day()
+        else:
+            # If device not found or not belonging to user, default to empty mapping
+            alarms_by_day = {day: [] for day in days}
+
+    # If viewing a single device, pre-select it in the add-alarm form
+    if view_device_serial != 'all' and any(d.serial_number == view_device_serial for d in current_user.devices):
+        form.device.data = view_device_serial
+
+    if form.validate_on_submit():
+        # Determine which device was selected in the form
+        selected_serial = form.device.data if hasattr(form, 'device') else None
+        device = None
+        if selected_serial:
+            device = Device.query.filter_by(serial_number=selected_serial, user_id=current_user.id).first()
+        # Fallback to first paired device if none selected
+        if device is None:
+            device = current_user.devices[0] if current_user.devices else None
+
+        if device:
+            Alarm.create(
+                device_serial=device.serial_number,
+                user_id=current_user.id,
+                time=datetime.strptime(form.time.data, "%H:%M").time(),
+                enabled=True,
+                day_of_week=int(form.day_of_week.data),
+                puzzle_type=form.puzzle_type.data
+            )
+            flash("Alarm added!", "success")
+            # After creating the alarm, stay on the same view (selected device or previously viewed device)
+            redirect_view = selected_serial if selected_serial else view_device_serial
+            if redirect_view == 'all':
+                return redirect(url_for("alarms"))
+            else:
+                return redirect(url_for("alarms", view_device=redirect_view))
+        else:
+            flash("No paired device found.", "danger")
+
+    return render_template("alarm.html", form=form, alarms_by_day=alarms_by_day)
+
+
+@app.route('/alarms/delete', methods=['POST'])
+@login_required
+def delete_alarm():
+    """Delete an alarm by id. Only the owner (user) may delete their alarm."""
+    alarm_id = request.form.get('alarm_id')
+    view_device = request.form.get('view_device', 'all')
+    if not alarm_id:
+        flash('Missing alarm id.', 'danger')
+        return redirect(url_for('alarms', view_device=view_device) if view_device and view_device != 'all' else url_for('alarms'))
+
+    try:
+        alarm = Alarm.query.get(int(alarm_id))
+    except Exception:
+        alarm = None
+
+    if alarm is None:
+        flash('Alarm not found.', 'danger')
+        return redirect(url_for('alarms', view_device=view_device) if view_device and view_device != 'all' else url_for('alarms'))
+
+    # Ensure the current user owns the alarm
+    if alarm.user_id != current_user.id:
+        flash('You do not have permission to delete this alarm.', 'danger')
+        return redirect(url_for('alarms', view_device=view_device) if view_device and view_device != 'all' else url_for('alarms'))
+
+    # Perform deletion
+    try:
+        db.session.delete(alarm)
+        db.session.commit()
+        flash('Alarm deleted.', 'success')
+    except Exception:
+        db.session.rollback()
+        flash('Failed to delete alarm.', 'danger')
+
+    if view_device and view_device != 'all':
+        return redirect(url_for('alarms', view_device=view_device))
+    return redirect(url_for('alarms'))
+
+
+@app.route('/api/alarms', methods=['GET'])
+@login_required
+def api_get_alarms():
+    """Return alarms grouped by day for AJAX requests. Use query param view_device=<serial>|all"""
+    view_device = request.args.get('view_device', 'all')
+    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    result = {d: [] for d in days}
+
+    if view_device == 'all' or not current_user.devices:
+        for device in current_user.devices:
+            for day, alarms in device.get_alarms_by_day().items():
+                for alarm in alarms:
+                    result[day].append({
+                        'id': alarm.id,
+                        'time': alarm.time.strftime('%H:%M'),
+                        'puzzle_type': getattr(alarm, 'puzzle_type', 'random'),
+                        'device_serial': alarm.device_serial,
+                        'device_name': alarm.device.name if alarm.device and alarm.device.name else None
+                    })
+    else:
+        device = Device.query.filter_by(serial_number=view_device, user_id=current_user.id).first()
+        if device:
+            for day, alarms in device.get_alarms_by_day().items():
+                for alarm in alarms:
+                    result[day].append({
+                        'id': alarm.id,
+                        'time': alarm.time.strftime('%H:%M'),
+                        'puzzle_type': getattr(alarm, 'puzzle_type', 'random'),
+                        'device_serial': alarm.device_serial,
+                        'device_name': device.name if device.name else None
+                    })
+
+    return jsonify({'alarms_by_day': result})
+
+
+@app.route('/api/alarms/create', methods=['POST'])
+@login_required
+def api_create_alarm():
+    """Create an alarm via AJAX. Expects JSON: device_serial, time (HH:MM), day_of_week, puzzle_type."""
+    data = request.get_json()
+    if not data:
+        return jsonify({'response': 'failed', 'message': 'invalid request'}), 400
+
+    device_serial = data.get('device_serial')
+    time_str = data.get('time')
+    day_of_week = data.get('day_of_week')
+    puzzle_type = data.get('puzzle_type', 'random')
+
+    # Resolve device
+    device = None
+    if device_serial:
+        device = Device.query.filter_by(serial_number=device_serial, user_id=current_user.id).first()
+    if device is None:
+        device = current_user.devices[0] if current_user.devices else None
+    if device is None:
+        return jsonify({'response': 'failed', 'message': 'no paired device'}), 400
+
+    # Parse time
+    try:
+        alarm_time = datetime.strptime(time_str, '%H:%M').time()
+    except Exception:
+        return jsonify({'response': 'failed', 'message': 'invalid time format'}), 400
+
+    try:
+        day_idx = int(day_of_week)
+        if not (0 <= day_idx <= 6):
+            raise ValueError
+    except Exception:
+        day_idx = 0
+
+    # Create new alarm
+    try:
+        alarm = Alarm()
+        alarm.device_serial = device.serial_number
+        alarm.user_id = current_user.id
+        alarm.time = alarm_time
+        alarm.day_of_week = day_idx
+        alarm.enabled = True
+        alarm.created_at = datetime.utcnow()
+        alarm.puzzle_type = puzzle_type
+
+        db.session.add(alarm)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'response': 'failed', 'message': 'db error'}), 500
+
+    return jsonify({
+        'response': 'ok',
+        'alarm': {
+            'id': alarm.id,
+            'time': alarm.time.strftime('%H:%M'),
+            'puzzle_type': alarm.puzzle_type,
+            'device_serial': alarm.device_serial,
+            'device_name': device.name if device.name else None,
+            'day_of_week': alarm.day_of_week
+        }
+    })
+
+
+@app.route('/api/alarms/delete', methods=['POST'])
+@login_required
+def api_delete_alarm():
+    """Delete alarm via AJAX. Expects JSON: alarm_id"""
+    data = request.get_json()
+    if not data or 'alarm_id' not in data:
+        return jsonify({'response': 'failed', 'message': 'missing alarm_id'}), 400
+
+    try:
+        alarm_id = int(data.get('alarm_id'))
+    except Exception:
+        return jsonify({'response': 'failed', 'message': 'invalid alarm_id'}), 400
+
+    alarm = Alarm.query.get(alarm_id)
+    if alarm is None:
+        return jsonify({'response': 'failed', 'message': 'not found'}), 404
+
+    if alarm.user_id != current_user.id:
+        return jsonify({'response': 'failed', 'message': 'forbidden'}), 403
+
+    try:
+        db.session.delete(alarm)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'response': 'failed', 'message': 'db error'}), 500
+
+    return jsonify({'response': 'ok'})
 
 
 
@@ -300,7 +537,9 @@ def get_alarms():
             {
                 "id": alarm.id,
                 "time": alarm.time.strftime("%H:%M"),
-                "enabled": alarm.enabled
+                "enabled": alarm.enabled,
+                "day_of_week": getattr(alarm, 'day_of_week', 0),
+                "puzzle_type": getattr(alarm, 'puzzle_type', 'random')
             }
             for alarm in alarms
         ]
@@ -339,3 +578,26 @@ def pair_device_debug(code=None):
     else:
         print("No code provided.")
         return "No code provided."
+
+
+@app.route("/dev/sample-data")
+def dev_sample_data():
+    """
+    Development utility: create a sample user, log them in, create a device, and generate sample alarms.
+    """
+    from app import database as db
+    from flask_login import login_user
+    # Create or get sample user
+    email = "sampleuser@example.com"
+    user = User.query.filter_by(email_address=email).first()
+    if not user:
+        user = User.register(email, "samplepass", "Sample User")
+    # Log in the user
+    login_user(user)
+    # Create or get a device
+    device = Device.query.filter_by(user_id=user.id).first()
+    if not device:
+        device = Device.register(serial_number="SAMPLE123", name="Jeff's Alarm", user=user)
+        device = Device.register(serial_number="SAMPLE456", name="Bob's Alarm", user=user)
+    flash("Sample user, device, and alarms created. You are now logged in as the sample user.", "success")
+    return redirect(url_for("alarms"))

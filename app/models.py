@@ -126,6 +126,23 @@ class Device(db.Model):
 
     def get_alarms(self) -> list['Alarm']:
         return Alarm.query.filter_by(device_serial=self.serial_number, user_id=self.user_id).all()
+    
+    def get_alarms_by_day(self):
+        """
+        Returns a dictionary mapping day names to lists of alarms for this device, grouped by day_of_week (0=Monday, 6=Sunday).
+        """
+        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        alarms_by_day = {day: [] for day in days}
+        alarms = self.get_alarms()
+        for alarm_obj in alarms:
+            day_idx = getattr(alarm_obj, 'day_of_week', 0)
+            try:
+                day_idx = int(day_idx)
+                if 0 <= day_idx <= 6:
+                    alarms_by_day[days[day_idx]].append(alarm_obj)
+            except Exception:
+                alarms_by_day[days[0]].append(alarm_obj)
+        return alarms_by_day
 
 
 class Alarm(db.Model):
@@ -134,8 +151,24 @@ class Alarm(db.Model):
     device_serial = db.Column(db.String(64), db.ForeignKey('devices.serial_number'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     time = db.Column(db.Time, nullable=False)
+    day_of_week = db.Column(db.Integer, nullable=False, default=0)  # 0=Monday, 6=Sunday
     enabled = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.utcnow())
+    puzzle_type = db.Column(db.String(16), nullable=False, default='random')
 
     device = db.relationship('Device', backref=db.backref('alarms', lazy='select'))
     user = db.relationship('User', backref=db.backref('alarms', lazy='select'))
+
+    @staticmethod
+    def create(device_serial: str, user_id: str, time: time, day_of_week: int, enabled: bool, puzzle_type: str):
+        alarm = Alarm()
+        alarm.device_serial = device_serial
+        alarm.user_id = user_id
+        alarm.time = time
+        alarm.day_of_week = day_of_week
+        alarm.enabled = enabled
+        alarm.created_at = datetime.utcnow()
+        alarm.puzzle_type = puzzle_type
+
+        db.session.add(alarm)
+        db.session.commit()

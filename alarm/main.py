@@ -14,8 +14,6 @@ SERIAL_NUMBER = "12345"
 flask_api_client = FlaskAPIClient(serial_number=SERIAL_NUMBER)
 input_handler = InputHandler()
 alarm_controller = AlarmController(input_handler)
-alarm_controller.alarms.append("10:22:00")
-alarm_controller.alarms.append("10:23:00")
 
 # Initial pairing loop
 # Comment out if still testing base alarm features without web
