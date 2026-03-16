@@ -13,12 +13,12 @@ def interpretCoords(x, y):
             if x < y:
                 return("UP")
             else:
-                return("RIGHT")
+                return("LEFT")
         elif y > 645:
             if (x-255) < (y-645):
                 return("UP")
             else:
-                return("LEFT")
+                return("RIGHT")
         else:
             return("UP")
 
@@ -28,10 +28,10 @@ def interpretCoords(x, y):
             if (x-645) < (y-255):
                 return("DOWN")
             else:
-                return ("RIGHT")
+                return ("LEFT")
         elif y > 645:
             if (x-645) < (y-645):
-                return("LEFT")
+                return("RIGHT")
             else:
                 return("DOWN")
         else:
@@ -39,9 +39,9 @@ def interpretCoords(x, y):
 
     #main section for left and right
     elif y < 385:
-        return("RIGHT")
-    elif y > 645:
         return("LEFT")
+    elif y > 645:
+        return("RIGHT")
 
     else:
         return("NEUTRAL")
@@ -49,7 +49,7 @@ def interpretCoords(x, y):
 def readDirections(xpin, ypin):
     user_inputs = ["NEUTRAL"]
     direction_values = []
-    while len(direction_values) < 5:
+    while True: #len(direction_values) < 5:
         try:
             x = grovepi.analogRead(xpin)
             y = grovepi.analogRead(ypin)
