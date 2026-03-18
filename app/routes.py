@@ -8,6 +8,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from app import app, database as db, login_manager
 from app.models import User, Device, Alarm
 from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm
+from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm, DeviceSettingsForm
 from werkzeug.exceptions import InternalServerError
 
 # Return JSON 401 for API/AJAX requests, otherwise redirect to the login page.
@@ -653,3 +654,45 @@ def dev_sample_data():
         device = Device.register(serial_number="SAMPLE456", name="Bob's Alarm", user=user)
     flash("Sample user, device, and alarms created. You are now logged in as the sample user.", "success")
     return redirect(url_for("alarms"))
+
+
+@app.route('/device/<serial>/settings', methods=['GET', 'POST'])
+@login_required
+def device_settings(serial):
+    # Lookup device and ensure it belongs to current_user
+    device = Device.query.filter_by(serial_number=serial, user_id=current_user.id).first()
+    if not device:
+        flash('Device not found or not owned by you.', 'danger')
+        return redirect(url_for('account'))
+
+    form = DeviceSettingsForm()
+    if form.validate_on_submit():
+        # Unpair takes precedence
+        if form.unpair.data:
+            try:
+                device.user_id = None
+                db.session.commit()
+                flash('Device unpaired successfully.', 'success')
+                return redirect(url_for('account'))
+            except Exception:
+                db.session.rollback()
+                flash('Failed to unpair device.', 'danger')
+                return redirect(url_for('device_settings', serial=serial))
+
+        # Save name
+        if form.save.data:
+            try:
+                device.name = form.name.data.strip() if form.name.data else None
+                db.session.commit()
+                flash('Device updated.', 'success')
+                return redirect(url_for('account'))
+            except Exception:
+                db.session.rollback()
+                flash('Failed to update device.', 'danger')
+
+    # Pre-fill the form on GET
+    if request.method == 'GET':
+        form.name.data = device.name
+
+    return render_template('device_settings.html', device=device, form=form)
+

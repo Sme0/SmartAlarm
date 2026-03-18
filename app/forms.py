@@ -142,3 +142,13 @@ class AlarmForm(FlaskForm):
     ], validators=[DataRequired()])
     puzzle_type = SelectField('Puzzle Type', choices=[('maths', 'Maths'), ('memory', 'Memory'), ('random', 'Random')], validators=[DataRequired()])
     submit = SubmitField('Save Alarm')
+
+
+class DeviceSettingsForm(FlaskForm):
+    """
+    Form to edit a device's display name or unpair it from the account.
+    """
+    name = StringField('Device name', validators=[Length(min=0, max=64)])
+    save = SubmitField('Save')
+    unpair = SubmitField('Unpair')
+
