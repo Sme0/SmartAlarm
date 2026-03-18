@@ -13,7 +13,7 @@ class PairingStatus(Enum):
 class FlaskAPIClient:
 
     def __init__(self, serial_number):
-        self.base_url = "http://127.0.0.1:5001"
+        self.base_url = "http://127.0.0.1:5000"
         self.serial_number = serial_number
 
     def get_pairing_status(self) -> PairingStatus:

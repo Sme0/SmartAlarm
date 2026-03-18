@@ -7,7 +7,6 @@ from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from app import app, database as db, login_manager
 from app.models import User, Device, Alarm
-from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm
 from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm, DeviceSettingsForm
 from werkzeug.exceptions import InternalServerError
 
@@ -70,9 +69,9 @@ def index():
     # If the login form was submitted and passed validation
     if login_form.validate_on_submit() and login_form.submit.data:
 
-        # Look up the user by email
-        user = User.query.filter_by(
-            email_address=login_form.email_address.data).first()
+        # Look up the user by email (normalize to match storage behaviour)
+        email_normalized = (login_form.email_address.data or '').strip().lower()
+        user = User.query.filter_by(email_address=email_normalized).first()
         
         # Verify the password matches the stored hash
         if user and user.verify_password(login_form.password.data):

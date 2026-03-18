@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from InputHandler import InputHandler, InputOption
+from alarm.alarmClockDisplay import Display
 from alarmState import AlarmState
 
 
@@ -18,6 +19,7 @@ class AlarmController:
 
         # Initialise input handler from parameters
         self.input_handler = input_handler
+        self.display = Display()
 
         # Current time in 24-hour format
         self.current_time = 0
@@ -50,6 +52,7 @@ class AlarmController:
         if self.state == AlarmState.WAITING and current_minute != self.last_displayed_minute:
             self.last_displayed_minute = current_minute
             print(f"Current Time: {datetime.utcnow().strftime('%H:%M')}")
+            self.display.set_text(datetime.utcnow().strftime('%H:%M'))
 
 
 
