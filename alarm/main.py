@@ -17,26 +17,29 @@ alarm_controller = AlarmController(input_handler)
 
 # Initial pairing loop
 # Comment out if still testing base alarm features without web
-print(f"Pairing code: {flask_api_client.request_pairing_code()}")
-while True:
-    status = flask_api_client.get_pairing_status()
 
-    if status == PairingStatus.PAIRED:
-        print("Successfully paired")
-        break
+if not flask_api_client.get_pairing_status() == PairingStatus.PAIRED:
+    #TODO: replace with device screen output
+    print(f"Pairing code: {flask_api_client.request_pairing_code()}")
+    while True:
+        status = flask_api_client.get_pairing_status()
 
-    if status == PairingStatus.INVALID:
-        print("Invalid code")
-        continue
+        if status == PairingStatus.PAIRED:
+            print("Successfully paired")
+            break
 
-    if status == PairingStatus.FAILED:
-        pairing_code = flask_api_client.request_pairing_code()
-        #TODO: Display new pairing code
-        print(f"Pairing code: {pairing_code}")
+        if status == PairingStatus.INVALID:
+            print("Invalid code")
+            continue
 
-    if status == PairingStatus.PAIRING:
-        print("Displaying up to date code. No issues")
-    time.sleep(5)
+        if status == PairingStatus.FAILED:
+            pairing_code = flask_api_client.request_pairing_code()
+            #TODO: replace with device screen output
+            print(f"Pairing code: {pairing_code}")
+
+        if status == PairingStatus.PAIRING:
+            print("Displaying up to date code. No issues")
+        time.sleep(5)
 
 
 # Main alarm loop
