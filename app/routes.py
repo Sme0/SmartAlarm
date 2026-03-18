@@ -5,12 +5,36 @@ from datetime import datetime, timezone
 
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
-from app import app, database as db
+from app import app, database as db, login_manager
 from app.models import User, Device, Alarm
 from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm
 from werkzeug.exceptions import InternalServerError
 
+# Return JSON 401 for API/AJAX requests, otherwise redirect to the login page.
+@login_manager.unauthorized_handler
+def unauthorized_callback():
+    from flask import request, redirect, url_for, flash, jsonify
 
+    # If client expects JSON (AJAX / API), return a 401 JSON response.
+    wants_json = False
+    # Prefer explicit JSON content type or common AJAX header
+    if request.is_json:
+        wants_json = True
+    elif request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        wants_json = True
+    else:
+        # also check Accept header
+        best = request.accept_mimetypes.best
+        if best and 'json' in best:
+            wants_json = True
+
+    if wants_json:
+        return jsonify({'response': 'unauthenticated', 'message': 'authentication required'}), 401
+
+    # For regular browser requests, flash a message and redirect to the login page.
+    flash(login_manager.login_message, login_manager.login_message_category)
+    # Use `next` so the user can be returned after login
+    return redirect(url_for(login_manager.login_view, next=request.path))
 
 @app.route("/status")
 def status():
@@ -56,37 +80,19 @@ def index():
             login_user(user, remember=login_form.remember_me.data)
             flash("Logged in successfully!", "success")
 
-            # Redirect prevents form re-submission on page refresh
+            # Respect a `next` parameter so users are returned to the page they
+            # originally requested (only allow relative URLs for safety).
+            next_page = request.args.get('next') or request.form.get('next')
+            if next_page and isinstance(next_page, str) and next_page.startswith('/'):
+                return redirect(next_page)
+
+            # Default redirect prevents form re-submission on page refresh
             return redirect(url_for("index"))
         else:
             flash("Invalid email or password.", "danger")
 
 
-    # If the registration form was submitted and passed validation
-    if register_form.validate_on_submit() and register_form.submit.data:
-
-        # Check if the email already exists
-        if User.query.filter_by(email_address=register_form.email_address.data).first():
-            flash("Email already registered.", "danger")
-        
-        # Ensure the two password fields match
-        elif register_form.password.data != register_form.repeated_password.data:
-            flash("Passwords do not match.", "danger")
-        else:
-            try:
-
-                # Create a new user using the model helper function
-                User.register(
-                    email_address=register_form.email_address.data,
-                    password=register_form.password.data
-                )
-                flash("Registration successful! Please log in.", "success")
-                return redirect(url_for("index"))
-            except Exception as e:
-
-                # Catch unexpected database or server errors
-                flash("An error occurred during registration. Please try again.", "danger")
-        
+    # (Registration is handled by a separate /register route.)
     # Render the login/register page if user is not authenticated
     return render_template(
         "home.html",
@@ -105,11 +111,58 @@ def account():
     If a user is not logged in, Flask-Login will redirect them to the login page.
     """
     try:
-        return render_template("accounts.html", user=current_user)
+        return render_template("account.html", user=current_user)
     except Exception as e:
 
         # Raise a 500 server error if something unexpected occurs
         raise InternalServerError("An error occurred while loading the account page.")
+
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """
+    Dedicated registration route. Accepts GET (render form) and POST (process registration).
+    Returns JSON for AJAX requests and full page redirect/flash for normal requests.
+    """
+    if current_user.is_authenticated:
+        return redirect(url_for('alarms'))
+
+    form = RegistrationForm()
+    if form.validate_on_submit() and form.submit.data:
+        # Basic server-side checks (form validators already cover many cases)
+        existing = User.query.filter_by(email_address=(form.email_address.data or '').strip().lower()).first()
+        if existing:
+            flash('Email already registered.', 'danger')
+            return render_template('home.html', login_form=LoginForm(), register_form=form)
+
+        if form.password.data != form.repeated_password.data:
+            flash('Passwords do not match.', 'danger')
+            return render_template('home.html', login_form=LoginForm(), register_form=form)
+
+        try:
+            user = User.register(
+                email_address=form.email_address.data,
+                password=form.password.data,
+                preferred_name=form.preferred_name.data if hasattr(form, 'preferred_name') else None
+            )
+
+            # Auto-login the new user and redirect to alarms or `next` if provided
+            login_user(user)
+            next_page = request.args.get('next') or request.form.get('next')
+            if next_page and isinstance(next_page, str) and next_page.startswith('/'):
+                return redirect(next_page)
+            return redirect(url_for('alarms'))
+        except ValueError as ve:
+            # Likely duplicate email surfaced from the model layer
+            flash(str(ve) or 'Email already registered.', 'danger')
+            return render_template('home.html', login_form=LoginForm(), register_form=form)
+        except Exception:
+            flash('An error occurred during registration. Please try again.', 'danger')
+            return render_template('home.html', login_form=LoginForm(), register_form=form)
+
+    # GET or validation errors
+    return render_template('home.html', login_form=LoginForm(), register_form=form)
 
 @app.route("/logout")
 @login_required
@@ -127,23 +180,22 @@ def pair_device():
     """
     pairing_form = PairDeviceForm()
 
+    # If the form was submitted, validate and either pair the device or
+    # re-render the form with errors so the user can see field-level messages.
     if pairing_form.validate_on_submit() and pairing_form.pairing_code.data:
         code = pairing_form.pairing_code.data.strip().upper()
         device = Device.query.filter_by(pairing_code=code).first()
 
-        if (device is None
-                or not device.pairing_expiry
-                or (device.pairing_expiry < datetime.utcnow())
-        ):
-            flash("Invalid pairing code. Enter the code on your device.", "danger")
-            return redirect(url_for("pair_device"))
+        if device is None or not device.pairing_expiry or (device.pairing_expiry < datetime.utcnow()):
+            flash("Invalid or expired pairing code. Enter the code on your device.", "danger")
+            return render_template('pair_device.html', pairing_form=pairing_form)
 
         device.pair(current_user.id)
         flash("Device paired successfully.", "success")
         return redirect(url_for('account'))
 
-    # TODO: html file
-    return render_template('pair_device.html', form=pairing_form)
+    # GET or validation error -> render the pairing page with the form instance
+    return render_template('pair_device.html', pairing_form=pairing_form)
 
 
 @app.route("/alarms", methods=["GET", "POST"])

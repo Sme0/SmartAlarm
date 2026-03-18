@@ -6,6 +6,8 @@ from flask_wtf import FlaskForm
 from wtforms.fields import SelectField
 from wtforms.fields.simple import EmailField, PasswordField, BooleanField, SubmitField, StringField
 from wtforms.validators import DataRequired, Email, Length
+from wtforms import ValidationError
+from app.models import User
 
 
 class LoginForm(FlaskForm):
@@ -18,7 +20,7 @@ class LoginForm(FlaskForm):
     ])
     password = PasswordField('Password', validators=[
         DataRequired(),
-        Length(min=8)
+        # Don't enforce a minimum length on the login form; registration enforces length.
     ])
     remember_me = BooleanField('Remember me')
     submit = SubmitField('Submit')
@@ -45,6 +47,11 @@ class RegistrationForm(FlaskForm):
         Length(min=8)
     ])
     submit = SubmitField('Register')
+
+    def validate_email_address(self, field):
+        # Ensure email is unique (case-insensitive)
+        if User.query.filter_by(email_address=(field.data or '').strip().lower()).first():
+            raise ValidationError('Email already registered.')
 
 class DeactivateAccountForm(FlaskForm):
     """
