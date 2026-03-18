@@ -6,6 +6,7 @@ import os
 from flask import Flask
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
+from flask_wtf import CSRFProtect
 from dotenv import load_dotenv
 
 # Load environment variables from .env if present
@@ -37,6 +38,7 @@ app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "dev-key")
 # Initialisation
 login_manager = LoginManager(app)
 database = SQLAlchemy(app)
+csrf = CSRFProtect(app)
 
 # Redirects users to login view if route requires authentication
 login_manager.login_view = 'login'

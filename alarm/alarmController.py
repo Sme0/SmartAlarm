@@ -3,8 +3,18 @@ from datetime import datetime, timedelta, timezone
 from InputHandler import InputHandler, InputOption
 from alarmState import AlarmState
 
+
+def get_current_day_of_week_number():
+    """
+    Returns the current day of the week as a number (Monday=0, Sunday=6)
+    """
+    from datetime import datetime
+    return datetime.today().weekday()
+
+
 class AlarmController:
-    def __init__(self, input_handler : InputHandler):
+
+    def __init__(self, input_handler: InputHandler):
 
         # Initialise input handler from parameters
         self.input_handler = input_handler
@@ -28,10 +38,11 @@ class AlarmController:
 
     def check_alarms(self):
         current_minute = datetime.utcnow().minute
+        day_of_week = get_current_day_of_week_number()
 
         # Check each alarm and trigger if needed
         for alarm in (self.alarms + self.snooze_alarms):
-            if self.state == AlarmState.WAITING and self.current_time == alarm:
+            if self.state == AlarmState.WAITING and day_of_week == alarm["day_of_week"] and self.current_time == alarm["time"]:
                 self.trigger_alarm(alarm)
                 break
 
@@ -58,7 +69,13 @@ class AlarmController:
     def snooze_alarm(self):
         # TODO: Play game
         snooze_time = (datetime.utcnow() + timedelta(minutes=5)).strftime("%H:%M") + ":00"
-        self.snooze_alarms.append(snooze_time)
+        self.snooze_alarms.append({
+            "id": self.current_triggered_alarm["id"] + "-Snooze",
+            "time": snooze_time,
+            "enabled": True,
+            "day_of_week": get_current_day_of_week_number(),
+            "puzzle_type": self.current_triggered_alarm["puzzle_type"]
+        })
         self.stop_alarm()
 
 

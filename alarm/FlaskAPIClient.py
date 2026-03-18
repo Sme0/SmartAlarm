@@ -106,9 +106,9 @@ class FlaskAPIClient:
             alarms = []
 
             for alarm in data.get('alarms'):
-                if alarm["enabled"]:
-                    alarms.append(alarm["time"])
-                    
+                if alarm["enabled"] and alarm["day_of_week"]:
+                    alarms.append(alarm)
+
             return alarms
 
         except requests.RequestException as e:
