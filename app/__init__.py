@@ -3,6 +3,8 @@ This module initialises the Flask application, initialises extensions (login man
 and registers application routes.
 """
 import os
+import tempfile
+
 from flask import Flask
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
@@ -28,7 +30,8 @@ if not is_development_mode and db_user and db_password and db_name and db_host:
     # Hostname inside Docker Compose is 'db'
     app.config['SQLALCHEMY_DATABASE_URI'] = f"mysql+pymysql://{db_user}:{db_password}@{db_host}/{db_name}"
 elif is_development_mode:
-    app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///data.sqlite3"
+    temp_dir = tempfile.gettempdir()
+    app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(temp_dir, 'data.sqlite3')}"
 else:
     raise ValueError("Production mode requires all .env fields to be completed.")
 
