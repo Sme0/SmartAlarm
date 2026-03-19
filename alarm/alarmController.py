@@ -10,7 +10,7 @@ def get_current_day_of_week_number():
     Returns the current day of the week as a number (Monday=0, Sunday=6)
     """
     from datetime import datetime
-    return datetime.today().weekday()
+    return datetime.today().weekday() + 1
 
 
 class AlarmController:
