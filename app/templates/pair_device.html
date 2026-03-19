@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Pair Device - SmartAlarm{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto mt-8 px-6">
+    <h1 class="text-2xl font-bold mb-4">Pair a new device</h1>
+
+    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+        <p class="text-sm text-gray-600 mb-4">Enter the 6-character pairing code shown on your physical SmartAlarm device.</p>
+        <form method="POST" action="{{ url_for('pair_device') }}">
+            {{ pairing_form.hidden_tag() }}
+            <div class="flex gap-3 items-center">
+                {{ pairing_form.pairing_code(class_='border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500') }}
+                {{ pairing_form.submit(class_='bg-indigo-600 text-white px-4 py-2 rounded-md') }}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+

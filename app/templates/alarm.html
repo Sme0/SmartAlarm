@@ -1,28 +1,8 @@
-﻿<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="csrf-token" content="{{ (csrf_token() if csrf_token is defined else '') }}">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alarm</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50 text-gray-800 font-sans">
-    <nav class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-        <div class="text-xl font-bold text-indigo-600">SmartAlarm</div>
-        <div class="relative">
-            <button id="profile-btn" class="relative focus:outline-none transition-transform hover:scale-105">
-                <div class="h-9 w-9 bg-indigo-100 rounded-full border border-indigo-200 flex items-center justify-center text-indigo-700 font-bold text-sm">U</div>
-                <span class="absolute bottom-0 right-0 h-3 w-3 bg-green-500 border-2 border-white rounded-full"></span>
-            </button>
-            <div id="profile-menu" class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg py-1">
-                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100">Manage Account</a>
-                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100">Contact Us</a>
-                <a href="#" class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50">Log out</a>
-            </div>
-        </div>
-    </nav>
+﻿{% extends "base.html" %}
 
+{% block title %}Alarm{% endblock %}
+
+{% block content %}
     <main class="max-w-5xl mx-auto mt-8 px-6">
         <header class="text-center mb-8">
             <h1 class="text-3xl font-bold text-gray-900">Manage Your Alarms</h1>
@@ -87,6 +67,9 @@
         </section>
     </main>
 
+{% endblock %}
+
+{% block scripts %}
     <script>
         // Helper: build alarm column HTML
         function renderAlarmsGrid(alarmsByDay) {
@@ -143,15 +126,26 @@
                             if (!confirm('Delete this alarm?')) return;
                             fetch('{{ url_for("api_delete_alarm") }}', {
                                 method: 'POST',
-                                headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content},
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                                },
                                 body: JSON.stringify({alarm_id: alarm.id})
-                            }).then(r => r.json()).then(data => {
+                            }).then(r => {
+                                if (r.status === 401) {
+                                    // session expired or unauthenticated -> redirect to login with next
+                                    window.location = '{{ url_for("index") }}?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+                                    throw new Error('unauthenticated');
+                                }
+                                return r.json();
+                            }).then(data => {
                                 if (data.response === 'ok') {
                                     loadAlarms();
                                 } else {
                                     alert('Failed to delete alarm: ' + (data.message || 'unknown'));
                                 }
-                            }).catch(() => alert('Network error'));
+                            }).catch(err => { if (err.message !== 'unauthenticated') alert('Network error'); });
                         });
 
                         right.appendChild(delBtn);
@@ -170,11 +164,20 @@
         // Load alarms for current view
         function loadAlarms() {
             const params = new URLSearchParams(window.location.search);
-            fetch('{{ url_for("api_get_alarms") }}' + '?' + params.toString()).then(r => r.json()).then(data => {
-                if (data.alarms_by_day) {
-                    renderAlarmsGrid(data.alarms_by_day);
-                }
-            }).catch(() => console.error('Failed to load alarms'));
+            const url = '{{ url_for("api_get_alarms") }}' + '?' + params.toString();
+            fetch(url, { headers: { 'Accept': 'application/json' } })
+                .then(r => {
+                    if (r.status === 401) {
+                        window.location = '{{ url_for("index") }}?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+                        throw new Error('unauthenticated');
+                    }
+                    return r.json();
+                })
+                .then(data => {
+                    if (data.alarms_by_day) {
+                        renderAlarmsGrid(data.alarms_by_day);
+                    }
+                }).catch(err => { if (err.message !== 'unauthenticated') console.error('Failed to load alarms', err); });
         }
 
         // Hook up view selector to fetch alarms via GET (no full reload)
@@ -203,9 +206,19 @@
             };
             fetch('{{ url_for("api_create_alarm") }}', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content},
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                },
                 body: JSON.stringify(payload)
-            }).then(r => r.json()).then(data => {
+            }).then(r => {
+                if (r.status === 401) {
+                    window.location = '{{ url_for("index") }}?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+                    throw new Error('unauthenticated');
+                }
+                return r.json();
+            }).then(data => {
                 if (data.response === 'ok') {
                     // reload alarms for current view
                     loadAlarms();
@@ -214,11 +227,10 @@
                 } else {
                     alert('Failed to create alarm: ' + (data.message || 'unknown'));
                 }
-            }).catch(() => alert('Network error'));
+            }).catch(err => { if (err.message !== 'unauthenticated') alert('Network error'); });
         });
 
         // Initial load
         loadAlarms();
     </script>
-</body>
-</html>
+{% endblock %}

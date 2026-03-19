@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="csrf-token" content="{{ (csrf_token() if csrf_token is defined else '') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SmartAlarm{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+        /* High-fidelity active state with Indigo brand color */
+        .nav-btn.active { background-color: #4F46E5; color: white; border-color: #4F46E5; }
+        .nav-btn.active:hover { background-color: #4338CA; }
+    </style>
+    {% block head_extra %}{% endblock %}
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans">
+
+    <nav class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center relative z-20">
+        <div class="text-xl font-bold text-indigo-600 tracking-tight">SmartAlarm</div>
+
+        <div class="relative">
+            <button id="profile-btn" type="button" aria-haspopup="true" aria-expanded="false" class="relative focus:outline-none transition-transform hover:scale-105">
+                <span class="h-9 w-9 inline-flex bg-indigo-100 rounded-full border border-indigo-200 items-center justify-center text-indigo-700 font-bold text-sm">U</span>
+                <span class="absolute bottom-0 right-0 h-3 w-3 bg-green-500 border-2 border-white rounded-full"></span>
+            </button>
+
+            <div id="profile-menu" role="menu" aria-hidden="true" class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg py-1">
+                <a href="{{ url_for('account') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100">Manage Account</a>
+                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100">Contact Us</a>
+                <a href="{{ url_for('logout') }}" class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50">Log out</a>
+            </div>
+        </div>
+    </nav>
+
+    {# Flash messages (show site-wide) #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="max-w-5xl mx-auto mt-4 px-6">
+                {% for category, message in messages %}
+                    {% set bg = 'bg-gray-50 text-gray-800' %}
+                    {% if category == 'success' %}
+                        {% set bg = 'bg-green-50 text-green-800' %}
+                    {% elif category == 'danger' or category == 'error' %}
+                        {% set bg = 'bg-red-50 text-red-800' %}
+                    {% elif category == 'warning' %}
+                        {% set bg = 'bg-yellow-50 text-yellow-800' %}
+                    {% endif %}
+                    <div class="mb-3 p-3 rounded {{ bg }} border border-gray-100">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <script>
+        // Shared dropdown behavior for the header profile button
+        document.addEventListener('DOMContentLoaded', function () {
+            const btn = document.getElementById('profile-btn');
+            const menu = document.getElementById('profile-menu');
+            if (!btn) return;
+
+            function openMenu() {
+                if (!menu) return;
+                menu.classList.remove('hidden');
+                menu.setAttribute('aria-hidden', 'false');
+                btn.setAttribute('aria-expanded', 'true');
+            }
+
+            function closeMenu() {
+                if (!menu) return;
+                menu.classList.add('hidden');
+                menu.setAttribute('aria-hidden', 'true');
+                btn.setAttribute('aria-expanded', 'false');
+            }
+
+            btn.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+                if (!menu) return;
+                if (menu.classList.contains('hidden')) openMenu(); else closeMenu();
+            });
+
+            // Prevent clicks inside menu from bubbling to document
+            if (menu) {
+                menu.addEventListener('click', function (ev) {
+                    ev.stopPropagation();
+                });
+            }
+
+            // Close when clicking outside or pressing Escape
+            document.addEventListener('click', function () { closeMenu(); });
+            document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') closeMenu(); });
+        });
+    </script>
+
+    <script>
+        // Global helper used by client-side code to handle API fetches
+        // Usage: apiFetch(url, options).then(data => { ... }).catch(err => ...)
+        window.apiFetch = function (url, options = {}) {
+            options = options || {};
+            options.headers = options.headers || {};
+            // Ensure client prefers JSON when talking to API endpoints
+            if (!options.headers['Accept']) options.headers['Accept'] = 'application/json';
+
+            return fetch(url, options).then(r => {
+                if (r.status === 401) {
+                    // Not authenticated: redirect to login and include next so user returns
+                    window.location = '{{ url_for("index") }}?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+                    throw new Error('unauthenticated');
+                }
+                // If response has no content (204) resolve with null
+                if (r.status === 204) return null;
+                // Try to parse JSON if content-type is json
+                const ct = r.headers.get('content-type') || '';
+                if (ct.indexOf('application/json') !== -1) return r.json();
+                // Fallback to text
+                return r.text();
+            });
+        };
+    </script>
+
+    {% block content %}{% endblock %}
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
+

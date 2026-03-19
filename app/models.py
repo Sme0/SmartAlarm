@@ -9,6 +9,7 @@ from typing import Optional
 
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy.exc import IntegrityError
 from app import database as db
 from app import login_manager as lm
 
@@ -43,17 +44,26 @@ class User(UserMixin, db.Model):
         :return: The newly created (and stored) User object
         """
 
+        # Normalize inputs
+        email_address = (email_address or '').strip().lower()
+        if not preferred_name:
+            preferred_name = email_address.split('@')[0] if '@' in email_address else email_address
+
         # Fill out attributes
         user = User()
         user.email_address = email_address
         user.set_password(password)
         user.preferred_name = preferred_name
 
-        # Save to DB
-        db.session.add(user)
-        db.session.commit()
-
-        return user
+        # Save to DB and handle uniqueness errors cleanly
+        try:
+            db.session.add(user)
+            db.session.commit()
+            return user
+        except IntegrityError:
+            db.session.rollback()
+            # Surface a clear exception to callers so they can respond appropriately
+            raise ValueError('email already registered')
 
     @staticmethod
     @lm.user_loader

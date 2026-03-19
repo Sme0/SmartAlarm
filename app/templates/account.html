@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}SmartAlarm - Accounts{% endblock %}
+
+{% block content %}
+    <div class="max-w-5xl mx-auto mt-8 flex gap-8 px-6">
+        
+        <aside class="w-64 flex flex-col gap-1 bg-white border border-gray-200 rounded-lg overflow-hidden h-fit shadow-sm">
+            <button data-target="change-details" class="nav-btn active text-left px-5 py-3 text-sm font-medium border-b border-gray-100 transition-colors">Change account details</button>
+            <button data-target="paired-devices" class="nav-btn text-left px-5 py-3 text-sm font-medium border-b border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors">Paired devices</button>
+            <button data-target="data-permissions" class="nav-btn text-left px-5 py-3 text-sm font-medium border-b border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors">Data permissions</button>
+            <button data-target="delete-account" class="nav-btn text-left px-5 py-3 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors">Delete account</button>
+        </aside>
+
+        <main class="flex-1 bg-white border-8 border-black rounded-lg p-8 shadow-sm min-h-[500px]">
+            <section id="change-details" class="view-section active">
+                <h2 class="text-lg font-bold mb-4 text-gray-900">Account details</h2>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Display name</label>
+                    <div class="text-gray-800 font-medium">{{ current_user.preferred_name }}</div>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email address</label>
+                    <div class="text-gray-800 font-medium">{{ current_user.email_address }}</div>
+                </div>
+
+                <div class="space-x-3">
+                    <a href="#" class="inline-block bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md">Edit details</a>
+                    <a href="#" class="inline-block bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md">Change password</a>
+                </div>
+            </section>
+
+            <section id="paired-devices" class="view-section">
+                <h2 class="text-lg font-bold mb-4 text-gray-900">Paired devices</h2>
+
+                {% if current_user.devices|length == 0 %}
+                    <div class="mb-4 text-sm text-gray-500">You have no paired devices yet. <a href="{{ url_for('pair_device') }}" class="text-indigo-600">Pair a device</a> to begin.</div>
+                {% else %}
+                    <div class="space-y-4 mb-6">
+                        {% for d in current_user.devices %}
+                            <div class="border border-gray-200 rounded-lg p-5 flex items-center justify-between bg-gray-50 shadow-sm">
+                                <div>
+                                    <div class="text-base font-bold text-gray-900 mb-1">{{ d.name if d.name else d.serial_number }}</div>
+                                    <div class="text-sm text-gray-600">Serial: <span class="font-mono">{{ d.serial_number }}</span></div>
+                                    <div class="text-sm text-gray-500">Status: {% if d.is_online() %}<span class="text-green-600">Online</span>{% else %}<span class="text-gray-500">Offline</span>{% endif %}</div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <a href="{{ url_for('device_settings', serial=d.serial_number) }}" class="text-indigo-600 text-sm">Manage</a>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-6">
+                        <a href="{{ url_for('pair_device') }}" class="inline-block bg-indigo-600 text-white px-4 py-2 rounded-md">Pair a new device</a>
+                    </div>
+                {% endif %}
+            </section>
+
+            <section id="data-permissions" class="view-section">
+                <h2 class="text-lg font-bold mb-6 text-gray-900">Statistics Collection</h2>
+                <div class="space-y-4 mb-10 bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <label class="flex items-center gap-3 text-sm font-medium text-gray-700 cursor-pointer">
+                        <input type="checkbox" checked class="accent-indigo-600 w-4 h-4 cursor-pointer">
+                        Collect completion time
+                    </label>
+                    <label class="flex items-center gap-3 text-sm font-medium text-gray-700 cursor-pointer">
+                        <input type="checkbox" checked class="accent-indigo-600 w-4 h-4 cursor-pointer">
+                        Collect snooze count
+                    </label>
+                    <label class="flex items-center gap-3 text-sm font-medium text-gray-700 cursor-pointer">
+                        <input type="checkbox" checked class="accent-indigo-600 w-4 h-4 cursor-pointer">
+                        Collect brainteaser performance
+                    </label>
+                </div>
+
+                <hr class="border-gray-100 mb-8">
+
+                <h2 class="text-lg font-bold mb-6 text-gray-900">Data Portability</h2>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between max-w-md p-4 border border-gray-200 rounded-lg">
+                        <span class="text-sm font-medium text-gray-700">Request a copy of your data</span>
+                        <button class="bg-white border border-gray-300 text-gray-700 font-medium rounded-md px-4 py-1.5 text-sm hover:bg-gray-50 transition-colors shadow-sm">Send Request</button>
+                    </div>
+                    <div class="flex items-center justify-between max-w-md p-4 border border-gray-200 rounded-lg">
+                        <span class="text-sm font-medium text-gray-700">Request data deletion</span>
+                        <button class="bg-white border border-gray-300 text-gray-700 font-medium rounded-md px-4 py-1.5 text-sm hover:bg-gray-50 transition-colors shadow-sm">Send Request</button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="delete-account" class="view-section">
+                <div class="bg-red-50 border border-red-200 rounded-lg p-6 max-w-2xl">
+                    <h2 class="text-lg font-bold text-red-700 mb-2">Deactivate account</h2>
+                    <p class="text-sm text-red-600 mb-4">Deactivated accounts will be deleted automatically if not reactivated within 30 days.</p>
+                    <button class="bg-white border border-red-300 text-red-700 font-medium rounded-md px-5 py-2 text-sm hover:bg-red-50 transition-colors shadow-sm mb-8">Deactivate</button>
+                    
+                    <hr class="border-red-200 mb-8">
+                    
+                    <h2 class="text-lg font-bold text-red-700 mb-2">Delete account permanently</h2>
+                    <p class="text-sm text-red-600 mb-4">This action cannot be undone. All your alarm logic, puzzles, and historical data will be wiped.</p>
+                    <button class="bg-red-600 text-white font-medium rounded-md px-5 py-2 text-sm hover:bg-red-700 transition-colors shadow-sm">Delete Account</button>
+                </div>
+            </section>
+
+        </main>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/app.js"></script>
+{% endblock %}

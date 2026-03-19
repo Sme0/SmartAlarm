@@ -44,7 +44,10 @@ database = SQLAlchemy(app)
 csrf = CSRFProtect(app)
 
 # Redirects users to login view if route requires authentication
-login_manager.login_view = 'login'
+# Point to the index route which serves the login/registration UI
+login_manager.login_view = 'index'
+login_manager.login_message = "Please log in to access that page."
+login_manager.login_message_category = "warning"
 
 # Register application routes and database models
 # Required to avoid circular imports
