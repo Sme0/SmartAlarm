@@ -7,7 +7,7 @@ import time
 from InputHandler import InputHandler, InputOption
 from FlaskAPIClient import FlaskAPIClient, PairingStatus
 from alarmClockDisplay import Display
-from alarm.alarmController import AlarmController
+from alarmController import AlarmController
 from alarmState import AlarmState
 
 SERIAL_NUMBER = "12345"
@@ -66,7 +66,7 @@ while True:
     # Send heartbeat every 30 seconds
     # Comment out if not using webserver yet
     current_time = time.time()
-    if current_time - last_heartbeat_time >= 10.0:
+    if current_time - last_heartbeat_time >= 15:
         print("THIS HAS HAPPENED")
         flask_api_client.heartbeat()
         alarm_controller.alarms = flask_api_client.get_alarms()
