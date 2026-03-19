@@ -32,6 +32,9 @@ if not is_development_mode and db_user and db_password and db_name and db_host:
 elif is_development_mode:
     temp_dir = tempfile.gettempdir()
     app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(temp_dir, 'data.sqlite3')}"
+
+    print(temp_dir)
+    print(os.path.join(temp_dir, 'data.sqlite3'))
 else:
     raise ValueError("Production mode requires all .env fields to be completed.")
 
