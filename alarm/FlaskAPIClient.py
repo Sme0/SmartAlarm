@@ -36,15 +36,15 @@ class FlaskAPIClient:
                 return PairingStatus.INVALID
 
             raw_pairing_status = data.get("response")
-            match raw_pairing_status:
-                case "paired":
-                    return PairingStatus.PAIRED
-                case "pairing":
-                    return PairingStatus.PAIRING
-                case "failed":
-                    return PairingStatus.FAILED
-                case _:
-                    return PairingStatus.INVALID
+            if raw_pairing_status == "paired":
+                return PairingStatus.PAIRED
+            elif raw_pairing_status == "pairing":
+                return PairingStatus.PAIRING
+            elif raw_pairing_status == "failed":
+                return PairingStatus.FAILED
+            else:
+                return PairingStatus.INVALID
+
 
 
         except requests.RequestException as e:
