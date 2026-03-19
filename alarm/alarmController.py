@@ -61,7 +61,7 @@ class AlarmController:
         self.state = AlarmState.TRIGGERED
         self.current_triggered_alarm = current_alarm
 
-        # TODO: Replace with RPI UI
+        self.display.set_text(f"Alarm Triggered: {datetime.utcnow().strftime('%H:%M')}")
         print(f"Alarm Triggered: {datetime.utcnow().strftime('%H:%M')}")
 
 
