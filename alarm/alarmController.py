@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
 from InputHandler import InputHandler, InputOption
-from main import current_time
 from alarmClockDisplay import Display
 from alarmState import AlarmState
 
@@ -44,7 +43,7 @@ class AlarmController:
         day_of_week = get_current_day_of_week_number()
 
         print(day_of_week)
-        print(current_time)
+        print(self.current_time)
 
         # Check each alarm and trigger if needed
         for alarm in (self.alarms + self.snooze_alarms):
