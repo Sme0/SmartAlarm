@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
-from app import app, database as db, login_manager
+from app import app, database as db, login_manager, csrf
 from app.models import User, Device, Alarm
 from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm, DeviceSettingsForm
 from werkzeug.exceptions import InternalServerError
@@ -440,6 +440,7 @@ def api_delete_alarm():
 # API Routes
 
 @app.route("/api/device/request-pairing-code", methods=["POST"])
+@csrf.exempt
 def request_pairing_code():
     """
     API route for the device to request a code for pairing.
@@ -478,6 +479,7 @@ def request_pairing_code():
     })
 
 @app.route("/api/device/pairing-status", methods=['POST'])
+@csrf.exempt
 def pairing_status():
     """
     API route for the device to get the current status of the pairing process.
@@ -523,6 +525,7 @@ def pairing_status():
     })
 
 @app.route("/api/device/heartbeat", methods=['POST'])
+@csrf.exempt
 def heartbeat():
     """
     API route for the device to send a heartbeat update
@@ -556,6 +559,7 @@ def heartbeat():
     }), 400
 
 @app.route("/api/device/get-alarms", methods=["POST"])
+@csrf.exempt
 def get_alarms():
     """
     API route for device to retrieve the alarms for that device/user

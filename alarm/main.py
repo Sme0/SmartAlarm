@@ -68,6 +68,7 @@ while True:
     current_time = time.time()
     if current_time - last_heartbeat_time >= 30:
         flask_api_client.heartbeat()
+        alarm_controller.alarms = flask_api_client.get_alarms()
         last_heartbeat_time = current_time
 
     time.sleep(0.1)

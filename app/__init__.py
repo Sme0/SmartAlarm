@@ -10,6 +10,7 @@ from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
 from dotenv import load_dotenv
+from flask_wtf.csrf import generate_csrf
 
 # Load environment variables from .env if present
 load_dotenv()
@@ -45,6 +46,13 @@ app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "dev-key")
 login_manager = LoginManager(app)
 database = SQLAlchemy(app)
 csrf = CSRFProtect(app)
+
+# Provide a `csrf_token()` helper to templates (used for AJAX/meta tag)
+@app.context_processor
+def inject_csrf_token():
+    # `generate_csrf` returns the current CSRF token; exposing it as `csrf_token` means
+    # templates can call `csrf_token()` (e.g. in a meta tag) or use `csrf_token` in forms.
+    return dict(csrf_token=generate_csrf)
 
 # Redirects users to login view if route requires authentication
 # Point to the index route which serves the login/registration UI

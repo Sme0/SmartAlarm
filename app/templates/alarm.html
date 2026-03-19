@@ -124,26 +124,15 @@
                             delBtn.addEventListener('click', function(ev) {
                             ev.preventDefault();
                             if (!confirm('Delete this alarm?')) return;
-                            fetch('{{ url_for("api_delete_alarm") }}', {
+                            apiFetch('{{ url_for("api_delete_alarm") }}', {
                                 method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Accept': 'application/json',
-                                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
-                                },
-                                body: JSON.stringify({alarm_id: alarm.id})
-                            }).then(r => {
-                                if (r.status === 401) {
-                                    // session expired or unauthenticated -> redirect to login with next
-                                    window.location = '{{ url_for("index") }}?next=' + encodeURIComponent(window.location.pathname + window.location.search);
-                                    throw new Error('unauthenticated');
-                                }
-                                return r.json();
+                                body: { alarm_id: alarm.id }
                             }).then(data => {
-                                if (data.response === 'ok') {
+                                // apiFetch resolves to parsed JSON for application/json
+                                if (data && data.response === 'ok') {
                                     loadAlarms();
                                 } else {
-                                    alert('Failed to delete alarm: ' + (data.message || 'unknown'));
+                                    alert('Failed to delete alarm: ' + (data && data.message ? data.message : 'unknown'));
                                 }
                             }).catch(err => { if (err.message !== 'unauthenticated') alert('Network error'); });
                         });
@@ -165,16 +154,8 @@
         function loadAlarms() {
             const params = new URLSearchParams(window.location.search);
             const url = '{{ url_for("api_get_alarms") }}' + '?' + params.toString();
-            fetch(url, { headers: { 'Accept': 'application/json' } })
-                .then(r => {
-                    if (r.status === 401) {
-                        window.location = '{{ url_for("index") }}?next=' + encodeURIComponent(window.location.pathname + window.location.search);
-                        throw new Error('unauthenticated');
-                    }
-                    return r.json();
-                })
-                .then(data => {
-                    if (data.alarms_by_day) {
+            apiFetch(url).then(data => {
+                    if (data && data.alarms_by_day) {
                         renderAlarmsGrid(data.alarms_by_day);
                     }
                 }).catch(err => { if (err.message !== 'unauthenticated') console.error('Failed to load alarms', err); });
@@ -204,28 +185,17 @@
                 day_of_week: fd.get('day_of_week'),
                 puzzle_type: fd.get('puzzle_type')
             };
-            fetch('{{ url_for("api_create_alarm") }}', {
+            apiFetch('{{ url_for("api_create_alarm") }}', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
-                },
-                body: JSON.stringify(payload)
-            }).then(r => {
-                if (r.status === 401) {
-                    window.location = '{{ url_for("index") }}?next=' + encodeURIComponent(window.location.pathname + window.location.search);
-                    throw new Error('unauthenticated');
-                }
-                return r.json();
+                body: payload
             }).then(data => {
-                if (data.response === 'ok') {
+                if (data && data.response === 'ok') {
                     // reload alarms for current view
                     loadAlarms();
                     // reset time field
                     form.querySelector('input[name="time"]').value = '';
                 } else {
-                    alert('Failed to create alarm: ' + (data.message || 'unknown'));
+                    alert('Failed to create alarm: ' + (data && data.message ? data.message : 'unknown'));
                 }
             }).catch(err => { if (err.message !== 'unauthenticated') alert('Network error'); });
         });

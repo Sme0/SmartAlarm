@@ -101,8 +101,32 @@
         window.apiFetch = function (url, options = {}) {
             options = options || {};
             options.headers = options.headers || {};
+
             // Ensure client prefers JSON when talking to API endpoints
             if (!options.headers['Accept']) options.headers['Accept'] = 'application/json';
+
+            // Read CSRF token injected into the page by the server (if present)
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = csrfMeta ? (csrfMeta.getAttribute('content') || '') : '';
+
+            // If this is a modifying request, attach CSRF headers automatically for same-origin
+            const method = (options.method || 'GET').toUpperCase();
+            const unsafeMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
+            if (unsafeMethods.indexOf(method) !== -1 && csrfToken) {
+                // Many CSRF middlewares accept either header name; set both for compatibility
+                options.headers['X-CSRFToken'] = csrfToken;
+                options.headers['X-CSRF-Token'] = csrfToken;
+            }
+
+            // If JSON body is provided as an object, stringify and set content-type unless already provided
+            if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
+                if (!options.headers['Content-Type'] && !options.headers['content-type']) {
+                    options.headers['Content-Type'] = 'application/json';
+                }
+                if (options.headers['Content-Type'] && options.headers['Content-Type'].indexOf('application/json') !== -1) {
+                    options.body = JSON.stringify(options.body);
+                }
+            }
 
             return fetch(url, options).then(r => {
                 if (r.status === 401) {
