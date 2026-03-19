@@ -86,6 +86,7 @@ class FlaskAPIClient:
         Returns updated alarms from the server
         :return: List of string-formatted alarms
         """
+        print("GETTING ALARMS")
         url = f"{self.base_url}/api/device/get-alarms"
         payload = {
             "serial_number": self.serial_number
@@ -110,6 +111,7 @@ class FlaskAPIClient:
                 if alarm["enabled"] and alarm["day_of_week"]:
                     alarms.append(alarm)
 
+            print("RETURNING ALARMS")
             return alarms
 
         except requests.RequestException as e:

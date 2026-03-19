@@ -66,9 +66,11 @@ while True:
     # Send heartbeat every 30 seconds
     # Comment out if not using webserver yet
     current_time = time.time()
-    if current_time - last_heartbeat_time >= 30:
+    if current_time - last_heartbeat_time >= 30.0:
+        print("THIS HAS HAPPENED")
         flask_api_client.heartbeat()
         alarm_controller.alarms = flask_api_client.get_alarms()
+        print(alarm_controller.alarms)
         last_heartbeat_time = current_time
 
     time.sleep(0.1)
