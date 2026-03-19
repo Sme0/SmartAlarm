@@ -7,7 +7,7 @@ import time
 from InputHandler import InputHandler, InputOption
 from FlaskAPIClient import FlaskAPIClient, PairingStatus
 from alarmClockDisplay import Display
-from alarmController import AlarmController
+from alarm.alarmController import AlarmController
 from alarmState import AlarmState
 
 SERIAL_NUMBER = "12345"
