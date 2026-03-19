@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from InputHandler import InputHandler, InputOption
+from alarm.main import current_time
 from alarmClockDisplay import Display
 from alarmState import AlarmState
 
@@ -10,7 +11,7 @@ def get_current_day_of_week_number():
     Returns the current day of the week as a number (Monday=0, Sunday=6)
     """
     from datetime import datetime
-    return datetime.today().weekday() + 1
+    return datetime.today().weekday()
 
 
 class AlarmController:
@@ -41,6 +42,9 @@ class AlarmController:
     def check_alarms(self):
         current_minute = datetime.utcnow().minute
         day_of_week = get_current_day_of_week_number()
+
+        print(day_of_week)
+        print(current_time)
 
         # Check each alarm and trigger if needed
         for alarm in (self.alarms + self.snooze_alarms):
