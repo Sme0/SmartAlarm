@@ -5,8 +5,8 @@ and delegating tasks to other modules.
 import time
 
 from InputHandler import InputHandler, InputOption
-from alarm.FlaskAPIClient import FlaskAPIClient, PairingStatus
-from alarm.alarmClockDisplay import Display
+from FlaskAPIClient import FlaskAPIClient, PairingStatus
+from alarmClockDisplay import Display
 from alarmController import AlarmController
 from alarmState import AlarmState
 

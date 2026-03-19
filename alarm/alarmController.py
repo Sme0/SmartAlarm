@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from InputHandler import InputHandler, InputOption
-from alarm.alarmClockDisplay import Display
+from alarmClockDisplay import Display
 from alarmState import AlarmState
 
 
