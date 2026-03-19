@@ -42,9 +42,6 @@ class AlarmController:
         current_minute = datetime.utcnow().minute
         day_of_week = get_current_day_of_week_number()
 
-        print(day_of_week)
-        print(self.current_time)
-
         # Check each alarm and trigger if needed
         for alarm in (self.alarms + self.snooze_alarms):
             if self.state == AlarmState.WAITING and day_of_week == alarm["day_of_week"] and self.current_time == (alarm["time"] + ":00"):
