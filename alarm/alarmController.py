@@ -47,7 +47,7 @@ class AlarmController:
 
         # Check each alarm and trigger if needed
         for alarm in (self.alarms + self.snooze_alarms):
-            if self.state == AlarmState.WAITING and day_of_week == alarm["day_of_week"] and self.current_time == alarm["time"]:
+            if self.state == AlarmState.WAITING and day_of_week == alarm["day_of_week"] and self.current_time == (alarm["time"] + ":00"):
                 self.trigger_alarm(alarm)
                 break
 
