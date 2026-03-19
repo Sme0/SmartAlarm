@@ -1,21 +1,19 @@
 import time
 from abc import ABC, abstractmethod
-
-from joystickDirection import directionRead #will this be part of input handler?
-from InputHandler import InputHandler #update after inputhandler finished
-from OutputHandler import * #update after outputhandler finished
+from alarmClockDisplay import MathsDisplay, Display
 
 class Puzzle(ABC):
-    def __init__(self, input_handler: InputHandler, output_handler: OutputHandler):
-        self.input_handler = input_handler
-        self.output_handler = output_handler
-
+    def __init__(self):
         self.problem = None
         self.solution = None
+        self.choices = []
 
         self.num_snoozes = 0
         self.snooze_cap = 3
         self.time_limit = 120
+
+        self.d = Display([255, 255, 255], "")
+        self.md = MathsDisplay(self.problem, self.choices)
 
     @abstractmethod
     def set_puzzle(self): #could add difficulty option
