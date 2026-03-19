@@ -38,7 +38,7 @@ if not flask_api_client.get_pairing_status() == PairingStatus.PAIRED:
         if status == PairingStatus.FAILED:
             pairing_code = flask_api_client.request_pairing_code()
             # print(f"Pairing code: {pairing_code}")
-            display.set_text(f"Pairing code: {pairing_code}")
+            display.set_text(pairing_code)
 
         if status == PairingStatus.PAIRING:
             print("Displaying up to date code. No issues")
