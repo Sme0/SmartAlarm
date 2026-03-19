@@ -13,7 +13,8 @@ class PairingStatus(Enum):
 class FlaskAPIClient:
 
     def __init__(self, serial_number):
-        self.base_url = "https://smart-alarm-smartalarmweb.apps.containers.cs.cf.ac.uk"
+        # self.base_url = "https://smart-alarm-smartalarmweb.apps.containers.cs.cf.ac.uk"
+        self.base_url = "http://10.2.229.60:5000"
         self.serial_number = serial_number
 
     def get_pairing_status(self) -> PairingStatus:
