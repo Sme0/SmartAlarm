@@ -1,25 +1,27 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+from enum import Enum
 
-from InputHandler import InputHandler, InputOption
-from alarmClockDisplay import Display
-from alarmState import AlarmState
+from alarm.io.output_handler import OutputHandler
+from alarm.io.input_handler import InputHandler
 
+class AlarmState(Enum):
+    WAITING = 1
+    TRIGGERED = 2
+    # TODO: Add playing puzzle state
 
 def get_current_day_of_week_number():
     """
     Returns the current day of the week as a number (Monday=0, Sunday=6)
     """
-    from datetime import datetime
     return datetime.today().weekday()
 
 
 class AlarmController:
 
-    def __init__(self, input_handler: InputHandler):
+    def __init__(self, input_handler: InputHandler, output_handler: OutputHandler):
 
-        # Initialise input handler from parameters
         self.input_handler = input_handler
-        self.display = Display()
+        self.output_handler = output_handler
 
         # Current time in 24-hour format
         self.current_time = 0
@@ -51,8 +53,7 @@ class AlarmController:
         # If there are no alarms triggered
         if self.state == AlarmState.WAITING and current_minute != self.last_displayed_minute:
             self.last_displayed_minute = current_minute
-            print(f"Current Time: {datetime.utcnow().strftime('%H:%M')}")
-            self.display.set_text(datetime.utcnow().strftime('%H:%M'))
+            self.output_handler.display_text(datetime.utcnow().strftime('%H:%M'))
 
 
 
@@ -61,9 +62,7 @@ class AlarmController:
         self.state = AlarmState.TRIGGERED
         self.current_triggered_alarm = current_alarm
 
-        self.display.set_text(f"Alarm Triggered: {datetime.utcnow().strftime('%H:%M')}")
-        print(f"Alarm Triggered: {datetime.utcnow().strftime('%H:%M')}")
-
+        self.output_handler.display_text(f"Alarm Triggered: {datetime.utcnow().strftime('%H:%M')}")
 
     def disarm_alarm(self):
         # TODO: Play game
