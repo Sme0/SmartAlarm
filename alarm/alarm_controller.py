@@ -1,13 +1,7 @@
 from datetime import datetime, timedelta
-from enum import Enum
-
 from alarm.io.output_handler import OutputHandler
 from alarm.io.input_handler import InputHandler
-
-class AlarmState(Enum):
-    WAITING = 1
-    TRIGGERED = 2
-    # TODO: Add playing puzzle state
+from alarm.alarm_state import AlarmState
 
 def get_current_day_of_week_number():
     """

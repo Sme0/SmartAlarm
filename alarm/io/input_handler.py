@@ -1,12 +1,13 @@
 import time
 from abc import abstractmethod, ABC
 from enum import Enum
+from alarm.alarm_state import AlarmState
 
 try:
     from grove_rgb_lcd import *
     import grovepi
 except ImportError:
-    print("Unable to import Pi libraries")
+    print("Unable to import Pi libraries. Only an issue if connecting to raspberry pi components.")
 
 
 class InputOption(Enum):
@@ -26,7 +27,7 @@ class InputHandler(ABC):
         self.current_action = None
 
     @abstractmethod
-    def check_inputs(self):
+    def check_inputs(self, state: AlarmState=None):
         pass
 
 
@@ -35,14 +36,21 @@ class DebugInputHandler(InputHandler):
     def __init__(self):
         super().__init__()
 
-    def check_inputs(self):
+    def check_inputs(self, state: AlarmState=None):
+        # Reset action each poll; controller reads this attribute.
+        self.current_action = InputOption.NONE
 
-        user_input = input("Enter your input")
+        if state == AlarmState.WAITING:
+            return self.current_action
+
+        user_input = input("Enter your input: ").strip().lower()
 
         if user_input == "snooze":
-            return InputOption.SNOOZE
-        if user_input == "disarm":
-            return InputOption.DISARM
+            self.current_action = InputOption.SNOOZE
+        elif user_input == "disarm":
+            self.current_action = InputOption.DISARM
+
+        return self.current_action
 
 
 class RaspberryPiInputHandler(InputHandler):
@@ -59,7 +67,7 @@ class RaspberryPiInputHandler(InputHandler):
         grovepi.pinMode(self.joystick_x, "INPUT")
         grovepi.pinMode(self.joystick_y, "INPUT")
 
-    def check_inputs(self):
+    def check_inputs(self, state: AlarmState=None):
 
         self.current_action = InputOption.NONE
         try:

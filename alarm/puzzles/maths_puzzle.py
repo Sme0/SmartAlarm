@@ -1,8 +1,8 @@
 import mathgenerator as mg
 import random
 
-from alarm.io.input_handler import InputHandler #update after inputhandler finished
-from alarm.io.output_handler import * #update after outputhandler finished
+from alarm.io.input_handler import InputHandler
+from alarm.io.output_handler import OutputHandler
 from alarm.puzzles.puzzle import Puzzle
 
 
@@ -18,11 +18,15 @@ class MathsPuzzle(Puzzle):
         #for item in mg.getGenList():
             #print(item[2])
         self.puzzle_id = [0, 1, 2, 3]
+        self.current_selection = 0
+
+    def _parse_solution_int(self, raw_solution):
+        return int(str(raw_solution).replace("$", "").strip())
 
     def set_puzzle(self): 
         #generate maths puzzle
         self.problem, self.solution = mg.genById(random.choice(self.puzzle_id))
-        self.solution = int(self.solution)
+        self.solution = self._parse_solution_int(self.solution)
         return self.problem
     
     def generate_choices(self):
@@ -36,16 +40,37 @@ class MathsPuzzle(Puzzle):
                 choices.append(incorrect_answer)
         choices.append(int(self.solution))
         random.shuffle(choices)
-        return choices
-    
-    def display_puzzle(self, choices, selected_index=0):
+        self.choices = choices
+        return self.choices
 
-        self.solution = int(str(self.solution).replace("$", ""))
+    def move_selection_left(self):
+        if not self.choices:
+            return self.current_selection
+        self.current_selection = (self.current_selection - 1) % len(self.choices)
+        self.display_puzzle()
+        return self.current_selection
+
+    def move_selection_right(self):
+        if not self.choices:
+            return self.current_selection
+        self.current_selection = (self.current_selection + 1) % len(self.choices)
+        self.display_puzzle()
+        return self.current_selection
+
+    def get_selected_answer(self):
+        if not self.choices:
+            return None
+        return self.choices[self.current_selection]
+    
+    def display_puzzle(self):
+        self.solution = self._parse_solution_int(self.solution)
         self.problem = str(self.problem).replace("$", "")
         self.problem = self.problem.replace("\\div", "÷")
         self.problem = self.problem.replace("\\cdot", "×")
         
-        self.output_handler.display_maths_problem(self.problem, choices, selected_index)
+        if self.current_selection is None:
+            self.current_selection = 0
+        self.output_handler.display_maths_problem(self.problem, self.choices, self.current_selection)
 
     def check_answer(self, answer):
         return answer == self.solution

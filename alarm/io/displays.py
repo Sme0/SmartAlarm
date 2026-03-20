@@ -1,12 +1,12 @@
 from typing import List
 from time import sleep
-from input_handler import JoystickDirection
+from alarm.io.input_handler import JoystickDirection
 
 try:
     from grove_rgb_lcd import *
     import smbus
 except ImportError as e:
-    print("Unable to import the following modules. Only an issue if connecting to raspberry pi components" + e)
+    print("Unable to import the following modules. Only an issue if connecting to raspberry pi components")
 
 
 class Display:
@@ -18,7 +18,7 @@ class Display:
         self.DISPLAY_RGB_ADDR = 0x30
         self.DISPLAY_TEXT_ADDR = 0x3e
         self.bus = smbus.SMBus(1)
-        
+
         self.update_colour()
         self.update_text()
 
@@ -42,75 +42,45 @@ class Display:
         
     def update_text (self) -> None:
         setText(self.text)
+
         
-        
-        
-class MathsDisplay:
-    def __init__(self, question: str, options: List[int]) -> None:
-        self.question = question
-        self.options = options
-        self.selected_option = 0
-        
-    # convert self.questions and self.options into string formatted for screen
-    def format_question(self) -> str:
-        displayed_options = self.update_selection([str(o) for o in self.options])
-        unpacked_options = f"{displayed_options[0]}{displayed_options[1]}{displayed_options[2]}{displayed_options[3]}"
-        
-        question = f"{self.question} =\n{unpacked_options}"
-        return question
-    
-    # clear current selection and add for different option
-    def update_selection(self, options: List[str]) -> List[str]:
-        updated_options = []
-        for o in options:
-            cleared_option = o.strip(">").strip("<")
-            updated_options.append(f" {cleared_option} ")
-        updated_options[self.selected_option] = f">{options[self.selected_option]}<"
-        return updated_options
-    
-    # selects option to left of current selection; can loop around
-    def move_selection_left(self) -> str:
-        self.selected_option = self.selected_option - 1 if self.selected_option > 1 else 3
-        return self.format_question()
-    
-    # selections option to right of current selection; can loop around
-    def move_selection_right(self) -> str:
-        self.selected_option = self.selected_option + 1 if self.selected_option < 3 else 0
-        return self.format_question()
-    
-    # get currently selected option
-    def current_selection(self) -> int:
-        return self.selected_option
+def render_maths_question(question: str, options: List[int], selected_index: int = 0) -> str:
+    cleaned_options = [str(o).strip(">").strip("<") for o in options]
+    if not cleaned_options:
+        return f"{question} ="
+
+    selected_index %= len(cleaned_options)
+    rendered_options = [f" {o} " for o in cleaned_options]
+    rendered_options[selected_index] = f">{cleaned_options[selected_index]}<"
+    return f"{question} =\n{''.join(rendered_options)}"
 
 
-class MemoryDisplay:
-    def __init__ (self, directions: List[JoystickDirection]) -> None:
-        self.directions = directions
-        
-    def format_directions(self) -> List[str]:
-        return [self.format_single_instruction(d) for d in self.directions]
-        
-    
-    def format_single_instruction(self, instruction: JoystickDirection):
-        if instruction == JoystickDirection.UP:
-            return f"       {instruction.value}"
-        else:
-            return f"      {instruction.value}"
+def format_memory_instruction(instruction: JoystickDirection) -> str:
+    if instruction == JoystickDirection.UP:
+        return f"       {instruction.value}"
+    return f"      {instruction.value}"
+
+
+def format_memory_directions(directions: List[JoystickDirection]) -> List[str]:
+    return [format_memory_instruction(d) for d in directions]
         
 
 def maths_sample_code():
     # create new display object
     d = Display()
     
-    # create new MathsDisplay object for new question
-    md = MathsDisplay("4 x 7", [22, 30, 28, 25])
-    d.set_text(md.format_question())
+    # format question with the currently selected option
+    selected_index = 0
+    options = [22, 30, 28, 25]
+    d.set_text(render_maths_question("4 x 7", options, selected_index))
     sleep(1)
     
     # move selection left or right
-    d.set_text(md.move_selection_left())
+    selected_index = (selected_index - 1) % len(options)
+    d.set_text(render_maths_question("4 x 7", options, selected_index))
     sleep(1)
-    d.set_text(md.move_selection_right())
+    selected_index = (selected_index + 1) % len(options)
+    d.set_text(render_maths_question("4 x 7", options, selected_index))
     sleep(1)
     
     # set display colour to red
@@ -121,11 +91,12 @@ def simon_sample_code ():
     # create new display object
     d = Display()
     
-    # create new memory game
-    md = MemoryDisplay([JoystickDirection.LEFT, JoystickDirection.RIGHT, JoystickDirection.UP, JoystickDirection.DOWN])
-    
-    # format directions for display
-    directions = md.format_directions()
+    directions = format_memory_directions([
+        JoystickDirection.LEFT,
+        JoystickDirection.RIGHT,
+        JoystickDirection.UP,
+        JoystickDirection.DOWN,
+    ])
     
     # iterate through directions
     for i in directions:

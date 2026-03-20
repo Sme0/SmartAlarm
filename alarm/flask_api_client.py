@@ -1,4 +1,5 @@
 from enum import Enum
+import os
 import requests
 from requests.exceptions import SSLError, RequestException
 
@@ -10,7 +11,6 @@ except Exception:
     CERTIFI_BUNDLE = None
 
 TIMEOUT = 5
-
 
 class PairingStatus(Enum):
     PAIRED = 0
@@ -27,15 +27,6 @@ class FlaskAPIClient:
         # self.base_url = "http://10.2.229.60:5000"
         self.base_url = "http://127.0.0.1:5000"
         self.serial_number = serial_number
-
-        # verify parameter controls SSL verification
-        # - None: prefer certifi bundle if available, otherwise use requests default (True)
-        # - False: disable verification (INSECURE — only for debugging)
-        # - str (path): path to a CA bundle file
-        if verify is not None:
-            self.verify = verify
-        else:
-            self.verify = CERTIFI_BUNDLE if CERTIFI_BUNDLE is not None else True
 
     def _post(self, path: str, payload: dict):
         url = f"{self.base_url}{path}"

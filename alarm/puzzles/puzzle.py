@@ -9,12 +9,21 @@ class Puzzle(ABC):
         self.input_handler = input_handler
         self.output_handler = output_handler
 
+        # The question and the required answer for the puzzle
         self.problem = None
         self.solution = None
+
+        # Choices that the user can choose from. Depending on puzzle may not be used
+        self.choices = None
+
+        # For puzzles that require selecting from a set of choices
+        self.current_selection = None
 
         self.num_snoozes = 0
         self.snooze_cap = 3
         self.time_limit = 120
+
+
 
     @abstractmethod
     def set_puzzle(self): #could add difficulty option
@@ -25,7 +34,7 @@ class Puzzle(ABC):
         pass
 
     @abstractmethod
-    def display_puzzle(self, choices):
+    def display_puzzle(self):
         pass
 
     @abstractmethod
@@ -38,8 +47,8 @@ class Puzzle(ABC):
     def run_puzzle(self):
         #create and display question and possible answers
         self.set_puzzle()
-        choices = self.generate_choices()
-        self.display_puzzle(choices)
+        self.generate_choices()
+        self.display_puzzle()
 
         #may need to fix so that timer isn't paused while waiting for input, depends on how inputhandler works
         start_time = time.time()

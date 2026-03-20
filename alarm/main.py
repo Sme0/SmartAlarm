@@ -7,12 +7,13 @@ import time
 from alarm.io.input_handler import DebugInputHandler
 from alarm.io.output_handler import DebugOutputHandler
 from alarm.io.input_handler import InputOption
-from FlaskAPIClient import FlaskAPIClient, PairingStatus
-from alarmController import AlarmController, AlarmState
+from alarm.flask_api_client import FlaskAPIClient, PairingStatus
+from alarm.alarm_controller import AlarmController
+from alarm.alarm_state import AlarmState
 
 SERIAL_NUMBER = "6789"
 
-flask_api_client = FlaskAPIClient(serial_number=SERIAL_NUMBER)
+flask_api_client = FlaskAPIClient()
 input_handler = DebugInputHandler()
 output_handler = DebugOutputHandler()
 alarm_controller = AlarmController(input_handler, output_handler)
@@ -54,7 +55,7 @@ def main_alarm_loop():
     last_heartbeat_time = time.time()
     while True:
 
-        input_handler.check_inputs()
+        input_handler.check_inputs(state=alarm_controller.state)
         if alarm_controller.state == AlarmState.TRIGGERED and input_handler.current_action == InputOption.DISARM:
             alarm_controller.disarm_alarm()
 
