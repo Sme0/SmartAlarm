@@ -1,56 +1,95 @@
-from time import sleep
+import random
+import time
 
-from alarm.io.displays import *
-import grovepi
+from alarm.io.input_handler import InputEventType, JoystickDirection
+from alarm.puzzles.puzzle import Puzzle
 
-from alarm.io.input_handler import JoystickDirection
+class MemoryPuzzle(Puzzle):
 
-#TODO: Make this a class extending off Puzzle abstract class
-def generatePattern():
-    directions = [JoystickDirection.UP, JoystickDirection.DOWN, JoystickDirection.LEFT, JoystickDirection.RIGHT]
-    puzzle_length = 5 #maybe change to variable that the user can edit
-    instructions = []
-    for i in range(0, puzzle_length):
-        x = rand.randint(0,3)
-        instructions.append(directions[x])
-    return instructions
+    def __init__(self, input_handler, output_handler, puzzle_length: int = 5):
+        super().__init__(input_handler, output_handler)
+        self.puzzle_length = puzzle_length
+        self.instructions: list[JoystickDirection] = []
+        self.direction_values: list[JoystickDirection] = []
 
-def printInstructions(instructions):
-    d = Display()
+    def generatePattern(self):
+        directions = [
+            JoystickDirection.UP,
+            JoystickDirection.DOWN,
+            JoystickDirection.LEFT,
+            JoystickDirection.RIGHT,
+        ]
+        instructions = []
+        for _ in range(self.puzzle_length):
+            instructions.append(random.choice(directions))
+        return instructions
 
-    d.set_text("Memory game: Copy the\norder with the joystick.")
+    def prepare_puzzle(self):
+        self.instructions = self.generatePattern()
+        self.solution = list(self.instructions)
+        self.problem = "Memory game: Copy the order with the joystick."
+        self.direction_values = []
+        return self.instructions
 
-    # create new memory game
-    md = MemoryDisplay(instructions)
+    def display_puzzle(self):
+        self.output_handler.display_text("Memory game: Copy the\norder with the joystick.")
+        self.output_handler.play_memory_sequence(self.instructions)
 
-    # format directions for display
-    directions = md.format_directions()
+    def _event_to_direction(self, event_type: InputEventType):
+        mapping = {
+            InputEventType.JOYSTICK_UP: JoystickDirection.UP,
+            InputEventType.JOYSTICK_DOWN: JoystickDirection.DOWN,
+            InputEventType.JOYSTICK_LEFT: JoystickDirection.LEFT,
+            InputEventType.JOYSTICK_RIGHT: JoystickDirection.RIGHT,
+        }
+        return mapping.get(event_type)
 
-    # iterate through directions
-    for i in directions:
-        d.set_text(i)
-        sleep(1)
+    def get_user_answer(self):
+        return self.direction_values
 
-    d.set_text(" ")
+    def run_puzzle(self):
+        self.prepare_puzzle()
+        self.display_puzzle()
 
+        # Clear stale movement events from before puzzle start.
+        self.input_handler.pop_events_by_type({
+            InputEventType.JOYSTICK_LEFT,
+            InputEventType.JOYSTICK_RIGHT,
+            InputEventType.JOYSTICK_UP,
+            InputEventType.JOYSTICK_DOWN,
+            InputEventType.JOYSTICK_PRESS
+        })
 
-def simonSays(xpin, ypin):
-    #generates the pattern
-    instructions = generatePattern()
+        start_time = time.time()
+        while True:
+            if time.time() - start_time > self.time_limit:
+                self.output_handler.display_text("Puzzle timeout")
+                return False
 
-    #display instructions
-    #change to call proper lcd display
-    print(instructions)
-    printInstructions(instructions)
+            self.input_handler.check_inputs()
+            events = self.input_handler.pop_events_by_type({
+                InputEventType.JOYSTICK_LEFT,
+                InputEventType.JOYSTICK_RIGHT,
+                InputEventType.JOYSTICK_UP,
+                InputEventType.JOYSTICK_DOWN,
+            })
 
-    #takes user input, pulls from joystickDirections
-    direction_values = readDirections(xpin,ypin)
+            if not events:
+                time.sleep(0.05)
+                continue
 
-    #run comparison
-    #if answer correct, return true
-    #if answer wrong, return false
-    if instructions == direction_values:
-        return True
-    else:
-        return False
+            for event in events:
+                direction = self._event_to_direction(event.event_type)
+                if direction is None:
+                    continue
 
+                self.direction_values.append(direction)
+
+                # Original flow: compare after collecting the full sequence.
+                if len(self.direction_values) >= len(self.instructions):
+                    if self.check_answer(self.get_user_answer()):
+                        self.output_handler.display_text("Correct")
+                        return True
+
+                    self.output_handler.display_text("Incorrect")
+                    return False

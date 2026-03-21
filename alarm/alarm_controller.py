@@ -3,6 +3,7 @@ from alarm.io.output_handler import OutputHandler
 from alarm.io.input_handler import InputHandler
 from alarm.alarm_state import AlarmState
 from alarm.puzzles.maths_puzzle import MathsPuzzle
+from alarm.puzzles.memory_puzzle import MemoryPuzzle
 
 
 def get_current_day_of_week_number():
@@ -76,9 +77,9 @@ class AlarmController:
         Disarms the current alarm
         :return:
         """
-        # TODO: Play game
         self.state = AlarmState.PUZZLE
-        puzzle = MathsPuzzle(self.input_handler, self.output_handler)
+        # TODO: Choose game automatically
+        puzzle = MemoryPuzzle(self.input_handler, self.output_handler)
         puzzle.run_puzzle()
         self.stop_alarm()
 
@@ -87,7 +88,6 @@ class AlarmController:
         Snoozes the current alarm by 5 minutes
         :return:
         """
-        # TODO: Play game
         # TODO: Make snooze time editable through web
         snooze_time = (datetime.utcnow() + timedelta(minutes=5)).strftime("%H:%M") + ":00"
         self.snooze_alarms.append({
