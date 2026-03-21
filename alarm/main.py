@@ -14,8 +14,10 @@ from alarm.alarm_state import AlarmState
 SERIAL_NUMBER = "6789"
 
 flask_api_client = FlaskAPIClient(serial_number=SERIAL_NUMBER)
-input_handler = DebugInputHandler()
-output_handler = DebugOutputHandler()
+
+input_handler = DebugInputHandler() # Change to RaspberryPiInputHandler() if on Pi
+output_handler = DebugOutputHandler() # Change to RaspberryPiOutputHandler() if on Pi
+
 alarm_controller = AlarmController(input_handler, output_handler)
 
 
