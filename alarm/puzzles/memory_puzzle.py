@@ -86,7 +86,7 @@ class MemoryPuzzle(Puzzle):
                 self.direction_values.append(direction)
 
                 # Original flow: compare after collecting the full sequence.
-                if len(self.direction_values) >= len(self.instructions):
+                if len(self.direction_values) >= len(self.instructions) or event.event_type == InputEventType.JOYSTICK_PRESS:
                     if self.check_answer(self.get_user_answer()):
                         self.output_handler.display_text("Correct")
                         return True

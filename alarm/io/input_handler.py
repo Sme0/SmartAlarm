@@ -307,39 +307,3 @@ class RaspberryPiInputHandler(InputHandler):
 
         else:
             return JoystickDirection.NEUTRAL
-
-    #TODO: Change name
-    def read_directions(self, number_of_inputs: int) -> list[JoystickDirection]:
-        """
-        Collect a fixed number of non-neutral joystick direction changes.
-
-        This helper is currently used by memory-style directional puzzles. It keeps
-        reading until `number_of_inputs` non-neutral direction transitions have been
-        captured.
-
-        :param number_of_inputs: The number of non-neutral joystick inputs to collect
-        :return: A list of non-neutral joystick inputs made by the user
-        """
-        user_inputs = [JoystickDirection.NEUTRAL]
-        direction_values = []
-        while len(direction_values) < number_of_inputs:
-            try:
-
-                direction = self.read_joystick()
-
-                if direction != user_inputs[len(user_inputs) - 1]:
-                    print(direction)
-                    user_inputs.append(direction)
-
-                direction_values = [item for item in user_inputs if item != JoystickDirection.NEUTRAL]
-                time.sleep(0.1)
-
-
-            except IOError:
-                print("ERROR: Simon Says User Input")
-
-        return direction_values
-
-
-
-
