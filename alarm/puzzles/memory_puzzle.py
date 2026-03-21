@@ -1,6 +1,6 @@
 from time import sleep
 
-from alarm.alarmClockDisplay import *
+from alarm.io.displays import *
 import grovepi
 
 from alarm.io.input_handler import JoystickDirection

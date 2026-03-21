@@ -21,7 +21,7 @@ class PairingStatus(Enum):
 
 class FlaskAPIClient:
 
-    def __init__(self, serial_number, base_url: str = None, verify: object = None):
+    def __init__(self, serial_number):
         # allow overriding base_url for testing
         # self.base_url = base_url or "https://smart-alarm-smartalarmweb.apps.containers.cs.cf.ac.uk"
         # self.base_url = "http://10.2.229.60:5000"
@@ -31,13 +31,10 @@ class FlaskAPIClient:
     def _post(self, path: str, payload: dict):
         url = f"{self.base_url}{path}"
         try:
-            resp = requests.post(url, json=payload, timeout=TIMEOUT, verify=self.verify)
+            resp = requests.post(url, json=payload, timeout=TIMEOUT)
             return resp
         except SSLError as e:
             print("SSL verification failed when contacting server:", e)
-            print(" - If this is a development server using a self-signed or internal CA,")
-            print("   consider passing a path to the CA bundle when constructing FlaskAPIClient,")
-            print("   or temporarily set verify=False (not for production).")
             raise
         except RequestException as e:
             print("HTTP request failed:", e)

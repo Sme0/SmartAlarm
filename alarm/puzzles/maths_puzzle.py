@@ -17,25 +17,30 @@ class MathsPuzzle(Puzzle):
         #to see all:
         #for item in mg.getGenList():
             #print(item[2])
-        self.puzzle_id = [0, 1, 2, 3]
+        self.question_types = [0, 1, 2, 3]
         self.current_selection = 0
 
     def _parse_solution_int(self, raw_solution):
         return int(str(raw_solution).replace("$", "").strip())
 
-    def set_puzzle(self): 
+    def _format_problem(self, raw_problem):
+        problem = str(raw_problem).replace("$", "")
+        problem = problem.replace("\\div", "÷")
+        return problem.replace("\\cdot", "×")
+
+    def prepare_puzzle(self):
         #generate maths puzzle
-        self.problem, self.solution = mg.genById(random.choice(self.puzzle_id))
+        self.problem, self.solution = mg.genById(random.choice(self.question_types))
         self.solution = self._parse_solution_int(self.solution)
-        return self.problem
-    
-    def generate_choices(self):
-        #generate incorrect options for answer
+        self.problem = self._format_problem(self.problem)
+        self.current_selection = 0
+
+        # Generate choices
         choices = []
         while len(choices) < 3:
-            offset = random.randint(-10, 10) #could change to scale to solution?
+            offset = random.randint(-10, 10)  # could change to scale to solution?
             incorrect_answer = self.solution + offset
-            #may have negative numbers
+            # may have negative numbers
             if incorrect_answer != self.solution and incorrect_answer not in choices:
                 choices.append(incorrect_answer)
         choices.append(int(self.solution))
@@ -47,36 +52,29 @@ class MathsPuzzle(Puzzle):
         if not self.choices:
             return self.current_selection
         self.current_selection = (self.current_selection - 1) % len(self.choices)
-        self.display_puzzle()
         return self.current_selection
 
     def move_selection_right(self):
         if not self.choices:
             return self.current_selection
         self.current_selection = (self.current_selection + 1) % len(self.choices)
-        self.display_puzzle()
         return self.current_selection
 
-    def get_selected_answer(self):
-        if not self.choices:
-            return None
-        return self.choices[self.current_selection]
-    
+    def on_joystick_left(self):
+        self.move_selection_left()
+
+    def on_joystick_right(self):
+        self.move_selection_right()
+
     def display_puzzle(self):
         self.solution = self._parse_solution_int(self.solution)
-        self.problem = str(self.problem).replace("$", "")
-        self.problem = self.problem.replace("\\div", "÷")
-        self.problem = self.problem.replace("\\cdot", "×")
-        
+
         if self.current_selection is None:
             self.current_selection = 0
         self.output_handler.display_maths_problem(self.problem, self.choices, self.current_selection)
 
-    def check_answer(self, answer):
-        return answer == self.solution
-
-            
 
 
-    
-    
+
+
+

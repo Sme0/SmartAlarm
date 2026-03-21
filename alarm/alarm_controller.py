@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 from alarm.io.output_handler import OutputHandler
 from alarm.io.input_handler import InputHandler
 from alarm.alarm_state import AlarmState
+from alarm.puzzles.maths_puzzle import MathsPuzzle
+
 
 def get_current_day_of_week_number():
     """
@@ -34,7 +36,11 @@ class AlarmController:
         self.current_time = datetime.utcnow().strftime("%H:%M:%S")
 
 
-    def check_alarms(self):
+    def check_alarms(self) -> bool:
+        """
+        Checks if there are any alarms due to trigger.
+        :return: If an alarm has been triggered
+        """
         current_minute = datetime.utcnow().minute
         day_of_week = get_current_day_of_week_number()
 
@@ -42,47 +48,71 @@ class AlarmController:
         for alarm in (self.alarms + self.snooze_alarms):
             if self.state == AlarmState.WAITING and day_of_week == alarm["day_of_week"] and self.current_time == (alarm["time"] + ":00"):
                 self.trigger_alarm(alarm)
-                break
+                return True
 
         # If there are no alarms triggered
         if self.state == AlarmState.WAITING and current_minute != self.last_displayed_minute:
             self.last_displayed_minute = current_minute
             self.output_handler.display_text(datetime.utcnow().strftime('%H:%M'))
 
+        return False
+
 
 
 
     def trigger_alarm(self, current_alarm):
+        """
+        Triggers the specified alarm.
+        :param current_alarm: The alarm to be triggered
+        :return:
+        """
         self.state = AlarmState.TRIGGERED
         self.current_triggered_alarm = current_alarm
 
         self.output_handler.display_text(f"Alarm Triggered: {datetime.utcnow().strftime('%H:%M')}")
 
     def disarm_alarm(self):
+        """
+        Disarms the current alarm
+        :return:
+        """
         # TODO: Play game
+        self.state = AlarmState.PUZZLE
+        puzzle = MathsPuzzle(self.input_handler, self.output_handler)
+        puzzle.run_puzzle()
         self.stop_alarm()
 
     def snooze_alarm(self):
+        """
+        Snoozes the current alarm by 5 minutes
+        :return:
+        """
         # TODO: Play game
+        # TODO: Make snooze time editable through web
         snooze_time = (datetime.utcnow() + timedelta(minutes=5)).strftime("%H:%M") + ":00"
         self.snooze_alarms.append({
-            "id": self.current_triggered_alarm["id"] + "-Snooze",
+            "id": str(self.current_triggered_alarm["id"]) + "-Snooze",
             "time": snooze_time,
             "enabled": True,
             "day_of_week": get_current_day_of_week_number(),
-            "puzzle_type": self.current_triggered_alarm["puzzle_type"]
+            "puzzle_type": self.current_triggered_alarm.get("puzzle_type", "none")
         })
         self.stop_alarm()
 
 
 
     def stop_alarm(self):
-        if self.state == AlarmState.TRIGGERED:
+        """
+        Stops the current alarm
+        :return:
+        """
+        if self.state in [AlarmState.TRIGGERED, AlarmState.PUZZLE]:
             print("Alarm Stopped")
             print(f"Active alarms: {self.alarms}, {self.snooze_alarms}")
 
             if self.current_triggered_alarm in self.snooze_alarms:
                 self.snooze_alarms.remove(self.current_triggered_alarm)
+            self.current_triggered_alarm = None
             self.update()
             self.state = AlarmState.WAITING
 

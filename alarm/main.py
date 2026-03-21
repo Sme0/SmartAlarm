@@ -6,17 +6,42 @@ import time
 
 from alarm.io.input_handler import DebugInputHandler
 from alarm.io.output_handler import DebugOutputHandler
-from alarm.io.input_handler import InputOption
+from alarm.io.input_handler import InputEventType
 from alarm.flask_api_client import FlaskAPIClient, PairingStatus
 from alarm.alarm_controller import AlarmController
 from alarm.alarm_state import AlarmState
 
 SERIAL_NUMBER = "6789"
 
-flask_api_client = FlaskAPIClient()
+flask_api_client = FlaskAPIClient(serial_number=SERIAL_NUMBER)
 input_handler = DebugInputHandler()
 output_handler = DebugOutputHandler()
 alarm_controller = AlarmController(input_handler, output_handler)
+
+
+def _flush_inputs_on_state_change(previous_state, current_state):
+    """Drop queued inputs whenever the alarm state changes."""
+    if previous_state != current_state:
+        input_handler.pop_events()
+
+
+def _handle_alarm_events():
+    events = input_handler.pop_events_by_type({
+        InputEventType.ALARM_DISARM,
+        InputEventType.ALARM_SNOOZE,
+    })
+
+    for event in events:
+        if alarm_controller.state != AlarmState.TRIGGERED:
+            continue
+
+        if event.event_type == InputEventType.ALARM_DISARM:
+            alarm_controller.disarm_alarm()
+            break
+
+        if event.event_type == InputEventType.ALARM_SNOOZE:
+            alarm_controller.snooze_alarm()
+            break
 
 def pairing_loop():
     if flask_api_client.get_pairing_status() == PairingStatus.PAIRED:
@@ -53,17 +78,23 @@ def pairing_loop():
 
 def main_alarm_loop():
     last_heartbeat_time = time.time()
+    previous_state = alarm_controller.state
     while True:
 
-        input_handler.check_inputs(state=alarm_controller.state)
-        if alarm_controller.state == AlarmState.TRIGGERED and input_handler.current_action == InputOption.DISARM:
-            alarm_controller.disarm_alarm()
+        _flush_inputs_on_state_change(previous_state, alarm_controller.state)
+        previous_state = alarm_controller.state
 
-        if alarm_controller.state == AlarmState.TRIGGERED and input_handler.current_action == InputOption.SNOOZE:
-            alarm_controller.snooze_alarm()
+        input_handler.check_inputs(state=alarm_controller.state)
+        _handle_alarm_events()
+
+        _flush_inputs_on_state_change(previous_state, alarm_controller.state)
+        previous_state = alarm_controller.state
 
         alarm_controller.update()
         alarm_controller.check_alarms()
+
+        _flush_inputs_on_state_change(previous_state, alarm_controller.state)
+        previous_state = alarm_controller.state
 
         # Send heartbeat every 30 seconds
         # Comment out if not using webserver yet
