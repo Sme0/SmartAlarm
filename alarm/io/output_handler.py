@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from typing import List, Any
 import time
 from alarm.io.displays import Display, render_maths_question, format_memory_directions
+from alarm.io.input_handler import JoystickDirection
 
 
 class OutputHandler(ABC):
@@ -29,7 +30,7 @@ class OutputHandler(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def play_memory_sequence(self, sequence: list[str]):
+    def play_memory_sequence(self, sequence: list[JoystickDirection]):
         """
         Present a memory-game sequence one step at a time.
 
@@ -53,19 +54,16 @@ class RaspberryPiOutputHandler(OutputHandler):
         """Render and display a formatted maths question with current selection highlight."""
         self.display.set_text(render_maths_question(question, list(options), selected_index))
 
-
-    def play_memory_sequence(self, sequence: List[Any]):
+    def play_memory_sequence(self, sequence: List[JoystickDirection]):
         """
         Animate memory directions on LCD with brief spacing between steps.
         """
         directions = format_memory_directions(sequence)
-
         time.sleep(1)
-
         for direction in directions:
-            self.display.set_text(direction)
+            self.display_text(direction)
             time.sleep(1)
-            self.display.set_text(" ") # Clear screen briefly between directions
+            self.display_text(" ") # Clear screen briefly between directions
             time.sleep(0.2)
 
 
@@ -80,7 +78,11 @@ class DebugOutputHandler(OutputHandler):
         """Print a formatted maths puzzle to the terminal."""
         print(f"[MATHS PUZZLE]:\n{render_maths_question(question, options, selected_index)}")
 
-        """Print the memory sequence in a readable debug representation."""
-        print(f"[MEMORY PUZZLE]: Playing sequence: {[s.value if hasattr(s, 'value') else str(s) for s in sequence]}")
-
-        self.display_text(view_model.message or "")
+    def play_memory_sequence(self, sequence: List[JoystickDirection]):
+        directions = format_memory_directions(sequence)
+        time.sleep(1)
+        for direction in directions:
+            self.display_text(direction)
+            time.sleep(1)
+            self.display_text(" ")  # Clear screen briefly between directions
+            time.sleep(0.2)
