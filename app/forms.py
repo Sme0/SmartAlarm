@@ -4,8 +4,9 @@ the .html files.
 """
 from flask_wtf import FlaskForm
 from wtforms.fields import SelectField
+from wtforms.fields.numeric import IntegerField
 from wtforms.fields.simple import EmailField, PasswordField, BooleanField, SubmitField, StringField
-from wtforms.validators import DataRequired, Email, Length
+from wtforms.validators import DataRequired, Email, Length, NumberRange
 from wtforms import ValidationError, widgets, SelectMultipleField
 from app.models import User
 
@@ -171,6 +172,7 @@ class DeviceSettingsForm(FlaskForm):
     Form to edit a device's display name or unpair it from the account.
     """
     name = StringField('Device name', validators=[Length(min=0, max=64)])
+    max_snoozes = IntegerField('Max snoozes', validators=[DataRequired(), NumberRange(min=0, max=20)])
     save = SubmitField('Save')
     unpair = SubmitField('Unpair')
 

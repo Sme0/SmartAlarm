@@ -78,6 +78,7 @@ class Device(db.Model):
     __tablename__ = 'devices'
     serial_number = db.Column(db.String(64), primary_key=True)
     name = db.Column(db.String(64), nullable=True)
+    max_snoozes = db.Column(db.Integer, nullable=False, default=3)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     pairing_code = db.Column(db.String(6), nullable=True, unique=True)
     pairing_expiry = db.Column(db.DateTime(timezone=True), nullable=True)

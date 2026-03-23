@@ -88,14 +88,31 @@ class AlarmController:
         Snoozes the current alarm by 5 minutes
         :return:
         """
+        if not self.current_triggered_alarm:
+            return
+
+        max_snoozes = int(self.current_triggered_alarm.get("max_snoozes", 3))
+        if max_snoozes < 0:
+            max_snoozes = 0
+
+        current_snooze_count = int(self.current_triggered_alarm.get("snooze_count", 0))
+        if current_snooze_count >= max_snoozes:
+            self.output_handler.display_text("Snooze limit reached")
+            return
+
         # TODO: Make snooze time editable through web
-        snooze_time = (datetime.utcnow() + timedelta(minutes=5)).strftime("%H:%M") + ":00"
+        snooze_time = (datetime.utcnow() + timedelta(minutes=5)).strftime("%H:%M")
+        source_alarm_id = self.current_triggered_alarm.get("source_alarm_id", self.current_triggered_alarm.get("id"))
+        next_snooze_count = current_snooze_count + 1
         self.snooze_alarms.append({
-            "id": str(self.current_triggered_alarm["id"]) + "-Snooze",
+            "id": f"{source_alarm_id}-Snooze-{next_snooze_count}",
             "time": snooze_time,
             "enabled": True,
             "day_of_week": get_current_day_of_week_number(),
-            "puzzle_type": self.current_triggered_alarm.get("puzzle_type", "none")
+            "puzzle_type": self.current_triggered_alarm.get("puzzle_type", "none"),
+            "max_snoozes": max_snoozes,
+            "snooze_count": next_snooze_count,
+            "source_alarm_id": source_alarm_id,
         })
         self.stop_alarm()
 

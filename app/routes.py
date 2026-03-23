@@ -722,7 +722,8 @@ def get_alarms():
                 "time": alarm.time.strftime("%H:%M"),
                 "enabled": alarm.enabled,
                 "day_of_week": getattr(alarm, 'day_of_week', 0),
-                "puzzle_type": getattr(alarm, 'puzzle_type', 'random')
+                "puzzle_type": getattr(alarm, 'puzzle_type', 'random'),
+                "max_snoozes": device.max_snoozes if device.max_snoozes is not None else 3
             }
             for alarm in alarms
         ]
@@ -813,6 +814,7 @@ def device_settings(serial):
         if form.save.data:
             try:
                 device.name = form.name.data.strip() if form.name.data else None
+                device.max_snoozes = form.max_snoozes.data
                 db.session.commit()
                 flash('Device updated.', 'success')
                 return redirect(url_for('account'))
@@ -823,6 +825,7 @@ def device_settings(serial):
     # Pre-fill the form on GET
     if request.method == 'GET':
         form.name.data = device.name
+        form.max_snoozes.data = device.max_snoozes if device.max_snoozes is not None else 3
 
     return render_template('device_settings.html', device=device, form=form)
 
