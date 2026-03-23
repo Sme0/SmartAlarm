@@ -1,14 +1,10 @@
 from enum import Enum
 import os
 import requests
+from dotenv import load_dotenv
 from requests.exceptions import SSLError, RequestException
 
-# Optional: prefer certifi bundle when available
-try:
-    import certifi
-    CERTIFI_BUNDLE = certifi.where()
-except Exception:
-    CERTIFI_BUNDLE = None
+load_dotenv()
 
 TIMEOUT = 5
 
@@ -23,15 +19,17 @@ class FlaskAPIClient:
 
     def __init__(self, serial_number):
         # allow overriding base_url for testing
-        # self.base_url = base_url or "https://smart-alarm-smartalarmweb.apps.containers.cs.cf.ac.uk"
-        # self.base_url = "http://10.2.229.60:5000"
-        self.base_url = "http://127.0.0.1:5000"
+        self.base_url = os.getenv("BASE_URL")
         self.serial_number = serial_number
 
     def _post(self, path: str, payload: dict):
         url = f"{self.base_url}{path}"
         try:
-            resp = requests.post(url, json=payload, timeout=TIMEOUT)
+            verify_path = os.getenv("REQUESTS_CA_BUNDLE")
+            if not verify_path or verify_path is None:
+                resp = requests.post(url, json=payload, timeout=TIMEOUT)
+            else:
+                resp = requests.post(url, json=payload, timeout=TIMEOUT, verify=verify_path if verify_path else True)
             return resp
         except SSLError as e:
             print("SSL verification failed when contacting server:", e)

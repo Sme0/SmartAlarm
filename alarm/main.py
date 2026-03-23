@@ -4,6 +4,8 @@ and delegating tasks to other modules.
 """
 import time
 
+from dotenv import load_dotenv
+
 from alarm.io.input_handler import DebugInputHandler
 from alarm.io.output_handler import DebugOutputHandler
 from alarm.io.input_handler import InputEventType
@@ -11,6 +13,7 @@ from alarm.flask_api_client import FlaskAPIClient, PairingStatus
 from alarm.alarm_controller import AlarmController
 from alarm.alarm_state import AlarmState
 
+load_dotenv()
 SERIAL_NUMBER = "rctvytbi7876urvytfyjg"
 
 flask_api_client = FlaskAPIClient(serial_number=SERIAL_NUMBER)
