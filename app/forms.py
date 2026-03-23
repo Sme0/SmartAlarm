@@ -6,7 +6,7 @@ from flask_wtf import FlaskForm
 from wtforms.fields import SelectField
 from wtforms.fields.simple import EmailField, PasswordField, BooleanField, SubmitField, StringField
 from wtforms.validators import DataRequired, Email, Length
-from wtforms import ValidationError
+from wtforms import ValidationError, widgets, SelectMultipleField
 from app.models import User
 
 
@@ -131,17 +131,31 @@ class AlarmForm(FlaskForm):
     """
     device = SelectField('Device', choices=[])
     time = StringField('Alarm Time', validators=[DataRequired()])
-    day_of_week = SelectField('Day of Week', choices=[
-        ('0', 'Monday'),
-        ('1', 'Tuesday'),
-        ('2', 'Wednesday'),
-        ('3', 'Thursday'),
-        ('4', 'Friday'),
-        ('5', 'Saturday'),
-        ('6', 'Sunday')
-    ], validators=[DataRequired()])
+    days_of_week = SelectMultipleField(
+        'Days of Week',
+        choices=[
+            (0, 'Monday'),
+            (1, 'Tuesday'),
+            (2, 'Wednesday'),
+            (3, 'Thursday'),
+            (4, 'Friday'),
+            (5, 'Saturday'),
+            (6, 'Sunday')
+        ],
+        coerce=int,
+        option_widget=widgets.CheckboxInput(),
+        widget=widgets.ListWidget(prefix_label=False),
+        validators=[]
+    )
     puzzle_type = SelectField('Puzzle Type', choices=[('maths', 'Maths'), ('memory', 'Memory'), ('random', 'Random')], validators=[DataRequired()])
     submit = SubmitField('Save Alarm')
+
+    def validate_days_of_week(self, field):
+        values = field.data or []
+        if not values:
+            raise ValidationError('Select at least one day.')
+        if any(day < 0 or day > 6 for day in values):
+            raise ValidationError('Invalid day selected.')
 
 
 class DeviceSettingsForm(FlaskForm):

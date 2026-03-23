@@ -11,59 +11,24 @@
         <section class="bg-white shadow rounded-lg p-6">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-2xl font-semibold">Weekly Alarms</h2>
-                {% if current_user.devices %}
-                <div id="view-selector" class="flex items-center space-x-2">
-                    <label for="view_device_select" class="text-sm text-gray-600">View:</label>
-                    <select id="view_device_select" name="view_device" class="border border-gray-300 rounded-md p-1">
-                        <option value="all" {% if request.args.get('view_device', 'all') == 'all' %}selected{% endif %}>All Devices</option>
-                        {% for d in current_user.devices %}
-                        <option value="{{ d.serial_number }}" {% if request.args.get('view_device') == d.serial_number %}selected{% endif %}>{{ d.name if d.name else d.serial_number }}</option>
-                        {% endfor %}
-                    </select>
+                <div class="flex items-center space-x-3">
+                    {% if current_user.devices %}
+                    <div id="view-selector" class="flex items-center space-x-2">
+                        <label for="view_device_select" class="text-sm text-gray-600">View:</label>
+                        <select id="view_device_select" name="view_device" class="border border-gray-300 rounded-md p-1">
+                            <option value="all" {% if request.args.get('view_device', 'all') == 'all' %}selected{% endif %}>All Devices</option>
+                            {% for d in current_user.devices %}
+                            <option value="{{ d.serial_number }}" {% if request.args.get('view_device') == d.serial_number %}selected{% endif %}>{{ d.name if d.name else d.serial_number }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+                    <a href="{{ url_for('add_alarm', device=request.args.get('view_device')) if request.args.get('view_device') and request.args.get('view_device') != 'all' else url_for('add_alarm') }}" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Add Alarm</a>
                 </div>
-                {% endif %}
             </div>
             <div id="alarms-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <!-- Alarm columns will be rendered by JavaScript -->
             </div>
-        </section>
-
-        <section class="mt-8">
-            <h2 class="text-2xl font-semibold mb-4">Add New Alarm</h2>
-            <form id="add-alarm-form" method="POST" class="bg-white shadow rounded-lg p-6">
-                {{ form.hidden_tag() }}
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {% if current_user.devices %}
-                    <div>
-                        {{ form.device.label(class_="block text-sm font-medium text-gray-700") }}
-                        {{ form.device(class_="mt-1 block w-full border-gray-300 rounded-md shadow-sm") }}
-                    </div>
-                    {% else %}
-                    <div class="md:col-span-3 text-sm text-gray-500">
-                        You have no paired devices. <a href="{{ url_for('pair_device') }}" class="text-indigo-600">Pair a device</a> to add alarms.
-                    </div>
-                    {% endif %}
-                    <div>
-                        {{ form.time.label(class_="block text-sm font-medium text-gray-700") }}
-                        {{ form.time(class_="mt-1 block w-full border-gray-300 rounded-md shadow-sm", type="time") }}
-                    </div>
-                    <div>
-                        {{ form.day_of_week.label(class_="block text-sm font-medium text-gray-700") }}
-                        {{ form.day_of_week(class_="mt-1 block w-full border-gray-300 rounded-md shadow-sm") }}
-                    </div>
-                    <div>
-                        {{ form.puzzle_type.label(class_="block text-sm font-medium text-gray-700") }}
-                        {{ form.puzzle_type(class_="mt-1 block w-full border-gray-300 rounded-md shadow-sm") }}
-                    </div>
-                    <div class="flex items-end">
-                        {% if current_user.devices %}
-                        {{ form.submit(class_="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700") }}
-                        {% else %}
-                        <button type="button" class="w-full px-4 py-2 bg-gray-300 text-gray-700 rounded-md" disabled>Save Alarm</button>
-                        {% endif %}
-                    </div>
-                </div>
-            </form>
         </section>
     </main>
 
@@ -169,35 +134,6 @@
             const newUrl = window.location.pathname + '?' + params.toString();
             history.pushState({}, '', newUrl);
             loadAlarms();
-            // Preselect device in add form
-            const deviceSelect = document.querySelector('select[name="device"]');
-            if (deviceSelect) deviceSelect.value = val === 'all' ? deviceSelect.value : val;
-        });
-
-        // Hook up add-alarm form to submit via AJAX
-        document.getElementById('add-alarm-form')?.addEventListener('submit', function(ev) {
-            ev.preventDefault();
-            const form = ev.currentTarget;
-            const fd = new FormData(form);
-            const payload = {
-                device_serial: fd.get('device'),
-                time: fd.get('time'),
-                day_of_week: fd.get('day_of_week'),
-                puzzle_type: fd.get('puzzle_type')
-            };
-            apiFetch('{{ url_for("api_create_alarm") }}', {
-                method: 'POST',
-                body: payload
-            }).then(data => {
-                if (data && data.response === 'ok') {
-                    // reload alarms for current view
-                    loadAlarms();
-                    // reset time field
-                    form.querySelector('input[name="time"]').value = '';
-                } else {
-                    alert('Failed to create alarm: ' + (data && data.message ? data.message : 'unknown'));
-                }
-            }).catch(err => { if (err.message !== 'unauthenticated') alert('Network error'); });
         });
 
         // Initial load

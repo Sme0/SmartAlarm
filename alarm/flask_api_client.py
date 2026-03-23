@@ -50,24 +50,26 @@ class FlaskAPIClient:
 
         try:
             response = self._post(path, payload)
+
+            if response.headers.get("Content-Type", "").lower().startswith("application/json"):
+                data = response.json()
+            else:
+                print("Failed to receive pairing status: " + response.text)
+                return PairingStatus.INVALID
+
+            raw_pairing_status = data.get("response")
+            if raw_pairing_status == "paired":
+                return PairingStatus.PAIRED
+            elif raw_pairing_status == "pairing":
+                return PairingStatus.PAIRING
+            elif raw_pairing_status == "failed":
+                return PairingStatus.FAILED
+            else:
+                return PairingStatus.INVALID
+
         except Exception:
             return PairingStatus.INVALID
 
-        if response.headers.get("Content-Type", "").lower().startswith("application/json"):
-            data = response.json()
-        else:
-            print("Failed to receive pairing status: " + response.text)
-            return PairingStatus.INVALID
-
-        raw_pairing_status = data.get("response")
-        if raw_pairing_status == "paired":
-            return PairingStatus.PAIRED
-        elif raw_pairing_status == "pairing":
-            return PairingStatus.PAIRING
-        elif raw_pairing_status == "failed":
-            return PairingStatus.FAILED
-        else:
-            return PairingStatus.INVALID
 
 
     def request_pairing_code(self):
@@ -80,20 +82,21 @@ class FlaskAPIClient:
 
         try:
             response = self._post(path, payload)
+
+            if response.headers.get("Content-Type", "").lower().startswith("application/json"):
+                data = response.json()
+            else:
+                print("Failed to request pairing code: " + response.text)
+                return None
+
+            if response.status_code != 200:
+                print("Failed to request pairing code: ", data.get('message', 'unknown reason'))
+                return None
+
+            return data.get("pairing_code")
+
         except Exception:
             return None
-
-        if response.headers.get("Content-Type", "").lower().startswith("application/json"):
-            data = response.json()
-        else:
-            print("Failed to request pairing code: " + response.text)
-            return None
-
-        if response.status_code != 200:
-            print("Failed to request pairing code: ", data.get('message', 'unknown reason'))
-            return None
-
-        return data.get("pairing_code")
 
     def get_alarms(self):
         """
@@ -106,30 +109,31 @@ class FlaskAPIClient:
 
         try:
             response = self._post(path, payload)
+
+            if response.headers.get("Content-Type", "").lower().startswith("application/json"):
+                data = response.json()
+            else:
+                print("Failed to get alarms: " + response.text)
+                return None
+
+            if response.status_code != 200:
+                print("Failed to get alarms: ", data.get('reason', 'unknown reason'))
+                return None
+
+            alarms = []
+            for alarm in data.get('alarms', []) or []:
+                try:
+                    if alarm.get("enabled") and alarm.get("day_of_week"):
+                        alarms.append(alarm)
+                except Exception:
+                    # skip malformed alarm entries
+                    continue
+
+            print("RETURNING ALARMS")
+            return alarms
+
         except Exception:
             return None
-
-        if response.headers.get("Content-Type", "").lower().startswith("application/json"):
-            data = response.json()
-        else:
-            print("Failed to get alarms: " + response.text)
-            return None
-
-        if response.status_code != 200:
-            print("Failed to get alarms: ", data.get('reason', 'unknown reason'))
-            return None
-
-        alarms = []
-        for alarm in data.get('alarms', []) or []:
-            try:
-                if alarm.get("enabled") and alarm.get("day_of_week"):
-                    alarms.append(alarm)
-            except Exception:
-                # skip malformed alarm entries
-                continue
-
-        print("RETURNING ALARMS")
-        return alarms
 
 
     def heartbeat(self) -> bool:
@@ -142,17 +146,18 @@ class FlaskAPIClient:
 
         try:
             response = self._post(path, payload)
+
+            if response.headers.get("Content-Type", "").lower().startswith("application/json"):
+                data = response.json()
+            else:
+                print("Failed to send heartbeat: " + response.text)
+                return False
+
+            if response.status_code != 200:
+                print("Failed to send heartbeat: ", data.get('reason', 'unknown reason'))
+                return False
+
+            return data.get('response') == 'success'
+
         except Exception:
             return False
-
-        if response.headers.get("Content-Type", "").lower().startswith("application/json"):
-            data = response.json()
-        else:
-            print("Failed to send heartbeat: " + response.text)
-            return False
-
-        if response.status_code != 200:
-            print("Failed to send heartbeat: ", data.get('reason', 'unknown reason'))
-            return False
-
-        return data.get('response') == 'success'
