@@ -15,7 +15,7 @@
                     {% if current_user.devices %}
                     <div id="view-selector" class="flex items-center space-x-2">
                         <label for="view_device_select" class="text-sm text-gray-600">View:</label>
-                        <select id="view_device_select" name="view_device" class="border border-gray-300 rounded-md p-1">
+                        <select id="view_device_select" name="view_device" class="ui-select min-w-56 md:min-w-64">
                             <option value="all" {% if request.args.get('view_device', 'all') == 'all' %}selected{% endif %}>All Devices</option>
                             {% for d in current_user.devices %}
                             <option value="{{ d.serial_number }}" {% if request.args.get('view_device') == d.serial_number %}selected{% endif %}>{{ d.name if d.name else d.serial_number }}</option>
@@ -77,6 +77,19 @@
                         }
 
                         const right = document.createElement('div');
+                        right.className = 'flex items-center gap-2';
+
+                        const editBtn = document.createElement('a');
+                        editBtn.className = 'text-indigo-600 hover:text-indigo-800 text-sm font-medium';
+                        editBtn.textContent = 'Edit';
+                        const editUrlTemplate = '{{ url_for("edit_alarm", alarm_id=123456789) }}';
+                        const editUrl = editUrlTemplate.replace('123456789', String(alarm.id));
+                        if (currentView && currentView !== 'all') {
+                            editBtn.href = `${editUrl}?view_device=${encodeURIComponent(currentView)}`;
+                        } else {
+                            editBtn.href = editUrl;
+                        }
+                        right.appendChild(editBtn);
 
                         // Delete button
                         const delBtn = document.createElement('button');

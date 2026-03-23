@@ -158,6 +158,14 @@ class AlarmForm(FlaskForm):
             raise ValidationError('Invalid day selected.')
 
 
+class EditAlarmForm(FlaskForm):
+    """Form for editing an existing alarm without changing its day."""
+    device = SelectField('Device', choices=[])
+    time = StringField('Alarm Time', validators=[DataRequired()])
+    puzzle_type = SelectField('Puzzle Type', choices=[('maths', 'Maths'), ('memory', 'Memory'), ('random', 'Random')], validators=[DataRequired()])
+    submit = SubmitField('Update Alarm')
+
+
 class DeviceSettingsForm(FlaskForm):
     """
     Form to edit a device's display name or unpair it from the account.

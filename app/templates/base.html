@@ -12,17 +12,80 @@
         /* High-fidelity active state with Indigo brand color */
         .nav-btn.active { background-color: #4F46E5; color: white; border-color: #4F46E5; }
         .nav-btn.active:hover { background-color: #4338CA; }
+
+        /* Shared select styling for a cleaner, consistent look across pages */
+        .ui-select {
+            width: 100%;
+            margin-top: 0.25rem;
+            padding: 0.5rem 2.25rem 0.5rem 0.75rem;
+            border: 1px solid #D1D5DB;
+            border-radius: 0.5rem;
+            background-color: #FFFFFF;
+            color: #111827;
+            line-height: 1.25rem;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236B7280' stroke-width='1.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.65rem center;
+            background-size: 1rem;
+            transition: border-color .15s ease, box-shadow .15s ease;
+        }
+        .ui-select:hover { border-color: #9CA3AF; }
+        .ui-select:focus {
+            outline: none;
+            border-color: #6366F1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        /* Secondary action button style used for back navigation links */
+        .ui-back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.45rem 0.75rem;
+            border: 1px solid #E5E7EB;
+            border-radius: 0.5rem;
+            background: #FFFFFF;
+            color: #4F46E5;
+            font-size: 0.875rem;
+            font-weight: 600;
+            line-height: 1;
+            text-decoration: none;
+            transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+        }
+        .ui-back-btn:hover {
+            background: #EEF2FF;
+            border-color: #C7D2FE;
+            color: #4338CA;
+        }
+        .ui-back-btn:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
     </style>
     {% block head_extra %}{% endblock %}
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans">
 
     <nav class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center relative z-20">
-        <div class="text-xl font-bold text-indigo-600 tracking-tight">SmartAlarm</div>
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('dashboard') }}" class="text-xl font-bold text-indigo-600 tracking-tight hover:text-indigo-700">SmartAlarm</a>
+        {% else %}
+            <a href="{{ url_for('index') }}" class="text-xl font-bold text-indigo-600 tracking-tight hover:text-indigo-700">SmartAlarm</a>
+        {% endif %}
 
         <div class="relative">
             <button id="profile-btn" type="button" aria-haspopup="true" aria-expanded="false" class="relative focus:outline-none transition-transform hover:scale-105">
-                <span class="h-9 w-9 inline-flex bg-indigo-100 rounded-full border border-indigo-200 items-center justify-center text-indigo-700 font-bold text-sm">U</span>
+                <span class="h-9 w-9 inline-flex bg-indigo-100 rounded-full border border-indigo-200 items-center justify-center text-indigo-700 font-bold text-sm">
+                    {% if current_user.is_authenticated and current_user.preferred_name %}
+                        {{ current_user.preferred_name[0]|upper }}
+                    {% else %}
+                        U
+                    {% endif %}
+                </span>
                 <span class="absolute bottom-0 right-0 h-3 w-3 bg-green-500 border-2 border-white rounded-full"></span>
             </button>
 
@@ -131,7 +194,7 @@
             return fetch(url, options).then(r => {
                 if (r.status === 401) {
                     // Not authenticated: redirect to login and include next so user returns
-                    window.location = '{{ url_for("index") }}?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+                    window.location = '{{ url_for("login") }}?next=' + encodeURIComponent(window.location.pathname + window.location.search);
                     throw new Error('unauthenticated');
                 }
                 // If response has no content (204) resolve with null

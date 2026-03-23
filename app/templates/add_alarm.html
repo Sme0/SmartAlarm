@@ -6,7 +6,10 @@
     <main class="max-w-3xl mx-auto mt-8 px-6">
         <header class="mb-6 flex items-center justify-between">
             <h1 class="text-3xl font-bold text-gray-900">Add Alarm</h1>
-            <a href="{{ url_for('alarms') }}" class="text-sm text-indigo-600 hover:text-indigo-700">Back to alarms</a>
+            <a href="{{ url_for('alarms') }}" class="ui-back-btn">
+                <span aria-hidden="true">&larr;</span>
+                <span>Back to alarms</span>
+            </a>
         </header>
 
         <section class="bg-white shadow rounded-lg p-6">
@@ -16,7 +19,7 @@
                 {% if current_user.devices %}
                 <div>
                     {{ form.device.label(class_="block text-sm font-medium text-gray-700") }}
-                    {{ form.device(class_="mt-1 block w-full border-gray-300 rounded-md shadow-sm") }}
+                    {{ form.device(class_="ui-select") }}
                 </div>
 
                 <div>
@@ -44,7 +47,7 @@
 
                 <div>
                     {{ form.puzzle_type.label(class_="block text-sm font-medium text-gray-700") }}
-                    {{ form.puzzle_type(class_="mt-1 block w-full border-gray-300 rounded-md shadow-sm") }}
+                    {{ form.puzzle_type(class_="ui-select") }}
                 </div>
 
                 <div>

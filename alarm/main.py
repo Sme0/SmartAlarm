@@ -11,7 +11,7 @@ from alarm.flask_api_client import FlaskAPIClient, PairingStatus
 from alarm.alarm_controller import AlarmController
 from alarm.alarm_state import AlarmState
 
-SERIAL_NUMBER = "6789"
+SERIAL_NUMBER = "rctvytbi7876urvytfyjg"
 
 flask_api_client = FlaskAPIClient(serial_number=SERIAL_NUMBER)
 
@@ -104,6 +104,8 @@ def main_alarm_loop():
         if current_time - last_heartbeat_time >= 15.0:
             flask_api_client.heartbeat()
             alarm_controller.alarms = flask_api_client.get_alarms()
+            print(f"Active alarms: {alarm_controller.alarms}, {alarm_controller.snooze_alarms}")
+
             last_heartbeat_time = current_time
 
         time.sleep(0.1)

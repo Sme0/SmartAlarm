@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Alarm{% endblock %}
+
+{% block content %}
+    <main class="max-w-3xl mx-auto mt-8 px-6">
+        <header class="mb-6 flex items-center justify-between">
+            <h1 class="text-3xl font-bold text-gray-900">Edit Alarm</h1>
+            {% if request.args.get('view_device') and request.args.get('view_device') != 'all' %}
+            <a href="{{ url_for('alarms', view_device=request.args.get('view_device')) }}" class="ui-back-btn">
+                <span aria-hidden="true">&larr;</span>
+                <span>Back to alarms</span>
+            </a>
+            {% else %}
+            <a href="{{ url_for('alarms') }}" class="ui-back-btn">
+                <span aria-hidden="true">&larr;</span>
+                <span>Back to alarms</span>
+            </a>
+            {% endif %}
+        </header>
+
+        <section class="bg-white shadow rounded-lg p-6">
+            {% set day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
+            <div class="mb-4 p-3 rounded border border-indigo-100 bg-indigo-50 text-indigo-900 text-sm">
+                Editing alarm for:
+                <span class="font-semibold">
+                    {% if alarm.day_of_week is not none and 0 <= alarm.day_of_week < 7 %}
+                        {{ day_names[alarm.day_of_week] }}
+                    {% else %}
+                        Unknown day
+                    {% endif %}
+                </span>
+            </div>
+            <form method="POST" class="space-y-5">
+                {{ form.hidden_tag() }}
+
+                <div>
+                    {{ form.device.label(class_="block text-sm font-medium text-gray-700") }}
+                    {{ form.device(class_="ui-select") }}
+                </div>
+
+                <div>
+                    {{ form.time.label(class_="block text-sm font-medium text-gray-700") }}
+                    {{ form.time(class_="mt-1 block w-full border-gray-300 rounded-md shadow-sm", type="time") }}
+                    {% if form.time.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.time.errors[0] }}</p>
+                    {% endif %}
+                </div>
+
+
+                <div>
+                    {{ form.puzzle_type.label(class_="block text-sm font-medium text-gray-700") }}
+                    {{ form.puzzle_type(class_="ui-select") }}
+                </div>
+
+                <div>
+                    {{ form.submit(class_="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700", value="Update Alarm") }}
+                </div>
+            </form>
+        </section>
+    </main>
+{% endblock %}
+

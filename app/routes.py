@@ -7,7 +7,7 @@ from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from app import app, database as db, login_manager, csrf
 from app.models import User, Device, Alarm
-from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm, DeviceSettingsForm
+from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm, EditAlarmForm, DeviceSettingsForm
 from werkzeug.exceptions import InternalServerError
 
 # Return JSON 401 for API/AJAX requests, otherwise redirect to the login page.
@@ -48,57 +48,44 @@ def status():
 def index():
 
     """
-    Main entry point of the application.
-    Behaviour:
-    - If the user is already logged in -> show the alarm dashboard
-    - If not logged in -> show the login/registration page
+    Public landing page for unauthenticated users.
+    Authenticated users are redirected to their dashboard.
     """
 
     # Test User
     if User.query.filter_by(email_address="test@test.com").first() is None:
         User.register("test@test.com", "12345", "test")
 
-    # If the user is authenticated, show the main alarm dashboard
+    # If the user is authenticated, send them to the main dashboard
     if current_user.is_authenticated:
-        return redirect(url_for("alarms"))
+        return redirect(url_for("dashboard"))
     
-    # Create instances of both forms
-    login_form = LoginForm()
-    register_form = RegistrationForm()
-    
-    # If the login form was submitted and passed validation
-    if login_form.validate_on_submit() and login_form.submit.data:
+    return render_template("home.html")
 
-        # Look up the user by email (normalize to match storage behaviour)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Dedicated login page and handler."""
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+
+    login_form = LoginForm()
+    if login_form.validate_on_submit() and login_form.submit.data:
         email_normalized = (login_form.email_address.data or '').strip().lower()
         user = User.query.filter_by(email_address=email_normalized).first()
-        
-        # Verify the password matches the stored hash
+
         if user and user.verify_password(login_form.password.data):
-
-            # Log the user in using Flask-Login
             login_user(user, remember=login_form.remember_me.data)
-            flash("Logged in successfully!", "success")
+            flash('Logged in successfully!', 'success')
 
-            # Respect a `next` parameter so users are returned to the page they
-            # originally requested (only allow relative URLs for safety).
             next_page = request.args.get('next') or request.form.get('next')
             if next_page and isinstance(next_page, str) and next_page.startswith('/'):
                 return redirect(next_page)
+            return redirect(url_for('dashboard'))
 
-            # Default redirect prevents form re-submission on page refresh
-            return redirect(url_for("index"))
-        else:
-            flash("Invalid email or password.", "danger")
+        flash('Invalid email or password.', 'danger')
 
-
-    # (Registration is handled by a separate /register route.)
-    # Render the login/register page if user is not authenticated
-    return render_template(
-        "home.html",
-        login_form=login_form,
-        register_form=register_form
-    )
+    return render_template('login.html', login_form=login_form, auth_mode='login')
 
 @app.route("/account")
 @login_required
@@ -118,7 +105,63 @@ def account():
         raise InternalServerError("An error occurred while loading the account page.")
 
 
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    """Main user dashboard with greeting, quick actions, and an overview of alarms/devices."""
+    devices = list(current_user.devices)
+    alarms = Alarm.query.filter_by(user_id=current_user.id).all()
+    enabled_alarms = [alarm for alarm in alarms if getattr(alarm, 'enabled', True)]
 
+    weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    online_device_count = sum(1 for device in devices if device.is_online())
+
+    next_alarm = None
+    if enabled_alarms:
+        now = datetime.now()
+        current_day = now.weekday()
+        current_minutes = now.hour * 60 + now.minute
+
+        def minutes_until_alarm(alarm_obj):
+            alarm_day = int(getattr(alarm_obj, 'day_of_week', 0))
+            day_offset = (alarm_day - current_day) % 7
+            alarm_minutes = alarm_obj.time.hour * 60 + alarm_obj.time.minute
+            delta = (day_offset * 24 * 60) + (alarm_minutes - current_minutes)
+            if delta <= 0:
+                delta += 7 * 24 * 60
+            return delta
+
+        next_alarm = min(enabled_alarms, key=minutes_until_alarm)
+
+    # Build a lightweight preview list ordered by weekday then time.
+    sorted_alarms = sorted(alarms, key=lambda alarm_obj: (int(getattr(alarm_obj, 'day_of_week', 0)), alarm_obj.time))
+    alarm_preview = []
+    for alarm_obj in sorted_alarms[:5]:
+        day_idx = int(getattr(alarm_obj, 'day_of_week', 0))
+        day_name = weekdays[day_idx] if 0 <= day_idx < 7 else 'Unknown'
+        alarm_preview.append({
+            'id': alarm_obj.id,
+            'day_name': day_name,
+            'time': alarm_obj.time.strftime('%H:%M'),
+            'puzzle_type': getattr(alarm_obj, 'puzzle_type', 'random'),
+            'device_name': alarm_obj.device.name if alarm_obj.device and alarm_obj.device.name else alarm_obj.device_serial
+        })
+
+    return render_template(
+        'dashboard.html',
+        device_count=len(devices),
+        online_device_count=online_device_count,
+        total_alarm_count=len(alarms),
+        enabled_alarm_count=len(enabled_alarms),
+        next_alarm=next_alarm,
+        weekdays=weekdays,
+        alarm_preview=alarm_preview,
+        devices=devices,
+    )
+
+
+
+@app.route('/signup', methods=['GET', 'POST'])
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     """
@@ -126,7 +169,7 @@ def register():
     Returns JSON for AJAX requests and full page redirect/flash for normal requests.
     """
     if current_user.is_authenticated:
-        return redirect(url_for('alarms'))
+        return redirect(url_for('dashboard'))
 
     form = RegistrationForm()
     if form.validate_on_submit() and form.submit.data:
@@ -134,11 +177,11 @@ def register():
         existing = User.query.filter_by(email_address=(form.email_address.data or '').strip().lower()).first()
         if existing:
             flash('Email already registered.', 'danger')
-            return render_template('home.html', login_form=LoginForm(), register_form=form)
+            return render_template('register.html', register_form=form)
 
         if form.password.data != form.repeated_password.data:
             flash('Passwords do not match.', 'danger')
-            return render_template('home.html', login_form=LoginForm(), register_form=form)
+            return render_template('register.html', register_form=form)
 
         try:
             user = User.register(
@@ -147,22 +190,22 @@ def register():
                 preferred_name=form.preferred_name.data if hasattr(form, 'preferred_name') else None
             )
 
-            # Auto-login the new user and redirect to alarms or `next` if provided
+            # Auto-login the new user and redirect to dashboard or `next` if provided
             login_user(user)
             next_page = request.args.get('next') or request.form.get('next')
             if next_page and isinstance(next_page, str) and next_page.startswith('/'):
                 return redirect(next_page)
-            return redirect(url_for('alarms'))
+            return redirect(url_for('dashboard'))
         except ValueError as ve:
             # Likely duplicate email surfaced from the model layer
             flash(str(ve) or 'Email already registered.', 'danger')
-            return render_template('home.html', login_form=LoginForm(), register_form=form)
+            return render_template('register.html', register_form=form)
         except Exception:
             flash('An error occurred during registration. Please try again.', 'danger')
-            return render_template('home.html', login_form=LoginForm(), register_form=form)
+            return render_template('register.html', register_form=form)
 
     # GET or validation errors
-    return render_template('home.html', login_form=LoginForm(), register_form=form)
+    return render_template('register.html', register_form=form)
 
 @app.route("/logout")
 @login_required
@@ -279,6 +322,61 @@ def add_alarm():
         return redirect(url_for('alarms', view_device=device.serial_number))
 
     return render_template('add_alarm.html', form=form)
+
+
+@app.route('/alarms/<int:alarm_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_alarm(alarm_id):
+    alarm = Alarm.query.get(alarm_id)
+    if alarm is None:
+        flash('Alarm not found.', 'danger')
+        return redirect(url_for('alarms'))
+
+    if alarm.user_id != current_user.id:
+        flash('You do not have permission to edit this alarm.', 'danger')
+        return redirect(url_for('alarms'))
+
+    form = EditAlarmForm()
+    form.device.choices = [
+        (d.serial_number, d.name if d.name else d.serial_number)
+        for d in current_user.devices
+    ]
+
+    if request.method == 'GET':
+        form.device.data = alarm.device_serial
+        form.time.data = alarm.time.strftime('%H:%M') if alarm.time else ''
+        form.puzzle_type.data = alarm.puzzle_type or 'random'
+
+    if form.validate_on_submit():
+        selected_serial = form.device.data
+        device = Device.query.filter_by(serial_number=selected_serial, user_id=current_user.id).first() if selected_serial else None
+        if device is None:
+            flash('Please select one of your paired devices.', 'danger')
+            return render_template('edit_alarm.html', form=form, alarm=alarm)
+
+        try:
+            alarm_time = datetime.strptime(form.time.data, '%H:%M').time()
+        except Exception:
+            flash('Please choose a valid time (HH:MM).', 'danger')
+            return render_template('edit_alarm.html', form=form, alarm=alarm)
+
+        try:
+            alarm.device_serial = device.serial_number
+            alarm.time = alarm_time
+            alarm.puzzle_type = form.puzzle_type.data
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            flash('Failed to update alarm. Please try again.', 'danger')
+            return render_template('edit_alarm.html', form=form, alarm=alarm)
+
+        view_device = request.args.get('view_device')
+        flash('Alarm updated.', 'success')
+        if view_device and view_device != 'all':
+            return redirect(url_for('alarms', view_device=view_device))
+        return redirect(url_for('alarms', view_device=device.serial_number))
+
+    return render_template('edit_alarm.html', form=form, alarm=alarm)
 
 
 @app.route('/alarms/delete', methods=['POST'])
@@ -685,7 +783,7 @@ def dev_sample_data():
         device = Device.register(serial_number="SAMPLE123", name="Jeff's Alarm", user=user)
         device = Device.register(serial_number="SAMPLE456", name="Bob's Alarm", user=user)
     flash("Sample user, device, and alarms created. You are now logged in as the sample user.", "success")
-    return redirect(url_for("alarms"))
+    return redirect(url_for("dashboard"))
 
 
 @app.route('/device/<serial>/settings', methods=['GET', 'POST'])

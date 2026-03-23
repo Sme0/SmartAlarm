@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartAlarm - {{ 'Sign Up' if auth_mode == 'signup' else 'Log In' }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans">
+    <nav class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+        <a href="{{ url_for('index') }}" class="text-xl font-bold text-indigo-600 tracking-tight hover:text-indigo-700">SmartAlarm</a>
+        {% if auth_mode == 'signup' %}
+            <a href="{{ url_for('login') }}" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">Log in</a>
+        {% else %}
+            <a href="{{ url_for('register') }}" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold">Sign up</a>
+        {% endif %}
+    </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="max-w-md mx-auto mt-4 px-6">
+                {% for category, message in messages %}
+                    {% set bg = 'bg-gray-50 text-gray-800' %}
+                    {% if category == 'success' %}
+                        {% set bg = 'bg-green-50 text-green-800' %}
+                    {% elif category == 'danger' or category == 'error' %}
+                        {% set bg = 'bg-red-50 text-red-800' %}
+                    {% elif category == 'warning' %}
+                        {% set bg = 'bg-yellow-50 text-yellow-800' %}
+                    {% endif %}
+                    <div class="mb-3 p-3 rounded {{ bg }} border border-gray-100">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <main class="max-w-md mx-auto mt-10 px-6 pb-10">
+        <section class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+            {% if auth_mode == 'signup' %}
+                <h1 class="text-2xl font-bold text-gray-900">Create your account</h1>
+                <p class="text-sm text-gray-600 mt-1">Set up your SmartAlarm account to start pairing devices.</p>
+
+                <form method="POST" action="{{ url_for('register') }}" class="mt-6 space-y-4">
+                    {{ register_form.hidden_tag() }}
+                    <input type="hidden" name="next" value="{{ request.args.get('next', request.form.get('next', '')) }}">
+
+                    <div>
+                        {{ register_form.email_address.label(class_='block text-sm font-medium text-gray-700') }}
+                        {{ register_form.email_address(class_='mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500') }}
+                        {% for err in register_form.email_address.errors %}
+                            <p class="text-sm text-red-600 mt-1">{{ err }}</p>
+                        {% endfor %}
+                    </div>
+
+                    <div>
+                        {{ register_form.preferred_name.label(class_='block text-sm font-medium text-gray-700') }}
+                        {{ register_form.preferred_name(class_='mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500') }}
+                        {% for err in register_form.preferred_name.errors %}
+                            <p class="text-sm text-red-600 mt-1">{{ err }}</p>
+                        {% endfor %}
+                    </div>
+
+                    <div>
+                        {{ register_form.password.label(class_='block text-sm font-medium text-gray-700') }}
+                        {{ register_form.password(class_='mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500') }}
+                        {% for err in register_form.password.errors %}
+                            <p class="text-sm text-red-600 mt-1">{{ err }}</p>
+                        {% endfor %}
+                    </div>
+
+                    <div>
+                        {{ register_form.repeated_password.label(class_='block text-sm font-medium text-gray-700') }}
+                        {{ register_form.repeated_password(class_='mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500') }}
+                        {% for err in register_form.repeated_password.errors %}
+                            <p class="text-sm text-red-600 mt-1">{{ err }}</p>
+                        {% endfor %}
+                    </div>
+
+                    {{ register_form.submit(class_='w-full bg-indigo-600 text-white font-medium px-6 py-2 rounded-md hover:bg-indigo-700 transition-colors shadow-sm') }}
+                </form>
+
+                <p class="text-sm text-gray-600 mt-5 text-center">
+                    Already have an account?
+                    <a href="{{ url_for('login') }}" class="text-indigo-600 hover:text-indigo-800 font-medium">Log in</a>
+                </p>
+            {% else %}
+                <h1 class="text-2xl font-bold text-gray-900">Log in</h1>
+                <p class="text-sm text-gray-600 mt-1">Welcome back. Enter your details to continue.</p>
+
+                <form method="POST" action="{{ url_for('login') }}" class="mt-6 space-y-4">
+                    {{ login_form.hidden_tag() }}
+                    <input type="hidden" name="next" value="{{ request.args.get('next', request.form.get('next', '')) }}">
+
+                    <div>
+                        {{ login_form.email_address.label(class_='block text-sm font-medium text-gray-700') }}
+                        {{ login_form.email_address(class_='mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500') }}
+                        {% for err in login_form.email_address.errors %}
+                            <p class="text-sm text-red-600 mt-1">{{ err }}</p>
+                        {% endfor %}
+                    </div>
+
+                    <div>
+                        {{ login_form.password.label(class_='block text-sm font-medium text-gray-700') }}
+                        {{ login_form.password(class_='mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500') }}
+                        {% for err in login_form.password.errors %}
+                            <p class="text-sm text-red-600 mt-1">{{ err }}</p>
+                        {% endfor %}
+                    </div>
+
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-600">
+                        {{ login_form.remember_me() }}
+                        <span>Remember me</span>
+                    </label>
+
+                    {{ login_form.submit(class_='w-full bg-indigo-600 text-white font-medium px-6 py-2 rounded-md hover:bg-indigo-700 transition-colors shadow-sm') }}
+                </form>
+
+                <p class="text-sm text-gray-600 mt-5 text-center">
+                    New here?
+                    <a href="{{ url_for('register') }}" class="text-indigo-600 hover:text-indigo-800 font-medium">Create an account</a>
+                </p>
+            {% endif %}
+        </section>
+    </main>
+</body>
+</html>
+

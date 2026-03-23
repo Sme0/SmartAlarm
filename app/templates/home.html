@@ -3,27 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SmartAlarm - Home</title>
+    <title>SmartAlarm - Welcome</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans">
-
-    <nav class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center relative z-20">
+    <nav class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
         <div class="text-xl font-bold text-indigo-600 tracking-tight">SmartAlarm</div>
-        <div class="relative">
-            <button id="profile-btn" type="button" aria-haspopup="true" aria-expanded="false" class="relative focus:outline-none transition-transform hover:scale-105">
-                <span class="h-9 w-9 bg-indigo-100 rounded-full border border-indigo-200 flex items-center justify-center text-indigo-700 font-bold text-sm">U</span>
-                <span class="absolute bottom-0 right-0 h-3 w-3 bg-green-500 border-2 border-white rounded-full"></span>
-            </button>
-
-            <div id="profile-menu" role="menu" aria-hidden="true" class="hidden absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-md shadow-lg py-1">
-                <button type="button" id="menu-login" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Log in</button>
-                <button type="button" id="menu-signup" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Sign up</button>
-            </div>
+        <div class="flex items-center gap-3">
+            <a href="{{ url_for('login') }}" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">Log in</a>
+            <a href="{{ url_for('register') }}" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold">Sign up</a>
         </div>
     </nav>
 
-    {# Flash messages (home page) #}
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             <div class="max-w-5xl mx-auto mt-4 px-6">
@@ -36,147 +27,38 @@
                     {% elif category == 'warning' %}
                         {% set bg = 'bg-yellow-50 text-yellow-800' %}
                     {% endif %}
-                    <div class="mb-3 p-3 rounded {{ bg }} border border-gray-100">
-                        {{ message }}
-                    </div>
+                    <div class="mb-3 p-3 rounded {{ bg }} border border-gray-100">{{ message }}</div>
                 {% endfor %}
             </div>
         {% endif %}
     {% endwith %}
 
-    <div class="max-w-5xl mx-auto mt-8 px-6">
-        <header class="text-center mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">Welcome to SmartAlarm™!</h1>
-            <p class="text-gray-600 mt-2">Log in below now and pair your SmartAlarm™ device to start beginning your mornings in a better way.</p>
-        </header>
+    <main class="max-w-5xl mx-auto px-6 pt-12 pb-16">
+        <section class="bg-white border border-gray-200 rounded-2xl shadow p-8 md:p-12 text-center">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-900">Wake up smarter with SmartAlarm</h1>
+            <p class="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
+                Pair your device, create puzzle alarms, and manage your schedule from one dashboard.
+            </p>
+            <div class="mt-8 flex flex-wrap justify-center gap-4">
+                <a href="{{ url_for('register') }}" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 shadow-sm">Create your account</a>
+                <a href="{{ url_for('login') }}" class="px-6 py-3 border border-indigo-300 text-indigo-700 rounded-lg font-semibold hover:bg-indigo-50">I already have an account</a>
+            </div>
+        </section>
 
-        <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm max-w-md mx-auto">
-            {# Login form using WTForms from routes.index #}
-            <form id="login-form" method="POST" action="{{ url_for('index') }}">
-                {{ login_form.hidden_tag() }}
-                <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
-                <div class="mb-4">
-                    {{ login_form.email_address.label(class_='block text-sm font-medium text-gray-700') }}
-                    {{ login_form.email_address(class_='w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500', id='email') }}
-                    {% for err in login_form.email_address.errors %}
-                        <p class="text-sm text-red-600 mt-1">{{ err }}</p>
-                    {% endfor %}
-                </div>
-                <div class="mb-4">
-                    {{ login_form.password.label(class_='block text-sm font-medium text-gray-700') }}
-                    {{ login_form.password(class_='w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500', id='password') }}
-                    {% for err in login_form.password.errors %}
-                        <p class="text-sm text-red-600 mt-1">{{ err }}</p>
-                    {% endfor %}
-                </div>
-                <div class="mb-4 flex items-center gap-2">
-                    {{ login_form.remember_me() }}
-                    <label class="text-sm text-gray-600">Remember me</label>
-                </div>
-                <div>
-                    {{ login_form.submit(class_='w-full bg-indigo-600 text-white font-medium px-6 py-2 rounded-md hover:bg-indigo-700 transition-colors shadow-sm') }}
-                </div>
-            </form>
-
-            {# Signup form using WTForms RegistrationForm (hidden by default) #}
-            <form id="signup-form" class="mt-6 hidden" aria-hidden="true" method="POST" action="{{ url_for('register') }}">
-                {{ register_form.hidden_tag() }}
-                <div class="mb-3">
-                    {{ register_form.email_address.label(class_='block text-sm font-medium text-gray-700') }}
-                    {{ register_form.email_address(class_='w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500', id='signup-email') }}
-                    {% for err in register_form.email_address.errors %}
-                        <p class="text-sm text-red-600 mt-1">{{ err }}</p>
-                    {% endfor %}
-                </div>
-                <div class="mb-3">
-                    {{ register_form.preferred_name.label(class_='block text-sm font-medium text-gray-700') }}
-                    {{ register_form.preferred_name(class_='w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500') }}
-                    {% for err in register_form.preferred_name.errors %}
-                        <p class="text-sm text-red-600 mt-1">{{ err }}</p>
-                    {% endfor %}
-                </div>
-                <div class="mb-3">
-                    {{ register_form.password.label(class_='block text-sm font-medium text-gray-700') }}
-                    {{ register_form.password(class_='w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500', id='signup-password') }}
-                    {% for err in register_form.password.errors %}
-                        <p class="text-sm text-red-600 mt-1">{{ err }}</p>
-                    {% endfor %}
-                </div>
-                <div class="mb-3">
-                    {{ register_form.repeated_password.label(class_='block text-sm font-medium text-gray-700') }}
-                    {{ register_form.repeated_password(class_='w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500') }}
-                    {% for err in register_form.repeated_password.errors %}
-                        <p class="text-sm text-red-600 mt-1">{{ err }}</p>
-                    {% endfor %}
-                </div>
-                <div>
-                    {{ register_form.submit(class_='w-full bg-white border border-indigo-600 text-indigo-600 font-medium px-6 py-2 rounded-md hover:bg-indigo-50 transition-colors') }}
-                </div>
-            </form>
-        </div>
-
-        <footer class="text-center mt-8 text-sm text-gray-500">
-            <p>Contact Us: <span class="text-indigo-600">emailaddress@email.com</span> | Phone: <span class="text-indigo-600">00000 000 000</span></p>
-        </footer>
-    </div>
-
-    <script>
-        // Header dropdown and local login/signup toggle for the home page
-        document.addEventListener('DOMContentLoaded', function () {
-            const btn = document.getElementById('profile-btn');
-            const menu = document.getElementById('profile-menu');
-            const loginBtn = document.getElementById('menu-login');
-            const signupBtn = document.getElementById('menu-signup');
-            const loginForm = document.getElementById('login-form');
-            const signupForm = document.getElementById('signup-form');
-
-            function openMenu() {
-                if (!menu) return;
-                menu.classList.remove('hidden');
-                menu.setAttribute('aria-hidden', 'false');
-                btn.setAttribute('aria-expanded', 'true');
-            }
-
-            function closeMenu() {
-                if (!menu) return;
-                menu.classList.add('hidden');
-                menu.setAttribute('aria-hidden', 'true');
-                btn.setAttribute('aria-expanded', 'false');
-            }
-
-            btn?.addEventListener('click', function (ev) {
-                ev.stopPropagation();
-                if (!menu) return;
-                if (menu.classList.contains('hidden')) openMenu(); else closeMenu();
-            });
-
-            loginBtn?.addEventListener('click', function () {
-                // Hide signup form and focus login
-                if (signupForm) {
-                    signupForm.classList.add('hidden');
-                    signupForm.setAttribute('aria-hidden', 'true');
-                }
-                if (loginForm) {
-                    loginForm.scrollIntoView({behavior: 'smooth', block: 'center'});
-                    loginForm.querySelector('input[name="email"]')?.focus();
-                }
-                closeMenu();
-            });
-
-            signupBtn?.addEventListener('click', function () {
-                if (signupForm) {
-                    signupForm.classList.remove('hidden');
-                    signupForm.setAttribute('aria-hidden', 'false');
-                    signupForm.scrollIntoView({behavior: 'smooth', block: 'center'});
-                    signupForm.querySelector('input[name="signup-email"]')?.focus();
-                }
-                closeMenu();
-            });
-
-            // Close menu when clicking outside or pressing Escape
-            document.addEventListener('click', function () { closeMenu(); });
-            document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') closeMenu(); });
-        });
-    </script>
+        <section class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <article class="bg-white border border-gray-200 rounded-xl p-5">
+                <h2 class="font-semibold text-gray-900">Easy setup</h2>
+                <p class="mt-2 text-sm text-gray-600">Create an account and pair your alarm clock in minutes.</p>
+            </article>
+            <article class="bg-white border border-gray-200 rounded-xl p-5">
+                <h2 class="font-semibold text-gray-900">Flexible alarms</h2>
+                <p class="mt-2 text-sm text-gray-600">Add alarms across multiple weekdays in one step.</p>
+            </article>
+            <article class="bg-white border border-gray-200 rounded-xl p-5">
+                <h2 class="font-semibold text-gray-900">Smart dashboard</h2>
+                <p class="mt-2 text-sm text-gray-600">View devices, upcoming alarms, and quick actions at a glance.</p>
+            </article>
+        </section>
+    </main>
 </body>
 </html>
