@@ -109,7 +109,6 @@ class FlaskAPIClient:
 
         try:
             response = self._post(path, payload)
-
             if response.headers.get("Content-Type", "").lower().startswith("application/json"):
                 data = response.json()
             else:
@@ -121,14 +120,13 @@ class FlaskAPIClient:
                 return None
 
             alarms = []
-            for alarm in data.get('alarms', []) or []:
+            for alarm in data.get('alarms'):
                 try:
-                    if alarm.get("enabled") and alarm.get("day_of_week"):
+                    if alarm.get("enabled") and alarm.get("day_of_week") is not None:
                         alarms.append(alarm)
                 except Exception:
                     # skip malformed alarm entries
                     continue
-
             print("RETURNING ALARMS")
             return alarms
 
