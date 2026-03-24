@@ -2,12 +2,13 @@
 This module is the main script for the physical alarm system, controlling the main loop
 and delegating tasks to other modules.
 """
+import os
 import time
 
 from dotenv import load_dotenv
 
-from alarm.io.input_handler import DebugInputHandler
-from alarm.io.output_handler import DebugOutputHandler
+from alarm.io.input_handler import DebugInputHandler, RaspberryPiInputHandler
+from alarm.io.output_handler import DebugOutputHandler, RaspberryPiOutputHandler
 from alarm.io.input_handler import InputEventType
 from alarm.flask_api_client import FlaskAPIClient, PairingStatus
 from alarm.alarm_controller import AlarmController
@@ -18,8 +19,14 @@ SERIAL_NUMBER = "rctvytbi7876urvytfyjg"
 
 flask_api_client = FlaskAPIClient(serial_number=SERIAL_NUMBER)
 
-input_handler = DebugInputHandler() # Change to RaspberryPiInputHandler() if on Pi
-output_handler = DebugOutputHandler() # Change to RaspberryPiOutputHandler() if on Pi
+if str(os.getenv("DEVICE_DEBUG_MODE")).lower() == "true":
+    input_handler = DebugInputHandler()
+    output_handler = DebugOutputHandler()
+elif str(os.getenv("DEVICE_DEBUG_MODE")).lower() == "false":
+    input_handler = RaspberryPiInputHandler()
+    output_handler = RaspberryPiOutputHandler()
+else:
+    raise Exception(f"DEVICE_DEBUG_MODE either not defined or valid: {os.getenv('DEVICE_DEBUG_MODE')}")
 
 alarm_controller = AlarmController(input_handler, output_handler)
 
