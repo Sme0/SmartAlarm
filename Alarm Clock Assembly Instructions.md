@@ -7,6 +7,8 @@
 - Buzzer
 - LCD display
 - LED button
+- (Optional) Gesture sensor
+  
 ### Assembly
 
 1. Attach the Grove Pi module to the top of the Raspberry Pi.
@@ -26,4 +28,8 @@
 7. Connect the Raspberry Pi via HDMI to a display
 
 8. Connect the power cable to the Raspberry Pi to turn it on
+
+### If using gesture sensor
+
+9. Connect gesture sensor to I2C-2 port on the Grove Pi
 
