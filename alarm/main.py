@@ -15,7 +15,10 @@ from alarm.alarm_controller import AlarmController
 from alarm.alarm_state import AlarmState
 
 load_dotenv()
-SERIAL_NUMBER = "rctvytbi7876urvytfyjg"
+SERIAL_NUMBER = os.getenv("SERIAL_NUMBER")
+
+if not SERIAL_NUMBER:
+    raise ValueError("SERIAL_NUMBER environment variable is not set. Please set it in the .env file.")
 
 flask_api_client = FlaskAPIClient(serial_number=SERIAL_NUMBER)
 
@@ -26,7 +29,7 @@ elif str(os.getenv("DEVICE_DEBUG_MODE")).lower() == "false":
     input_handler = RaspberryPiInputHandler()
     output_handler = RaspberryPiOutputHandler()
 else:
-    raise Exception(f"DEVICE_DEBUG_MODE either not defined or valid: {os.getenv('DEVICE_DEBUG_MODE')}")
+    raise Exception(f"DEVICE_DEBUG_MODE environment variable either not defined or valid: {os.getenv('DEVICE_DEBUG_MODE')}")
 
 alarm_controller = AlarmController(input_handler, output_handler)
 
