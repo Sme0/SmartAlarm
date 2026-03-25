@@ -11,8 +11,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy app code into container
 COPY . .
 
-# Expose port 8080 to match docker-compose mapping
-EXPOSE 8080
+# Default application port across local Python, Docker and Compose
+ENV FLASK_HOST_PORT=5000
 
-# Start the Flask app with Gunicorn
-ENTRYPOINT ["gunicorn", "app:app", "--bind", "0.0.0.0:8080"]
+# Expose the default application port
+EXPOSE 5000
+
+# Start the Flask app with Gunicorn on FLASK_HOST_PORT
+ENTRYPOINT ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${FLASK_HOST_PORT:-5000}"]

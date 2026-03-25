@@ -5,15 +5,13 @@ services:
     build: .
     restart: unless-stopped     #Restarts if container crashes
     ports:
-      - "${FLASK_HOST_PORT}:8080"        # maps host 5000 → container 8080 (Gunicorn)
+      - "${FLASK_HOST_PORT:-5000}:${FLASK_HOST_PORT:-5000}"  # same host/container port
     env_file:
       - .env               # load environment variables from .env
     environment:
       PYTHONUNBUFFERED: 1
-      MYSQL_HOST: db        # hostname of MySQL container
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      DB_ENGINE: ${DB_ENGINE:-mysql}
+      DB_HOST: db           # hostname of MySQL container
     depends_on:
       db:
         condition: service_healthy
@@ -21,19 +19,17 @@ services:
   db:
     image: mysql:8.0
     restart: always
-    env_file:
-      - .env               # load credentials for MySQL
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
     ports:
       - "3306:3306"        # optional, exposes MySQL for external tools
     volumes:
       - db_data:/var/lib/mysql   # persist MySQL data across restarts
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${MYSQL_USER}", "-p${MYSQL_PASSWORD}" ]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${DB_USER}", "-p${DB_PASSWORD}" ]
       interval: 5s
       timeout: 5s
       retries: 10

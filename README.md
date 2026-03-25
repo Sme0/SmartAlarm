@@ -14,7 +14,7 @@ The following software is required to run the project:
 #### Web Application
 
 - **Docker Desktop (recommended)** - required for the containerised version.
-- **Python 3.12+** - required for running the application in development mode without Docker.
+- **Python 3.12+** - required for running the application without Docker.
 - **pip** - required to install dependencies without Docker.
 - **Git (optional)** - for cloning the repository.
 
@@ -33,8 +33,8 @@ Download the project or clone the project repository, and navigate to the downlo
 git clone <repository-url>
 cd <repository-folder>
 ```
-All dependencies will be automatically installed if running with Docker. If you are not running with Docker
-(development mode), install the python dependencies manually:
+All dependencies will be automatically installed if running with Docker. If you are not running with Docker, 
+install the python dependencies manually:
 ```commandline
 pip install -r requirements.txt
 ```
@@ -44,26 +44,44 @@ TODO: Detailed commands and steps to install dependencies and set up the environ
 
 ### Configuration
 
-Below are the following steps to correctly configure the project:
-
-#### Web Application
-
 Copy the example environment file as the basis for its .env:
 ```commandline
 cp .env.example .env
 ```
 This file contains configuration values such as:
 
-- Database general details
-- Database login details
-- Flask secret key
+- Database details
+- Flask setup
+- Alarm device details
 
-If running with Docker/in production, you may ignore most of the attributes.
-However, ensure you have modified the secret key and database login details
-from their default values.
+#### Web Application
 
-If running in Development Mode, ensure you change the secret key attribute from its default, and follow the instructions
-inside the .env file.
+By default, the database is set to a local SQLite DB, stored inside the repository. This can be changed by modifying the
+database/db fields to link the project to a production database, by either providing a database url, or filling out the
+individual database details. 
+
+If using Docker, ensure that any database url you supply resolves to an IPv4 address, unless otherwise configured.
+
+Below is an example of specifying the docker-compose MySQL database, although these should only be used as EXAMPLE data, and be changed on deployment:
+```dotenv
+DATABASE_URL=
+
+DB_ENGINE=mysql
+
+SQLITE_PATH=
+
+DB_USER=example_username
+DB_PASSWORD=example_password
+DB_HOST=db
+DB_PORT=3306
+DB_NAME=db
+
+MYSQL_ROOT_PASSWORD=root_password
+
+FLASK_HOST_PORT=5000
+```
+
+Ensure a flask secret key is entered for the application to run.
 
 #### Physical Device
 TODO: Instructions on how to configure the project, including any environment variables or configuration files that need to be set.
@@ -76,36 +94,38 @@ Instructions on how to run each aspect of the project:
 
 #### Running with Docker (Recommended)
 
-From the project root directory, run:
+To run docker-compose with the local MySQL server, run:
 ```commandline
 docker compose up --build
 ```
-This will start both the web application and the MySQL database. Once both containers are up and running,
-open a browser and navigate to:
+
+To run only Docker file and use another database of your choice, run (assuming ports are 5000):
+```commandline
+docker build -t alarm-web .
+docker run -p 5000:5000 --env-file .env alarm-web
+```
+
+Running one of these sets of commands will start the web application, and link/start the corresponding database.
+Assuming no errors occur, you may access the web application, for example using:
 ```
 http://localhost:<port>
 ```
 This will however depend on where the docker is being run, and the port you have entered into the .env file.
 
-#### Running in Development Mode (Without Docker)
+#### Running directly with Python (Without Docker)
 
-Assuming all dependencies have already been installed (as per above instructions), run the flask development
-server using one of the following (depending on operating system):
+Assuming all dependencies have already been installed (as per above instructions), run the dedicated python script using one
+of the following (depending on operating system):
 
 ```commandline
-Windows -> python run_dev_server.py
-MacOS/Linux -> python3 run_dev_server.py
+Windows -> python web.py
+MacOS/Linux -> python3 web.py
 ```
-Then open a browser and navigate to:
+Assuming no errors occur, you may now access the web application, for example using:
 ```
 http://localhost:<port>
 ```
-This mode will run using:
 
-- The Flask development server
-- A local SQLite database
-
-This mode is intended for development and testing ONLY.
 
 ### Physical Device
 
