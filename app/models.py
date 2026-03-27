@@ -4,6 +4,7 @@ and not telemetry data that will be recorded on ThingsBoard.
 """
 import random
 import string
+from abc import abstractmethod
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -171,7 +172,7 @@ class Alarm(db.Model):
     user = db.relationship('User', backref=db.backref('alarms', lazy='select'))
 
     @staticmethod
-    def create(device_serial: str, user_id: str, time: time, day_of_week: int, enabled: bool, puzzle_type: str):
+    def create(device_serial: str, user_id: str, time, day_of_week: int, enabled: bool, puzzle_type: str):
         alarm = Alarm()
         alarm.device_serial = device_serial
         alarm.user_id = user_id
@@ -183,3 +184,82 @@ class Alarm(db.Model):
 
         db.session.add(alarm)
         db.session.commit()
+
+class AlarmSession(db.Model):
+    __tablename__ = 'alarm_sessions'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    device_serial = db.Column(db.String(64), db.ForeignKey('devices.serial_number'), nullable=False)
+    triggered_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.utcnow())
+
+    @staticmethod
+    def create(user_id: int, device_serial: str, when: datetime | None = None):
+        """
+        Create and persist an AlarmSession entry recording when an alarm fired.
+
+        :param user_id: id of the user owning the device
+        :param device_serial: device serial which triggered
+        :param when: optional timezone-aware datetime; if omitted, now (UTC) is used
+        :return: the created AlarmSession instance
+        """
+        if when is None:
+            when = datetime.now(timezone.utc)
+
+        session = AlarmSession()
+        session.user_id = user_id
+        session.device_serial = device_serial
+        session.triggered_at = when
+
+        db.session.add(session)
+        db.session.commit()
+        return session
+
+class PuzzleSession(db.Model):
+    __tablename__ = 'puzzle_sessions'
+    id = db.Column(db.Integer, primary_key=True)
+    alarm_session_id = db.Column(
+        db.Integer,
+        db.ForeignKey('alarm_sessions.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    puzzle_type = db.Column(db.String(16), nullable=False)
+    question = db.Column(db.String(64), nullable=False)
+    is_correct = db.Column(db.Boolean, nullable=False)
+    time_taken_seconds = db.Column(db.Integer, nullable=False)
+
+    # Let the DB perform cascade deletes; avoid ORM issuing separate DELETEs by using passive_deletes.
+    alarm_session = db.relationship(
+        'AlarmSession',
+        backref=db.backref('puzzle_sessions', lazy='select'),
+        passive_deletes=True,
+        foreign_keys=[alarm_session_id],
+    )
+
+    @abstractmethod
+    def create(
+        self,
+        alarm_session_id: str,
+        puzzle_type: str,
+        question: str,
+        is_correct: bool,
+        time_taken_seconds: int,
+    ):
+        """
+        :param alarm_session_id: id of the alarm session
+        :param puzzle_type: type of puzzle
+        :param question: question of the puzzle
+        :param is_correct: was the answer correct
+        :param time_taken_seconds: time to complete the puzzle
+        :return:
+        """
+        session = PuzzleSession()
+        session.alarm_session_id = alarm_session_id
+        session.puzzle_type = puzzle_type
+        session.question = question
+        session.is_correct = is_correct
+        session.time_taken_seconds = time_taken_seconds
+        db.session.add(session)
+        db.session.commit()
+
+
