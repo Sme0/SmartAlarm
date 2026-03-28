@@ -628,6 +628,8 @@ def pairing_status():
 
     device = Device.query.get(serial_number)
 
+    device.update_heartbeat()
+
     if device is None:
         return jsonify({
             "response": "failed",
@@ -650,40 +652,6 @@ def pairing_status():
         "response": "pairing",
         "message": "Waiting for user to enter pairing code"
     })
-
-@app.route("/api/device/heartbeat", methods=['POST'])
-@csrf.exempt
-def heartbeat():
-    """
-    API route for the device to send a heartbeat update
-    :return: success or failed depending on outcome
-    """
-    data = request.get_json()
-    if not data:
-        return jsonify({
-            "response": "failed",
-            "message": "invalid request"
-        }), 400
-
-    serial_number = data.get("serial_number")
-    if not serial_number:
-        return jsonify({
-            "response": "failed",
-            "message": "missing serial number"
-        }), 400
-
-    device = Device.query.get(serial_number)
-    if device:
-        device.update_heartbeat()
-        return jsonify({
-            "response": "success",
-            "message": "heartbeat recognised"
-        })
-
-    return jsonify({
-        "response": "failed",
-        "message": "invalid serial number"
-    }), 400
 
 @app.route("/api/device/get-alarms", methods=["POST"])
 @csrf.exempt
@@ -713,6 +681,8 @@ def get_alarms():
             "response": "failed",
             "message": "device not paired"
         })
+
+    device.update_heartbeat()
 
     alarms: list[Alarm] = device.get_alarms()
     return jsonify({
@@ -751,6 +721,8 @@ def pair_device_debug(code=None):
                 or (device.pairing_expiry < datetime.utcnow())):
             print("Invalid pairing code. Enter the code on your device.")
             return "Invalid pairing code."
+
+        device.update_heartbeat()
 
         # Pair device with user
         user = User.query.filter_by(

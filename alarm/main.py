@@ -115,7 +115,6 @@ def main_alarm_loop():
         # Comment out if not using webserver yet
         current_time = time.time()
         if current_time - last_heartbeat_time >= 15.0:
-            flask_api_client.heartbeat()
             alarm_controller.alarms = flask_api_client.get_alarms()
             print(f"Active alarms: {alarm_controller.alarms}, {alarm_controller.snooze_alarms}")
 

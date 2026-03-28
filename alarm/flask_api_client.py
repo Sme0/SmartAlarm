@@ -4,6 +4,8 @@ import requests
 from dotenv import load_dotenv
 from requests.exceptions import SSLError, RequestException
 
+from alarm.alarm_controller import Alarm
+
 load_dotenv()
 
 TIMEOUT = 5
@@ -121,7 +123,16 @@ class FlaskAPIClient:
             for alarm in data.get('alarms'):
                 try:
                     if alarm.get("enabled") and alarm.get("day_of_week") is not None:
-                        alarms.append(alarm)
+                        alarms.append(Alarm(
+                            id=alarm.get("id"),
+                            time=alarm.get("time"),
+                            enabled=alarm.get("enabled"),
+                            day_of_week=alarm.get("day_of_week"),
+                            puzzle_type=alarm.get("puzzle_type"),
+                            max_snoozes=alarm.get("max_snoozes"),
+                            snooze_count=0,
+                            source_alarm_id=alarm.get("id")
+                        ))
                 except Exception:
                     # skip malformed alarm entries
                     continue
@@ -130,30 +141,3 @@ class FlaskAPIClient:
 
         except Exception:
             return None
-
-
-    def heartbeat(self) -> bool:
-        """
-        Sends heartbeat update to the server
-        :return: True if success, False if failed
-        """
-        path = "/api/device/heartbeat"
-        payload = {"serial_number": self.serial_number}
-
-        try:
-            response = self._post(path, payload)
-
-            if response.headers.get("Content-Type", "").lower().startswith("application/json"):
-                data = response.json()
-            else:
-                print("Failed to send heartbeat: " + response.text)
-                return False
-
-            if response.status_code != 200:
-                print("Failed to send heartbeat: ", data.get('reason', 'unknown reason'))
-                return False
-
-            return data.get('response') == 'success'
-
-        except Exception:
-            return False

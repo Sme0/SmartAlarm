@@ -1,9 +1,12 @@
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import List
+
 from alarm.io.output_handler import OutputHandler
 from alarm.io.input_handler import InputHandler
 from alarm.alarm_state import AlarmState
-from alarm.puzzles.maths_puzzle import MathsPuzzle
 from alarm.puzzles.memory_puzzle import MemoryPuzzle
+from alarm.puzzles.puzzle import Puzzle
 
 
 def get_current_day_of_week_number():
@@ -11,6 +14,17 @@ def get_current_day_of_week_number():
     Returns the current day of the week as a number (Monday=0, Sunday=6)
     """
     return datetime.today().weekday()
+
+@dataclass
+class Alarm:
+    id: str
+    time: str
+    enabled: bool
+    day_of_week: int
+    puzzle_type: str
+    max_snoozes: int
+    snooze_count: int
+    source_alarm_id: str
 
 
 class AlarmController:
@@ -25,12 +39,12 @@ class AlarmController:
         self.last_displayed_minute = None
 
         # Alarms in 24-hour format
-        self.alarms = []
-        self.snooze_alarms = []
+        self.alarms: List[Alarm] = []
+        self.snooze_alarms: List[Alarm] = []
 
         # Current alarm state
         self.state : AlarmState = AlarmState.WAITING
-        self.current_triggered_alarm = None
+        self.current_triggered_alarm: Alarm | None = None
 
     def update(self):
         # Update current time
@@ -47,7 +61,7 @@ class AlarmController:
 
         # Check each alarm and trigger if needed
         for alarm in (self.alarms + self.snooze_alarms):
-            if self.state == AlarmState.WAITING and day_of_week == alarm["day_of_week"] and self.current_time == (alarm["time"] + ":00"):
+            if self.state == AlarmState.WAITING and day_of_week == alarm.day_of_week and self.current_time == (alarm.time + ":00"):
                 self.trigger_alarm(alarm)
                 return True
 
@@ -79,7 +93,7 @@ class AlarmController:
         """
         self.state = AlarmState.PUZZLE
         # TODO: Choose game automatically
-        puzzle = MemoryPuzzle(self.input_handler, self.output_handler)
+        puzzle: Puzzle = MemoryPuzzle(self.input_handler, self.output_handler)
         puzzle.run_puzzle()
         self.stop_alarm()
 
@@ -91,29 +105,28 @@ class AlarmController:
         if not self.current_triggered_alarm:
             return
 
-        max_snoozes = int(self.current_triggered_alarm.get("max_snoozes", 3))
+        max_snoozes = int(self.current_triggered_alarm.max_snoozes)
         if max_snoozes < 0:
             max_snoozes = 0
 
-        current_snooze_count = int(self.current_triggered_alarm.get("snooze_count", 0))
+        current_snooze_count = self.current_triggered_alarm.snooze_count
         if current_snooze_count >= max_snoozes:
             self.output_handler.display_text("Snooze limit reached")
             return
 
         # TODO: Make snooze time editable through web
         snooze_time = (datetime.utcnow() + timedelta(minutes=5)).strftime("%H:%M")
-        source_alarm_id = self.current_triggered_alarm.get("source_alarm_id", self.current_triggered_alarm.get("id"))
-        next_snooze_count = current_snooze_count + 1
-        self.snooze_alarms.append({
-            "id": f"{source_alarm_id}-Snooze-{next_snooze_count}",
-            "time": snooze_time,
-            "enabled": True,
-            "day_of_week": get_current_day_of_week_number(),
-            "puzzle_type": self.current_triggered_alarm.get("puzzle_type", "none"),
-            "max_snoozes": max_snoozes,
-            "snooze_count": next_snooze_count,
-            "source_alarm_id": source_alarm_id,
-        })
+        source_alarm_id = self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id
+        self.snooze_alarms.append(Alarm(
+            id=f"{source_alarm_id}-Snooze-{current_snooze_count + 1}",
+            time=snooze_time,
+            enabled=True,
+            day_of_week=get_current_day_of_week_number(),
+            puzzle_type=self.current_triggered_alarm.puzzle_type,
+            max_snoozes=max_snoozes,
+            snooze_count=current_snooze_count + 1,
+            source_alarm_id=source_alarm_id,
+        ))
         self.stop_alarm()
 
 

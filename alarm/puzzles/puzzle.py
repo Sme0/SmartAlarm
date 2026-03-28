@@ -22,6 +22,9 @@ class Puzzle(ABC):
         #TODO: Move snooze logic to AlarmController
         self.num_snoozes = 0
         self.snooze_cap = 3
+
+        self.start_time = None
+        self.end_time = None
         self.time_limit = 120
 
 
@@ -42,14 +45,13 @@ class Puzzle(ABC):
         """
         pass
 
-    def check_answer(self, answer) -> bool:
+    def check_answer(self) -> bool:
         """
         Checks answer and returns the result. May be overridden if logic for a specific puzzle
         is different.
-        :param answer: The user's answer
         :return: The result
         """
-        return answer == self.solution
+        return self.get_user_answer() == self.solution
 
     def on_joystick_left(self):
         """
@@ -123,11 +125,11 @@ class Puzzle(ABC):
         self.display_puzzle()
 
         #may need to fix so that timer isn't paused while waiting for input, depends on how inputhandler works
-        start_time = time.time()
+        self.start_time = time.time()
 
         # Poll input events until timeout and only submit when a submit event arrives.
         while True:
-            if time.time() - start_time > self.time_limit:
+            if time.time() - self.start_time > self.time_limit:
                 self.output_handler.display_text("Puzzle timeout")
                 return False
 
@@ -147,8 +149,8 @@ class Puzzle(ABC):
             for event in events:
 
                 if event.event_type == InputEventType.JOYSTICK_PRESS:
-                    answer = self.get_user_answer()
-                    if self.check_answer(answer):
+                    self.end_time = time.time()
+                    if self.check_answer():
                         self.output_handler.display_text("Correct")
                         return True
 

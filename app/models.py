@@ -236,9 +236,8 @@ class PuzzleSession(db.Model):
         foreign_keys=[alarm_session_id],
     )
 
-    @abstractmethod
+    @staticmethod
     def create(
-        self,
         alarm_session_id: str,
         puzzle_type: str,
         question: str,
@@ -261,5 +260,5 @@ class PuzzleSession(db.Model):
         session.time_taken_seconds = time_taken_seconds
         db.session.add(session)
         db.session.commit()
-
+        return session
 
