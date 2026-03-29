@@ -6,9 +6,16 @@ from datetime import datetime, timezone
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from app import app, database as db, login_manager, csrf
-from app.models import User, Device, Alarm
+from app.models import User, Device, Alarm, AlarmSession, PuzzleSession
 from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm, EditAlarmForm, DeviceSettingsForm
 from werkzeug.exceptions import InternalServerError
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+def _is_expired(value: datetime | None) -> bool:
+    return value is not None and value < _utc_now()
 
 # Return JSON 401 for API/AJAX requests, otherwise redirect to the login page.
 @login_manager.unauthorized_handler
@@ -118,7 +125,7 @@ def dashboard():
 
     next_alarm = None
     if enabled_alarms:
-        now = datetime.now()
+        now = _utc_now()
         current_day = now.weekday()
         current_minutes = now.hour * 60 + now.minute
 
@@ -229,7 +236,7 @@ def pair_device():
         code = pairing_form.pairing_code.data.strip().upper()
         device = Device.query.filter_by(pairing_code=code).first()
 
-        if device is None or not device.pairing_expiry or (device.pairing_expiry < datetime.utcnow()):
+        if device is None or not device.pairing_expiry or _is_expired(device.pairing_expiry):
             flash("Invalid or expired pairing code. Enter the code on your device.", "danger")
             return render_template('pair_device.html', pairing_form=pairing_form)
 
@@ -309,7 +316,7 @@ def add_alarm():
                 alarm.time = alarm_time
                 alarm.day_of_week = day_idx
                 alarm.enabled = True
-                alarm.created_at = datetime.utcnow()
+                alarm.created_at = _utc_now()
                 alarm.puzzle_type = form.puzzle_type.data
                 db.session.add(alarm)
             db.session.commit()
@@ -324,7 +331,7 @@ def add_alarm():
     return render_template('add_alarm.html', form=form)
 
 
-@app.route('/alarms/<int:alarm_id>/edit', methods=['GET', 'POST'])
+@app.route('/alarms/<string:alarm_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_alarm(alarm_id):
     alarm = Alarm.query.get(alarm_id)
@@ -390,7 +397,7 @@ def delete_alarm():
         return redirect(url_for('alarms', view_device=view_device) if view_device and view_device != 'all' else url_for('alarms'))
 
     try:
-        alarm = Alarm.query.get(int(alarm_id))
+        alarm = Alarm.query.get(alarm_id)
     except Exception:
         alarm = None
 
@@ -507,7 +514,7 @@ def api_create_alarm():
             alarm.time = alarm_time
             alarm.day_of_week = day_idx
             alarm.enabled = True
-            alarm.created_at = datetime.utcnow()
+            alarm.created_at = _utc_now()
             alarm.puzzle_type = puzzle_type
             db.session.add(alarm)
             created_alarms.append(alarm)
@@ -541,7 +548,7 @@ def api_delete_alarm():
         return jsonify({'response': 'failed', 'message': 'missing alarm_id'}), 400
 
     try:
-        alarm_id = int(data.get('alarm_id'))
+        alarm_id = data.get('alarm_id')
     except Exception:
         return jsonify({'response': 'failed', 'message': 'invalid alarm_id'}), 400
 
@@ -598,7 +605,7 @@ def request_pairing_code():
             "message": "device already paired"
         }), 400
 
-    if not device.pairing_expiry or device.pairing_expiry < datetime.utcnow():
+    if not device.pairing_expiry or _is_expired(device.pairing_expiry):
         device.generate_pairing_code()
 
     return jsonify({
@@ -628,8 +635,6 @@ def pairing_status():
 
     device = Device.query.get(serial_number)
 
-    device.update_heartbeat()
-
     if device is None:
         return jsonify({
             "response": "failed",
@@ -642,7 +647,7 @@ def pairing_status():
             "message": "Device already paired"
         })
 
-    if device.pairing_expiry and device.pairing_expiry < datetime.utcnow():
+    if device.pairing_expiry and _is_expired(device.pairing_expiry):
         return jsonify({
             "response": "failed",
             "message": "Pairing code has expired. Request a new one"
@@ -699,6 +704,110 @@ def get_alarms():
         ]
     })
 
+@app.route("/api/device/submit-complete-sessions", methods=["POST"])
+@csrf.exempt
+def submit_complete_sessions():
+    """
+    API route for a device to submit completed alarm + puzzle sessions.
+
+    Expected payload:
+    {
+        "serial_number": "DEVICE123",
+        "complete_sessions": {
+            "alarm-session-key": {
+                "triggered_at": "2026-03-29T12:00:00",
+                "puzzle_sessions": [
+                    {
+                        "puzzle_type": "memory",
+                        "question": "1+1",
+                        "is_correct": true,
+                        "time_taken_seconds": 4.2
+                    }
+                ]
+            }
+        }
+    }
+    """
+
+    # Data validation
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"response": "failed", "message": "invalid request"}), 400
+
+    serial_number = data.get("serial_number")
+    complete_sessions = data.get("complete_sessions")
+
+    if not serial_number:
+        return jsonify({"response": "failed", "message": "missing serial number"}), 400
+
+    if complete_sessions is None:
+        return jsonify({"response": "failed", "message": "missing complete_sessions"}), 400
+
+    if not isinstance(complete_sessions, dict):
+        return jsonify({"response": "failed", "message": "complete_sessions must be an dictionary"}), 400
+
+    device: Device = Device.query.get(serial_number)
+    if device is None or device.user_id is None:
+        return jsonify({"response": "failed", "message": "device not paired"}), 400
+
+    device.update_heartbeat()
+
+    try:
+        for _, session_data in complete_sessions.items():
+            if not isinstance(session_data, dict):
+                continue
+
+            when_raw = session_data.get("when") or session_data.get("triggered_at")
+            if when_raw:
+                try:
+                    normalized_when = str(when_raw).replace("Z", "+00:00")
+                    when = datetime.fromisoformat(normalized_when)
+                except (TypeError, ValueError):
+                    return jsonify({"response": "failed", "message": "invalid session datetime"}), 400
+            else:
+                when = _utc_now()
+
+            alarm_session = AlarmSession.create(
+                user_id=device.user_id,
+                device_serial=device.serial_number,
+                triggered_at=when
+            )
+
+            puzzle_sessions = session_data.get("puzzle_sessions", [])
+            if not isinstance(puzzle_sessions, list):
+                return jsonify({"response": "failed", "message": "puzzle_sessions must be a list"}), 400
+
+            for puzzle_data in puzzle_sessions:
+                if not isinstance(puzzle_data, dict):
+                    continue
+
+                puzzle_type = puzzle_data.get("puzzle_type")
+                question = puzzle_data.get("question")
+                if not puzzle_type or not question:
+                    continue
+
+                raw_time_taken = puzzle_data.get("time_taken_seconds", 0)
+                try:
+                    time_taken_seconds = int(round(float(raw_time_taken)))
+                except (TypeError, ValueError):
+                    time_taken_seconds = 0
+
+                PuzzleSession.create(
+                    alarm_session_id=alarm_session.id,
+                    puzzle_type=str(puzzle_type),
+                    question=str(question),
+                    is_correct=bool(puzzle_data.get("is_correct", False)),
+                    time_taken_seconds=time_taken_seconds,
+                )
+    except Exception:
+        db.session.rollback()
+        return jsonify({"response": "failed", "message": "db error while storing sessions"}), 500
+
+    return jsonify({
+        "response": "ok",
+        "message": "sessions stored",
+    })
+
 # Debug routes
 
 @app.route("/debug/pair-device/<code>", methods=["GET", "POST"])
@@ -718,7 +827,7 @@ def pair_device_debug(code=None):
         # If device does not exist or code is out of date
         if (device is None
                 or not device.pairing_expiry
-                or (device.pairing_expiry < datetime.utcnow())):
+                or _is_expired(device.pairing_expiry)):
             print("Invalid pairing code. Enter the code on your device.")
             return "Invalid pairing code."
 

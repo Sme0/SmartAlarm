@@ -141,3 +141,52 @@ class FlaskAPIClient:
 
         except Exception:
             return None
+
+    def send_complete_sessions(self, complete_sessions: dict) -> bool:
+        """
+        Sends complete alarm/puzzle session data to the server.
+
+        Expected input format:
+        {
+            "<alarm_session_id>": {
+                "triggered_at": "2026-03-29T12:00:00",
+                "puzzle_sessions": [
+                    {
+                        "alarm_session_id": "<alarm_session_id>",
+                        "puzzle_type": "memory",
+                        "question": "...",
+                        "is_correct": True,
+                        "time_taken_seconds": 12.4
+                    }
+                ]
+            }
+        }
+        :param complete_sessions: alarm/puzzle session data in the above format
+        :return: success
+        """
+        if not complete_sessions:
+            return True
+
+        path = "/api/device/submit-complete-sessions"
+        payload = {
+            "serial_number": self.serial_number,
+            "complete_sessions": complete_sessions,
+        }
+
+        try:
+            response = self._post(path, payload)
+
+            if response.headers.get("Content-Type", "").lower().startswith("application/json"):
+                data = response.json()
+            else:
+                print("Failed to submit complete sessions: " + response.text)
+                return False
+
+            if response.status_code != 200:
+                print("Failed to submit complete sessions: ", data.get("message", data.get("reason", "unknown reason")))
+                return False
+
+            return True
+
+        except Exception:
+            return False

@@ -4,7 +4,7 @@ and not telemetry data that will be recorded on ThingsBoard.
 """
 import random
 import string
-from abc import abstractmethod
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -14,6 +14,9 @@ from sqlalchemy.exc import IntegrityError
 from app import database as db
 from app import login_manager as lm
 
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 class User(UserMixin, db.Model):
     """User model for account management."""
@@ -110,14 +113,14 @@ class Device(db.Model):
 
         return device
 
-    def generate_pairing_code(self) -> (str, datetime):
+    def generate_pairing_code(self) -> tuple[str, datetime]:
         while True:
             code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
             if not Device.query.filter_by(pairing_code=code).first():
                 break
 
         self.pairing_code = code
-        self.pairing_expiry = datetime.utcnow() + timedelta(minutes=5)
+        self.pairing_expiry = _utc_now() + timedelta(minutes=5)
         db.session.commit()
         return self.pairing_code, self.pairing_expiry
 
@@ -128,13 +131,13 @@ class Device(db.Model):
         db.session.commit()
 
     def update_heartbeat(self):
-        self.last_seen = datetime.utcnow()
+        self.last_seen = _utc_now()
         db.session.commit()
 
     def is_online(self) -> bool:
         if not self.last_seen:
             return False
-        return datetime.utcnow() - self.last_seen < timedelta(minutes=2)
+        return _utc_now() - self.last_seen < timedelta(minutes=2)
 
     def get_alarms(self) -> list['Alarm']:
         return Alarm.query.filter_by(device_serial=self.serial_number, user_id=self.user_id).all()
@@ -159,13 +162,13 @@ class Device(db.Model):
 
 class Alarm(db.Model):
     __tablename__ = 'alarms'
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
     device_serial = db.Column(db.String(64), db.ForeignKey('devices.serial_number'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     time = db.Column(db.Time, nullable=False)
     day_of_week = db.Column(db.Integer, nullable=False, default=0)  # 0=Monday, 6=Sunday
     enabled = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.utcnow())
+    created_at = db.Column(db.DateTime(timezone=True), default=_utc_now)
     puzzle_type = db.Column(db.String(16), nullable=False, default='random')
 
     device = db.relationship('Device', backref=db.backref('alarms', lazy='select'))
@@ -179,7 +182,7 @@ class Alarm(db.Model):
         alarm.time = time
         alarm.day_of_week = day_of_week
         alarm.enabled = enabled
-        alarm.created_at = datetime.utcnow()
+        alarm.created_at = _utc_now()
         alarm.puzzle_type = puzzle_type
 
         db.session.add(alarm)
@@ -190,25 +193,25 @@ class AlarmSession(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     device_serial = db.Column(db.String(64), db.ForeignKey('devices.serial_number'), nullable=False)
-    triggered_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.utcnow())
+    triggered_at = db.Column(db.DateTime(timezone=True), nullable=False, default=_utc_now)
 
     @staticmethod
-    def create(user_id: int, device_serial: str, when: datetime | None = None):
+    def create(user_id: int, device_serial: str, triggered_at: datetime | None = None):
         """
         Create and persist an AlarmSession entry recording when an alarm fired.
 
         :param user_id: id of the user owning the device
         :param device_serial: device serial which triggered
-        :param when: optional timezone-aware datetime; if omitted, now (UTC) is used
+        :param triggered_at: optional timezone-aware datetime; if omitted, now (UTC) is used
         :return: the created AlarmSession instance
         """
-        if when is None:
-            when = datetime.now(timezone.utc)
+        if triggered_at is None:
+            triggered_at = datetime.now(timezone.utc)
 
         session = AlarmSession()
         session.user_id = user_id
         session.device_serial = device_serial
-        session.triggered_at = when
+        session.triggered_at = triggered_at
 
         db.session.add(session)
         db.session.commit()

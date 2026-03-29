@@ -1,6 +1,8 @@
+import os
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import List
+from datetime import datetime, timedelta, timezone
+from typing import List, Dict, Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from alarm.io.output_handler import OutputHandler
 from alarm.io.input_handler import InputHandler
@@ -9,11 +11,40 @@ from alarm.puzzles.memory_puzzle import MemoryPuzzle
 from alarm.puzzles.puzzle import Puzzle
 
 
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _resolve_clock_timezone():
+    """
+    Resolve timezone in this priority:
+    1) DEVICE_TIMEZONE env var (e.g. Europe/London)
+    2) OS/device local timezone
+    3) UTC fallback
+    """
+    configured_tz = (os.getenv("DEVICE_TIMEZONE") or "").strip()
+    if configured_tz:
+        try:
+            return ZoneInfo(configured_tz)
+        except ZoneInfoNotFoundError:
+            print(f"Invalid DEVICE_TIMEZONE '{configured_tz}', falling back to device timezone")
+
+    local_tz = datetime.now().astimezone().tzinfo
+    return local_tz or timezone.utc
+
+
+CLOCK_TIMEZONE = _resolve_clock_timezone()
+
+
+def _clock_now() -> datetime:
+    return datetime.now(CLOCK_TIMEZONE)
+
+
 def get_current_day_of_week_number():
     """
     Returns the current day of the week as a number (Monday=0, Sunday=6)
     """
-    return datetime.today().weekday()
+    return _clock_now().weekday()
 
 @dataclass
 class Alarm:
@@ -45,10 +76,14 @@ class AlarmController:
         # Current alarm state
         self.state : AlarmState = AlarmState.WAITING
         self.current_triggered_alarm: Alarm | None = None
+        
+        # Session data
+        self._pending_sessions: Dict[str, Dict[str, Any]] = {}
+        self._complete_sessions: Dict[str, Dict[str, Any]] = {}
 
     def update(self):
         # Update current time
-        self.current_time = datetime.utcnow().strftime("%H:%M:%S")
+        self.current_time = _clock_now().strftime("%H:%M:%S")
 
 
     def check_alarms(self) -> bool:
@@ -56,7 +91,7 @@ class AlarmController:
         Checks if there are any alarms due to trigger.
         :return: If an alarm has been triggered
         """
-        current_minute = datetime.utcnow().minute
+        current_minute = _clock_now().minute
         day_of_week = get_current_day_of_week_number()
 
         # Check each alarm and trigger if needed
@@ -68,7 +103,7 @@ class AlarmController:
         # If there are no alarms triggered
         if self.state == AlarmState.WAITING and current_minute != self.last_displayed_minute:
             self.last_displayed_minute = current_minute
-            self.output_handler.display_text(datetime.utcnow().strftime('%H:%M'))
+            self.output_handler.display_text(_clock_now().strftime('%H:%M'))
 
         return False
 
@@ -84,17 +119,35 @@ class AlarmController:
         self.state = AlarmState.TRIGGERED
         self.current_triggered_alarm = current_alarm
 
-        self.output_handler.display_text(f"Alarm Triggered: {datetime.utcnow().strftime('%H:%M')}")
+        source_alarm_id = str(current_alarm.source_alarm_id or current_alarm.id)
+        self._pending_sessions.setdefault(source_alarm_id, {
+            "triggered_at": _utc_now().isoformat(),
+            "puzzle_sessions": [],
+        })
+
+        self.output_handler.display_text(f"Alarm Triggered: {_clock_now().strftime('%H:%M')}")
 
     def disarm_alarm(self):
         """
         Disarms the current alarm
         :return:
         """
+        if not self.current_triggered_alarm:
+            return
+
         self.state = AlarmState.PUZZLE
+        
+        # Puzzle startup logic. Use whenever a puzzle is being started
         # TODO: Choose game automatically
         puzzle: Puzzle = MemoryPuzzle(self.input_handler, self.output_handler)
         puzzle.run_puzzle()
+        source_alarm_id = str(self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id)
+        session = self._pending_sessions[source_alarm_id]
+        session["puzzle_sessions"].append(puzzle.export_session(source_alarm_id))
+
+        # On alarm completion/disarm
+        self._complete_sessions[source_alarm_id] = session
+        self._pending_sessions.pop(source_alarm_id, None)
         self.stop_alarm()
 
     def snooze_alarm(self):
@@ -115,7 +168,7 @@ class AlarmController:
             return
 
         # TODO: Make snooze time editable through web
-        snooze_time = (datetime.utcnow() + timedelta(minutes=5)).strftime("%H:%M")
+        snooze_time = (_clock_now() + timedelta(minutes=5)).strftime("%H:%M")
         source_alarm_id = self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id
         self.snooze_alarms.append(Alarm(
             id=f"{source_alarm_id}-Snooze-{current_snooze_count + 1}",
@@ -145,4 +198,9 @@ class AlarmController:
             self.current_triggered_alarm = None
             self.update()
             self.state = AlarmState.WAITING
+
+    def pull_complete_sessions(self):
+        sessions = self._complete_sessions
+        self._complete_sessions = {}
+        return sessions
 

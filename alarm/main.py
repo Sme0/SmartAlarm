@@ -92,16 +92,19 @@ def pairing_loop():
 
 
 def main_alarm_loop():
-    last_heartbeat_time = time.time()
+    last_update_time = time.time()
     previous_state = alarm_controller.state
     while True:
 
+        # Prepare for state change by clearing old inputs
         _flush_inputs_on_state_change(previous_state, alarm_controller.state)
         previous_state = alarm_controller.state
 
+        # Record inputs on this tick
         input_handler.check_inputs(state=alarm_controller.state)
         _handle_alarm_events()
 
+        # Clear old inputs again if state has changed
         _flush_inputs_on_state_change(previous_state, alarm_controller.state)
         previous_state = alarm_controller.state
 
@@ -114,11 +117,15 @@ def main_alarm_loop():
         # Send heartbeat every 30 seconds
         # Comment out if not using webserver yet
         current_time = time.time()
-        if current_time - last_heartbeat_time >= 15.0:
+        if current_time - last_update_time >= 15.0:
             alarm_controller.alarms = flask_api_client.get_alarms()
             print(f"Active alarms: {alarm_controller.alarms}, {alarm_controller.snooze_alarms}")
 
-            last_heartbeat_time = current_time
+            complete_sessions = alarm_controller.pull_complete_sessions()
+            if complete_sessions:
+                flask_api_client.send_complete_sessions(complete_sessions)
+
+            last_update_time = current_time
 
         time.sleep(0.1)
 
