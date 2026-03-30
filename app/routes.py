@@ -128,6 +128,12 @@ def session_history():
     """Show recorded alarm/puzzle sessions grouped by day for the current user."""
     display_tz, active_tz = _resolve_timezone((request.args.get("tz") or "").strip())
 
+    # Only use names for devices owned by the current user; otherwise fallback to serial number.
+    serial_to_device_name = {
+        d.serial_number: (d.name.strip() if isinstance(d.name, str) and d.name.strip() else d.serial_number)
+        for d in current_user.devices
+    }
+
     alarm_sessions = (
         AlarmSession.query
         .filter_by(user_id=current_user.id)
@@ -152,6 +158,7 @@ def session_history():
         grouped_by_day[day_key]["sessions"].append({
             "id": alarm_session.id,
             "device_serial": alarm_session.device_serial,
+            "device_display_name": serial_to_device_name.get(alarm_session.device_serial, alarm_session.device_serial),
             "triggered_at": triggered_at_local,
             "puzzle_sessions": sorted(alarm_session.puzzle_sessions, key=lambda s: s.id),
         })
