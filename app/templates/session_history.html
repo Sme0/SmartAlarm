@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Session History - SmartAlarm{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto mt-8 flex gap-8 px-6">
+    <aside class="w-64 flex flex-col gap-1 bg-white border border-gray-200 rounded-lg overflow-hidden h-fit shadow-sm">
+        <a href="{{ url_for('account', _anchor='change-details') }}" class="block w-full text-left px-5 py-3 text-sm font-medium border-b border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors">Change account details</a>
+        <a href="{{ url_for('account', _anchor='paired-devices') }}" class="block w-full text-left px-5 py-3 text-sm font-medium border-b border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors">Paired devices</a>
+        <span class="block w-full text-left px-5 py-3 text-sm font-medium border-b border-gray-100 bg-indigo-600 text-white">Session history</span>
+        <a href="{{ url_for('account', _anchor='data-permissions') }}" class="block w-full text-left px-5 py-3 text-sm font-medium border-b border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors">Data permissions</a>
+        <a href="{{ url_for('account', _anchor='delete-account') }}" class="block w-full text-left px-5 py-3 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors">Delete account</a>
+    </aside>
+
+    <main class="flex-1 bg-white border-8 border-black rounded-lg p-8 shadow-sm min-h-[500px]">
+        <h1 class="text-2xl font-bold text-gray-900 mb-4">Alarm and Puzzle Session History</h1>
+
+        {% if not day_groups %}
+            <div class="bg-white border border-gray-200 rounded-lg p-6 text-gray-600">
+                No session history recorded yet.
+            </div>
+        {% else %}
+            <section class="space-y-4">
+                {% for group in day_groups %}
+                    <article id="day-{{ group.day_key }}" class="bg-white border border-gray-200 rounded-lg p-4">
+                        <h2 class="text-lg font-semibold text-gray-900 mb-3">{{ group.day_label }}</h2>
+
+                        <div class="space-y-3">
+                            {% for alarm_session in group.sessions %}
+                                <details class="border border-gray-200 rounded-lg">
+                                    <summary class="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3 hover:bg-gray-50">
+                                        <span class="block">
+                                            <span class="block font-medium text-gray-900">Alarm session #{{ alarm_session.id }}</span>
+                                            <span class="block text-sm text-gray-600">
+                                                Triggered:
+                                                <time class="js-local-datetime" datetime="{{ alarm_session.triggered_at.isoformat() }}">
+                                                    {{ alarm_session.triggered_at.strftime('%Y-%m-%d %H:%M:%S %Z') }}
+                                                </time>
+                                                · Device: {{ alarm_session.device_serial }}
+                                            </span>
+                                        </span>
+                                        <span class="text-xs text-gray-500">{{ alarm_session.puzzle_sessions|length }} puzzle attempt(s)</span>
+                                    </summary>
+
+                                    <div class="px-4 pb-4 pt-1 border-t border-gray-100 space-y-2">
+                                        <div class="flex items-center justify-end">
+                                            <form method="POST" action="{{ url_for('delete_alarm_session', alarm_session_id=alarm_session.id) }}" onsubmit="return confirm('Delete this alarm session and all puzzle attempts in it?');">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="day" value="{{ group.day_key }}">
+                                                <input type="hidden" name="tz" value="{{ active_tz }}">
+                                                <button type="submit" class="text-xs text-red-600 hover:text-red-800">Delete alarm session</button>
+                                            </form>
+                                        </div>
+
+                                        {% if alarm_session.puzzle_sessions %}
+                                            {% for puzzle in alarm_session.puzzle_sessions %}
+                                                <details class="border border-gray-200 rounded-md">
+                                                    <summary class="cursor-pointer list-none px-3 py-2 flex items-center justify-between gap-3 hover:bg-gray-50">
+                                                        <span class="text-sm">
+                                                            <span class="font-medium text-gray-900">Puzzle #{{ puzzle.id }}</span>
+                                                            <span class="text-gray-500">· {{ puzzle.puzzle_type|capitalize }}</span>
+                                                        </span>
+                                                        <span class="text-xs {% if puzzle.is_correct %}text-green-700{% else %}text-red-700{% endif %}">
+                                                            {% if puzzle.is_correct %}Correct{% else %}Incorrect{% endif %}
+                                                        </span>
+                                                    </summary>
+
+                                                    <div class="px-3 pb-3 pt-1 border-t border-gray-100">
+                                                        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                                            <div>
+                                                                <dt class="text-gray-500">Puzzle type</dt>
+                                                                <dd class="text-gray-900">{{ puzzle.puzzle_type }}</dd>
+                                                            </div>
+                                                            <div>
+                                                                <dt class="text-gray-500">Was correct?</dt>
+                                                                <dd class="text-gray-900">{{ 'Yes' if puzzle.is_correct else 'No' }}</dd>
+                                                            </div>
+                                                            <div class="sm:col-span-2">
+                                                                <dt class="text-gray-500">Question</dt>
+                                                                <dd class="text-gray-900">{{ puzzle.question }}</dd>
+                                                            </div>
+                                                            <div>
+                                                                <dt class="text-gray-500">Time taken (seconds)</dt>
+                                                                <dd class="text-gray-900">{{ puzzle.time_taken_seconds }}</dd>
+                                                            </div>
+                                                            <div>
+                                                                <dt class="text-gray-500">Alarm session id</dt>
+                                                                <dd class="text-gray-900">{{ puzzle.alarm_session_id }}</dd>
+                                                            </div>
+                                                        </dl>
+
+                                                        <div class="mt-3 text-right">
+                                                            <form method="POST" action="{{ url_for('delete_puzzle_session', puzzle_session_id=puzzle.id) }}" onsubmit="return confirm('Delete this puzzle attempt?');">
+                                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                                <input type="hidden" name="day" value="{{ group.day_key }}">
+                                                                <input type="hidden" name="tz" value="{{ active_tz }}">
+                                                                <button type="submit" class="text-xs text-red-600 hover:text-red-800">Delete puzzle attempt</button>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </details>
+                                            {% endfor %}
+                                        {% else %}
+                                            <p class="text-sm text-gray-500">No puzzle attempts were recorded for this alarm session.</p>
+                                        {% endif %}
+                                    </div>
+                                </details>
+                            {% endfor %}
+                        </div>
+                    </article>
+                {% endfor %}
+            </section>
+        {% endif %}
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const params = new URLSearchParams(window.location.search);
+    const currentTz = params.get('tz');
+
+    // Use browser timezone for server-side grouping so dates after midnight appear on the correct day.
+    if (browserTimeZone && currentTz !== browserTimeZone) {
+        params.set('tz', browserTimeZone);
+        const query = params.toString();
+        const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash || ''}`;
+        window.location.replace(nextUrl);
+        return;
+    }
+
+    const localFormatter = new Intl.DateTimeFormat(undefined, {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        timeZoneName: 'short'
+    });
+
+    document.querySelectorAll('.js-local-datetime').forEach(function (el) {
+        const isoValue = el.getAttribute('datetime');
+        if (!isoValue) return;
+
+        const dt = new Date(isoValue);
+        if (Number.isNaN(dt.getTime())) return;
+
+        el.textContent = localFormatter.format(dt);
+    });
+});
+</script>
+{% endblock %}
+
+

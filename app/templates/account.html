@@ -6,14 +6,15 @@
     <div class="max-w-5xl mx-auto mt-8 flex gap-8 px-6">
         
         <aside class="w-64 flex flex-col gap-1 bg-white border border-gray-200 rounded-lg overflow-hidden h-fit shadow-sm">
-            <button data-target="change-details" class="nav-btn active text-left px-5 py-3 text-sm font-medium border-b border-gray-100 transition-colors">Change account details</button>
-            <button data-target="paired-devices" class="nav-btn text-left px-5 py-3 text-sm font-medium border-b border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors">Paired devices</button>
-            <button data-target="data-permissions" class="nav-btn text-left px-5 py-3 text-sm font-medium border-b border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors">Data permissions</button>
-            <button data-target="delete-account" class="nav-btn text-left px-5 py-3 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors">Delete account</button>
+            <button data-target="change-details" class="nav-btn block w-full text-left px-5 py-3 text-sm font-medium border-b border-gray-100 transition-colors">Change account details</button>
+            <button data-target="paired-devices" class="nav-btn block w-full text-left px-5 py-3 text-sm font-medium border-b border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors">Paired devices</button>
+            <a href="{{ url_for('session_history') }}" class="block w-full text-left px-5 py-3 text-sm font-medium border-b border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors">Session history</a>
+            <button data-target="data-permissions" class="nav-btn block w-full text-left px-5 py-3 text-sm font-medium border-b border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors">Data permissions</button>
+            <button data-target="delete-account" class="nav-btn block w-full text-left px-5 py-3 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors">Delete account</button>
         </aside>
 
         <main class="flex-1 bg-white border-8 border-black rounded-lg p-8 shadow-sm min-h-[500px]">
-            <section id="change-details" class="view-section active">
+            <section id="change-details" class="view-section">
                 <h2 class="text-lg font-bold mb-4 text-gray-900">Account details</h2>
 
                 <div class="mb-4">

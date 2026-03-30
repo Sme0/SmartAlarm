@@ -25,6 +25,7 @@
             <div class="flex gap-3">
                 {{ form.save(class_='bg-indigo-600 text-white px-4 py-2 rounded-md') }}
                 {{ form.unpair(class_='bg-red-600 text-white px-4 py-2 rounded-md') }}
+                <a href="{{ url_for('session_history') }}" class="text-sm text-indigo-600 self-center">Session history</a>
                 <a href="{{ url_for('account') }}" class="ml-auto text-sm text-gray-600">Back to account</a>
             </div>
         </form>

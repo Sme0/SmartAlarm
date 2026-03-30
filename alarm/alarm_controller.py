@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from alarm.io.output_handler import OutputHandler
 from alarm.io.input_handler import InputHandler
 from alarm.alarm_state import AlarmState
+from alarm.puzzles.maths_puzzle import MathsPuzzle
 from alarm.puzzles.memory_puzzle import MemoryPuzzle
 from alarm.puzzles.puzzle import Puzzle
 
@@ -139,7 +140,7 @@ class AlarmController:
         
         # Puzzle startup logic. Use whenever a puzzle is being started
         # TODO: Choose game automatically
-        puzzle: Puzzle = MemoryPuzzle(self.input_handler, self.output_handler)
+        puzzle: Puzzle = MathsPuzzle(self.input_handler, self.output_handler)
         puzzle.run_puzzle()
         source_alarm_id = str(self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id)
         session = self._pending_sessions[source_alarm_id]
@@ -161,6 +162,12 @@ class AlarmController:
         max_snoozes = int(self.current_triggered_alarm.max_snoozes)
         if max_snoozes < 0:
             max_snoozes = 0
+
+        puzzle: Puzzle = MathsPuzzle(self.input_handler, self.output_handler)
+        puzzle.run_puzzle()
+        source_alarm_id = str(self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id)
+        session = self._pending_sessions[source_alarm_id]
+        session["puzzle_sessions"].append(puzzle.export_session(source_alarm_id))
 
         current_snooze_count = self.current_triggered_alarm.snooze_count
         if current_snooze_count >= max_snoozes:

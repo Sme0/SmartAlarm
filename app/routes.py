@@ -2,6 +2,7 @@
 This module implements all the routes for the Flask application.
 """
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
@@ -9,10 +10,19 @@ from app import app, database as db, login_manager, csrf
 from app.models import User, Device, Alarm, AlarmSession, PuzzleSession
 from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm, EditAlarmForm, DeviceSettingsForm
 from werkzeug.exceptions import InternalServerError
+from sqlalchemy.orm import selectinload
 
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+def _resolve_timezone(tz_name: str | None):
+    if tz_name:
+        try:
+            return ZoneInfo(tz_name), tz_name
+        except ZoneInfoNotFoundError:
+            pass
+    return timezone.utc, "UTC"
 
 def _is_expired(value: datetime | None) -> bool:
     return value is not None and value < _utc_now()
@@ -110,6 +120,99 @@ def account():
 
         # Raise a 500 server error if something unexpected occurs
         raise InternalServerError("An error occurred while loading the account page.")
+
+
+@app.route('/account/session-history', methods=['GET'])
+@login_required
+def session_history():
+    """Show recorded alarm/puzzle sessions grouped by day for the current user."""
+    display_tz, active_tz = _resolve_timezone((request.args.get("tz") or "").strip())
+
+    alarm_sessions = (
+        AlarmSession.query
+        .filter_by(user_id=current_user.id)
+        .options(selectinload(AlarmSession.puzzle_sessions))
+        .order_by(AlarmSession.triggered_at.desc())
+        .all()
+    )
+
+    grouped_by_day: dict[str, dict] = {}
+    for alarm_session in alarm_sessions:
+        triggered_at_utc = alarm_session.triggered_at
+        triggered_at_local = triggered_at_utc.astimezone(display_tz)
+        day_key = triggered_at_local.date().isoformat()
+
+        if day_key not in grouped_by_day:
+            grouped_by_day[day_key] = {
+                "day_key": day_key,
+                "day_label": triggered_at_local.strftime('%A %d %B %Y'),
+                "sessions": [],
+            }
+
+        grouped_by_day[day_key]["sessions"].append({
+            "id": alarm_session.id,
+            "device_serial": alarm_session.device_serial,
+            "triggered_at": triggered_at_local,
+            "puzzle_sessions": sorted(alarm_session.puzzle_sessions, key=lambda s: s.id),
+        })
+
+    day_groups = [grouped_by_day[key] for key in sorted(grouped_by_day.keys(), reverse=True)]
+    selected_day = request.args.get("day")
+
+    return render_template(
+        'session_history.html',
+        day_groups=day_groups,
+        selected_day=selected_day,
+        active_tz=active_tz,
+    )
+
+
+@app.route('/account/session-history/alarm/<int:alarm_session_id>/delete', methods=['POST'])
+@login_required
+def delete_alarm_session(alarm_session_id):
+    alarm_session = AlarmSession.query.get(alarm_session_id)
+    day = request.form.get('day')
+    tz_name = request.form.get('tz')
+
+    if alarm_session is None or alarm_session.user_id != current_user.id:
+        flash('Alarm session not found.', 'danger')
+        return redirect(url_for('session_history', day=day, tz=tz_name) if day else url_for('session_history', tz=tz_name))
+
+    try:
+        db.session.delete(alarm_session)
+        db.session.commit()
+        flash('Alarm session deleted.', 'success')
+    except Exception:
+        db.session.rollback()
+        flash('Failed to delete alarm session.', 'danger')
+
+    return redirect(url_for('session_history', day=day, tz=tz_name) if day else url_for('session_history', tz=tz_name))
+
+
+@app.route('/account/session-history/puzzle/<int:puzzle_session_id>/delete', methods=['POST'])
+@login_required
+def delete_puzzle_session(puzzle_session_id):
+    puzzle_session = PuzzleSession.query.get(puzzle_session_id)
+    day = request.form.get('day')
+    tz_name = request.form.get('tz')
+
+    if puzzle_session is None or puzzle_session.alarm_session is None:
+        flash('Puzzle session not found.', 'danger')
+        return redirect(url_for('session_history', day=day, tz=tz_name) if day else url_for('session_history', tz=tz_name))
+
+    if puzzle_session.alarm_session.user_id != current_user.id:
+        flash('You do not have permission to delete this puzzle session.', 'danger')
+        return redirect(url_for('session_history', day=day, tz=tz_name) if day else url_for('session_history', tz=tz_name))
+
+    try:
+        db.session.delete(puzzle_session)
+        db.session.commit()
+        flash('Puzzle session deleted.', 'success')
+    except Exception:
+        db.session.rollback()
+        flash('Failed to delete puzzle session.', 'danger')
+
+    return redirect(url_for('session_history', day=day, tz=tz_name) if day else url_for('session_history', tz=tz_name))
 
 
 @app.route('/dashboard')
