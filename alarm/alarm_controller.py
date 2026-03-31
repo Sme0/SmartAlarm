@@ -163,16 +163,18 @@ class AlarmController:
         if max_snoozes < 0:
             max_snoozes = 0
 
+        current_snooze_count = self.current_triggered_alarm.snooze_count
+        if current_snooze_count >= max_snoozes:
+            self.output_handler.display_text("Snooze limit reached")
+            return
+
+        # Puzzle startup logic. Use whenever a puzzle is being started
+        # TODO: Choose game automatically
         puzzle: Puzzle = MathsPuzzle(self.input_handler, self.output_handler)
         puzzle.run_puzzle()
         source_alarm_id = str(self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id)
         session = self._pending_sessions[source_alarm_id]
         session["puzzle_sessions"].append(puzzle.export_session(source_alarm_id))
-
-        current_snooze_count = self.current_triggered_alarm.snooze_count
-        if current_snooze_count >= max_snoozes:
-            self.output_handler.display_text("Snooze limit reached")
-            return
 
         # TODO: Make snooze time editable through web
         snooze_time = (_clock_now() + timedelta(minutes=5)).strftime("%H:%M")

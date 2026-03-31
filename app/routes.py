@@ -116,7 +116,7 @@ def account():
     """
     try:
         return render_template("account.html", user=current_user)
-    except Exception as e:
+    except Exception:
 
         # Raise a 500 server error if something unexpected occurs
         raise InternalServerError("An error occurred while loading the account page.")
@@ -960,7 +960,6 @@ def dev_sample_data():
     """
     Development utility: create a sample user, log them in, create a device, and generate sample alarms.
     """
-    from app import database as db
     from flask_login import login_user
     # Create or get sample user
     email = "sampleuser@example.com"
@@ -972,8 +971,8 @@ def dev_sample_data():
     # Create or get a device
     device = Device.query.filter_by(user_id=user.id).first()
     if not device:
-        device = Device.register(serial_number="SAMPLE123", name="Jeff's Alarm", user=user)
-        device = Device.register(serial_number="SAMPLE456", name="Bob's Alarm", user=user)
+        Device.register(serial_number="SAMPLE123", name="Jeff's Alarm", user=user)
+        Device.register(serial_number="SAMPLE456", name="Bob's Alarm", user=user)
     flash("Sample user, device, and alarms created. You are now logged in as the sample user.", "success")
     return redirect(url_for("dashboard"))
 
