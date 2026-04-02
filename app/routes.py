@@ -285,6 +285,24 @@ def update_sleep_data():
     if not grouped_nights:
         return jsonify({'response': 'failed', 'message': 'no sleep sessions grouped'}), 400
 
+    # Determine import time range
+    min_date = min(r['start_time'] for r in parsed_data)
+    max_date = max(r['end_time'] for r in parsed_data)
+
+    # Delete existing sleep stages in this range
+    SleepStage.query.filter(
+        SleepStage.user_id == current_user.id,
+        SleepStage.start_date <= max_date,
+        SleepStage.end_date >= min_date
+    ).delete(synchronize_session=False)
+
+    # Delete existing sleep sessions in this range
+    SleepSession.query.filter(
+        SleepSession.user_id == current_user.id,
+        SleepSession.start_date <= max_date,
+        SleepSession.end_date >= min_date
+    ).delete(synchronize_session=False)
+
     try:
         for night_records in grouped_nights:
             start_time = night_records[0]['start_time']
@@ -306,6 +324,7 @@ def update_sleep_data():
 
             for record in night_records:
                 stage = SleepStage()
+                stage.user_id = current_user.id
                 stage.stage = record['stage']
                 stage.start_date = record['start_time']
                 stage.end_date = record['end_time']
