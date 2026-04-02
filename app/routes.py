@@ -7,8 +7,9 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from app import app, database as db, login_manager, csrf
-from app.models import User, Device, Alarm, AlarmSession, PuzzleSession
+from app.models import User, Device, Alarm, AlarmSession, PuzzleSession, SleepSession, SleepStage
 from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm, EditAlarmForm, DeviceSettingsForm
+from app.utils import group_sleep_records
 from werkzeug.exceptions import InternalServerError
 from sqlalchemy.orm import selectinload
 
@@ -221,11 +222,110 @@ def delete_puzzle_session(puzzle_session_id):
 
     return redirect(url_for('session_history', day=day, tz=tz_name) if day else url_for('session_history', tz=tz_name))
 
+@app.route('/sleep-data', methods=['GET', 'POST'])
+@login_required
+def sleep_data():
+    return render_template("sleep_data.html")
+
+@app.route('/sleep-data/update', methods=['POST'])
+@login_required
+@csrf.exempt
+def update_sleep_data():
+    if not request.is_json:
+        return jsonify({'response': 'failed', 'message': 'request must be JSON'}), 400
+
+    payload = request.get_json(silent=True) or {}
+    raw_sleep_data = payload.get('sleep_data')
+
+    if raw_sleep_data is None:
+        return jsonify({'response': 'failed', "message": "missing sleep data"}), 400
+
+    if not isinstance(raw_sleep_data, list):
+        return jsonify({"response": "failed", "message": "sleep data must be a list"}), 400
+
+    def parse_apple_dt(value: str | None):
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError('invalid datetime value')
+        normalized = value.strip()
+        # Apple export format uses +0000; Python expects +00:00.
+        if len(normalized) >= 5 and (normalized[-5] in ['+', '-']) and normalized[-3] != ':':
+            normalized = normalized[:-2] + ':' + normalized[-2:]
+        return datetime.fromisoformat(normalized)
+
+    parsed_data = []
+    for record in raw_sleep_data:
+        if not isinstance(record, dict):
+            continue
+
+        try:
+            stage_raw = record.get('stage')
+            if not isinstance(stage_raw, str):
+                continue
+
+            stage = stage_raw.replace('HKCategoryValueSleepAnalysis', '')
+            start_time = parse_apple_dt(record.get('start_date'))
+            end_time = parse_apple_dt(record.get('end_date'))
+            creation_date = parse_apple_dt(record.get('creation_date'))
+            source_name = record.get('source_name')
+        except (ValueError, TypeError):
+            continue
+
+        parsed_data.append({
+            'stage': stage,
+            'start_time': start_time,
+            'end_time': end_time,
+            'source_name': source_name,
+            'creation_date': creation_date,
+        })
+
+    if not parsed_data:
+        return jsonify({'response': 'failed', 'message': 'no valid sleep records found'}), 400
+
+    grouped_nights = group_sleep_records(parsed_data)
+    if not grouped_nights:
+        return jsonify({'response': 'failed', 'message': 'no sleep sessions grouped'}), 400
+
+    try:
+        for night_records in grouped_nights:
+            start_time = night_records[0]['start_time']
+            end_time = night_records[-1]['end_time']
+            total_duration = int(sum(
+                (r['end_time'] - r['start_time']).total_seconds()
+                for r in night_records
+                if r['stage'].lower() != 'awake'
+            ))
+
+            sleep_session = SleepSession()
+            sleep_session.user_id = current_user.id
+            sleep_session.start_date = start_time
+            sleep_session.end_date = end_time
+            sleep_session.total_duration = total_duration
+
+            db.session.add(sleep_session)
+            db.session.flush()
+
+            for record in night_records:
+                stage = SleepStage()
+                stage.stage = record['stage']
+                stage.start_date = record['start_time']
+                stage.end_date = record['end_time']
+                stage.creation_date = record['creation_date']
+                stage.source_name = record['source_name']
+                stage.sleep_session_id = sleep_session.id
+                db.session.add(stage)
+
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'response': 'failed', 'message': 'database error while saving sleep data'}), 500
+
+    return jsonify({'response': 'ok', 'message': f'imported {len(grouped_nights)} sleep sessions'}), 200
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
     """Main user dashboard with greeting, quick actions, and an overview of alarms/devices."""
+    print("Dashboard")
     devices = list(current_user.devices)
     alarms = Alarm.query.filter_by(user_id=current_user.id).all()
     enabled_alarms = [alarm for alarm in alarms if getattr(alarm, 'enabled', True)]
@@ -278,7 +378,6 @@ def dashboard():
 
 
 
-@app.route('/signup', methods=['GET', 'POST'])
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     """

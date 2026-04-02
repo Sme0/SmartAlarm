@@ -265,3 +265,22 @@ class PuzzleSession(db.Model):
         db.session.commit()
         return session
 
+class SleepSession(db.Model):
+    __tablename__ = 'sleep_sessions'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    start_date = db.Column(db.DateTime(timezone=True), nullable=False)
+    end_date = db.Column(db.DateTime(timezone=True), nullable=False)
+    total_duration = db.Column(db.Integer, nullable=False)
+
+class SleepStage(db.Model):
+    __tablename__ = 'sleep_stages'
+    id = db.Column(db.Integer, primary_key=True)
+    stage = db.Column(db.String(64), nullable=False)
+    creation_date = db.Column(db.DateTime(timezone=True))
+    start_date = db.Column(db.DateTime(timezone=True))
+    end_date = db.Column(db.DateTime(timezone=True))
+    source_name = db.Column(db.String(64))
+    sleep_session_id = db.Column(db.Integer, db.ForeignKey('sleep_sessions.id'), nullable=False)
+
+
