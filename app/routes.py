@@ -9,7 +9,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from app import app, database as db, login_manager, csrf
 from app.models import User, Device, Alarm, AlarmSession, PuzzleSession, SleepSession, SleepStage
 from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm, EditAlarmForm, DeviceSettingsForm
-from app.utils import group_sleep_records
+from app.utils import group_sleep_records, parse_apple_dt
 from werkzeug.exceptions import InternalServerError
 from sqlalchemy.orm import selectinload
 
@@ -231,26 +231,20 @@ def sleep_data():
 @login_required
 @csrf.exempt
 def update_sleep_data():
+
+    # Data must be in JSON format
     if not request.is_json:
         return jsonify({'response': 'failed', 'message': 'request must be JSON'}), 400
 
     payload = request.get_json(silent=True) or {}
     raw_sleep_data = payload.get('sleep_data')
 
+    # Basic validation
     if raw_sleep_data is None:
         return jsonify({'response': 'failed', "message": "missing sleep data"}), 400
 
     if not isinstance(raw_sleep_data, list):
         return jsonify({"response": "failed", "message": "sleep data must be a list"}), 400
-
-    def parse_apple_dt(value: str | None):
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError('invalid datetime value')
-        normalized = value.strip()
-        # Apple export format uses +0000; Python expects +00:00.
-        if len(normalized) >= 5 and (normalized[-5] in ['+', '-']) and normalized[-3] != ':':
-            normalized = normalized[:-2] + ':' + normalized[-2:]
-        return datetime.fromisoformat(normalized)
 
     parsed_data = []
     for record in raw_sleep_data:
@@ -258,10 +252,14 @@ def update_sleep_data():
             continue
 
         try:
+
             stage_raw = record.get('stage')
+
+            # Bad data, if so ignore
             if not isinstance(stage_raw, str):
                 continue
 
+            # Extract data
             stage = stage_raw.replace('HKCategoryValueSleepAnalysis', '')
             start_time = parse_apple_dt(record.get('start_date'))
             end_time = parse_apple_dt(record.get('end_date'))
@@ -281,6 +279,7 @@ def update_sleep_data():
     if not parsed_data:
         return jsonify({'response': 'failed', 'message': 'no valid sleep records found'}), 400
 
+    # Groups the stage data into a night session
     grouped_nights = group_sleep_records(parsed_data)
     if not grouped_nights:
         return jsonify({'response': 'failed', 'message': 'no sleep sessions grouped'}), 400

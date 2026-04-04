@@ -1,3 +1,6 @@
+from datetime import datetime
+
+
 def group_sleep_records(records: list[dict], night_gap_size=2):
     if not records:
         return []
@@ -30,3 +33,17 @@ def group_sleep_records(records: list[dict], night_gap_size=2):
         nights.append(current_night)
 
     return nights
+
+def parse_apple_dt(value: str | None):
+    """
+    Reformats datetime from Apple format to Python format
+    :param value: datetime as a string
+    :return: the newly formatted datetime
+    """
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError('invalid datetime value')
+    normalized = value.strip()
+    # Apple export format uses +0000; Python expects +00:00.
+    if len(normalized) >= 5 and (normalized[-5] in ['+', '-']) and normalized[-3] != ':':
+        normalized = normalized[:-2] + ':' + normalized[-2:]
+    return datetime.fromisoformat(normalized)
