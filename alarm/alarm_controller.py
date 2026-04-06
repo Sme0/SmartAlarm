@@ -82,6 +82,16 @@ class AlarmController:
         self._pending_sessions: Dict[str, Dict[str, Any]] = {}
         self._complete_sessions: Dict[str, Dict[str, Any]] = {}
 
+    def _build_puzzle_for_current_alarm(self) -> Puzzle:
+        """
+        Create the puzzle instance for the active alarm.
+        Defaults to maths if the alarm is missing or has an unknown type.
+        """
+        puzzle_type = (getattr(self.current_triggered_alarm, "puzzle_type", "") or "").strip().lower()
+        if puzzle_type == "memory":
+            return MemoryPuzzle(self.input_handler, self.output_handler)
+        return MathsPuzzle(self.input_handler, self.output_handler)
+
     def update(self):
         # Update current time
         self.current_time = _clock_now().strftime("%H:%M:%S")
@@ -127,6 +137,8 @@ class AlarmController:
         })
 
         self.output_handler.display_text(f"Alarm Triggered: {_clock_now().strftime('%H:%M')}")
+        if isinstance(self.output_handler, OutputHandler):
+            print("[DEBUG] Type 'disarm' to solve and dismiss, or 'snooze' to solve and snooze.")
 
     def disarm_alarm(self):
         """
@@ -137,16 +149,24 @@ class AlarmController:
             return
 
         self.state = AlarmState.PUZZLE
-        
-        # Puzzle startup logic. Use whenever a puzzle is being started
-        # TODO: Choose game automatically
-        puzzle: Puzzle = MathsPuzzle(self.input_handler, self.output_handler)
-        puzzle.run_puzzle()
+        puzzle = self._build_puzzle_for_current_alarm()
+        print(f"[DEBUG] Starting {puzzle.get_puzzle_type()} puzzle for dismiss.")
+        solved = puzzle.run_puzzle()
         source_alarm_id = str(self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id)
-        session = self._pending_sessions[source_alarm_id]
+        session = self._pending_sessions.get(source_alarm_id)
+        if session is None:
+            print(f"[DEBUG] No pending session found for alarm ID {source_alarm_id}")
+            return
         session["puzzle_sessions"].append(puzzle.export_session(source_alarm_id))
 
+        if not solved:
+            self.state = AlarmState.TRIGGERED
+            self.output_handler.display_text("Solve puzzle to dismiss")
+            print("[DEBUG] Puzzle failed. Alarm is still ringing.")
+            return
+
         # On alarm completion/disarm
+        session["puzzle_sessions"][-1]["outcome_action"] = "dismissed"
         self._complete_sessions[source_alarm_id] = session
         self._pending_sessions.pop(source_alarm_id, None)
         self.stop_alarm()
@@ -168,15 +188,21 @@ class AlarmController:
             self.output_handler.display_text("Snooze limit reached")
             return
 
-        # Puzzle startup logic. Use whenever a puzzle is being started
-        # TODO: Choose game automatically
-        puzzle: Puzzle = MathsPuzzle(self.input_handler, self.output_handler)
-        puzzle.run_puzzle()
+        puzzle = self._build_puzzle_for_current_alarm()
+        print(f"[DEBUG] Starting {puzzle.get_puzzle_type()} puzzle for snooze.")
+        solved = puzzle.run_puzzle()
         source_alarm_id = str(self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id)
         session = self._pending_sessions[source_alarm_id]
         session["puzzle_sessions"].append(puzzle.export_session(source_alarm_id))
 
+        if not solved:
+            self.state = AlarmState.TRIGGERED
+            self.output_handler.display_text("Solve puzzle to snooze")
+            print("[DEBUG] Puzzle failed. Alarm is still ringing.")
+            return
+
         # TODO: Make snooze time editable through web
+        session["puzzle_sessions"][-1]["outcome_action"] = "snoozed"
         snooze_time = (_clock_now() + timedelta(minutes=5)).strftime("%H:%M")
         source_alarm_id = self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id
         self.snooze_alarms.append(Alarm(
@@ -212,4 +238,11 @@ class AlarmController:
         sessions = self._complete_sessions
         self._complete_sessions = {}
         return sessions
+
+    def peek_complete_sessions(self):
+        return dict(self._complete_sessions)
+
+    def drop_complete_sessions(self, session_ids):
+        for session_id in session_ids:
+            self._complete_sessions.pop(session_id, None)
 

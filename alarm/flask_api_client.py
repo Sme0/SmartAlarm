@@ -100,27 +100,27 @@ class FlaskAPIClient:
 
     def get_alarms(self):
         """
-        Returns updated alarms from the server
-        :return: List of string-formatted alarms
+        Returns updated alarms from the server.
+        :return: (success: bool, alarms: list[Alarm])
         """
-        print("GETTING ALARMS")
         path = "/api/device/get-alarms"
         payload = {"serial_number": self.serial_number}
 
         try:
             response = self._post(path, payload)
-            if response.headers.get("Content-Type", "").lower().startswith("application/json"):
-                data = response.json()
-            else:
+
+            if not response.headers.get("Content-Type", "").lower().startswith("application/json"):
                 print("Failed to get alarms: " + response.text)
-                return None
+                return False, []
+
+            data = response.json()
 
             if response.status_code != 200:
-                print("Failed to get alarms: ", data.get('reason', 'unknown reason'))
-                return None
+                print("Failed to get alarms:", data.get("reason", "unknown reason"))
+                return False, []
 
             alarms = []
-            for alarm in data.get('alarms'):
+            for alarm in data.get("alarms", []):
                 try:
                     if alarm.get("enabled") and alarm.get("day_of_week") is not None:
                         alarms.append(Alarm(
@@ -133,14 +133,15 @@ class FlaskAPIClient:
                             snooze_count=0,
                             source_alarm_id=alarm.get("id")
                         ))
-                except Exception:
-                    # skip malformed alarm entries
+                except Exception as e:
+                    print(f"Skipping malformed alarm entry: {e}")
                     continue
-            print("RETURNING ALARMS")
-            return alarms
 
-        except Exception:
-            return None
+            return True, alarms
+
+        except Exception as e:
+            print(f"Failed to get alarms: {e}")
+            return False, []
 
     def send_complete_sessions(self, complete_sessions: dict) -> bool:
         """

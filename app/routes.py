@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from app import app, database as db, login_manager, csrf
-from app.models import User, Device, Alarm, AlarmSession, PuzzleSession
+from app.models import User, Device, Alarm, AlarmSession, PuzzleSession, resolve_effective_puzzle_type
 from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm, EditAlarmForm, DeviceSettingsForm
 from werkzeug.exceptions import InternalServerError
 from sqlalchemy.orm import selectinload
@@ -15,6 +15,17 @@ from sqlalchemy.orm import selectinload
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+def _as_utc(value: datetime | None) -> datetime | None:
+    """
+    Normalize DB datetimes so comparisons work even if the database driver
+    returns naive values.
+    """
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 def _resolve_timezone(tz_name: str | None):
     if tz_name:
@@ -25,7 +36,8 @@ def _resolve_timezone(tz_name: str | None):
     return timezone.utc, "UTC"
 
 def _is_expired(value: datetime | None) -> bool:
-    return value is not None and value < _utc_now()
+    normalized = _as_utc(value)
+    return normalized is not None and normalized < _utc_now()
 
 # Return JSON 401 for API/AJAX requests, otherwise redirect to the login page.
 @login_manager.unauthorized_handler
@@ -144,7 +156,9 @@ def session_history():
 
     grouped_by_day: dict[str, dict] = {}
     for alarm_session in alarm_sessions:
-        triggered_at_utc = alarm_session.triggered_at
+        triggered_at_utc = _as_utc(alarm_session.triggered_at)
+        if triggered_at_utc is None:
+            continue
         triggered_at_local = triggered_at_utc.astimezone(display_tz)
         day_key = triggered_at_local.date().isoformat()
 
@@ -807,7 +821,7 @@ def get_alarms():
                 "time": alarm.time.strftime("%H:%M"),
                 "enabled": alarm.enabled,
                 "day_of_week": getattr(alarm, 'day_of_week', 0),
-                "puzzle_type": getattr(alarm, 'puzzle_type', 'random'),
+                "puzzle_type": resolve_effective_puzzle_type(alarm, device),
                 "max_snoozes": device.max_snoozes if device.max_snoozes is not None else 3
             }
             for alarm in alarms
@@ -831,7 +845,8 @@ def submit_complete_sessions():
                         "puzzle_type": "memory",
                         "question": "1+1",
                         "is_correct": true,
-                        "time_taken_seconds": 4.2
+                        "time_taken_seconds": 4.2,
+                        "outcome_action": "dismissed"
                     }
                 ]
             }
@@ -880,7 +895,8 @@ def submit_complete_sessions():
             alarm_session = AlarmSession.create(
                 user_id=device.user_id,
                 device_serial=device.serial_number,
-                triggered_at=when
+                triggered_at=when,
+                commit=False,
             )
 
             puzzle_sessions = session_data.get("puzzle_sessions", [])
@@ -902,13 +918,18 @@ def submit_complete_sessions():
                 except (TypeError, ValueError):
                     time_taken_seconds = 0
 
+                outcome_action = puzzle_data.get("outcome_action")
+
                 PuzzleSession.create(
                     alarm_session_id=alarm_session.id,
                     puzzle_type=str(puzzle_type),
                     question=str(question),
                     is_correct=bool(puzzle_data.get("is_correct", False)),
                     time_taken_seconds=time_taken_seconds,
+                    outcome_action=str(outcome_action) if outcome_action is not None else None,
+                    commit=False,
                 )
+        db.session.commit()
     except Exception:
         db.session.rollback()
         return jsonify({"response": "failed", "message": "db error while storing sessions"}), 500

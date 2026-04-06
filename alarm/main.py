@@ -33,6 +33,17 @@ else:
 
 alarm_controller = AlarmController(input_handler, output_handler)
 
+# Helperfunctions for debuugging and main loop
+def _print_debug_help():
+    if str(os.getenv("DEVICE_DEBUG_MODE")).lower() != "true":
+        return
+
+    print("[DEBUG] SmartAlarm terminal controls")
+    print("[DEBUG] When alarm is ringing: type 'disarm' or 'snooze' and press Enter.")
+    print("[DEBUG] Maths puzzle controls: 'left', 'right', 'joy_press'.")
+    print("[DEBUG] Memory puzzle controls: 'up', 'down', 'left', 'right'.")
+    print("[DEBUG] Commands are read from this terminal while the program is running.\n")
+
 
 def _flush_inputs_on_state_change(previous_state, current_state):
     """Drop queued inputs whenever the alarm state changes."""
@@ -94,6 +105,7 @@ def pairing_loop():
 def main_alarm_loop():
     last_update_time = time.time()
     previous_state = alarm_controller.state
+    previous_alarm_snapshot = None
     while True:
 
         # Prepare for state change by clearing old inputs
@@ -114,21 +126,36 @@ def main_alarm_loop():
         _flush_inputs_on_state_change(previous_state, alarm_controller.state)
         previous_state = alarm_controller.state
 
-        # Send heartbeat every 30 seconds
+        # Send heartbeat every 15 seconds
         # Comment out if not using webserver yet
         current_time = time.time()
         if current_time - last_update_time >= 15.0:
-            alarm_controller.alarms = flask_api_client.get_alarms()
-            print(f"Active alarms: {alarm_controller.alarms}, {alarm_controller.snooze_alarms}")
+            success,latest_alarms = flask_api_client.get_alarms()
+            if success:
+                    alarm_controller.alarms = latest_alarms
+            alarm_snapshot = (
+                [(alarm.id, alarm.time, alarm.day_of_week, alarm.puzzle_type) for alarm in alarm_controller.alarms],
+                [(alarm.id, alarm.time, alarm.day_of_week, alarm.puzzle_type) for alarm in alarm_controller.snooze_alarms],
+            )
+            if not success:
+                print("[DEBUG] Failed to refresh alarms, keeping existing ones")
+            if alarm_snapshot != previous_alarm_snapshot:
+                print(f"[DEBUG] Active alarms updated: {alarm_controller.alarms}, {alarm_controller.snooze_alarms}")
+                previous_alarm_snapshot = alarm_snapshot
 
-            complete_sessions = alarm_controller.pull_complete_sessions()
+            complete_sessions = alarm_controller.peek_complete_sessions()
             if complete_sessions:
-                flask_api_client.send_complete_sessions(complete_sessions)
+                uploaded = flask_api_client.send_complete_sessions(complete_sessions)
+                if uploaded:
+                    alarm_controller.drop_complete_sessions(complete_sessions.keys())
+                else:
+                    print("[DEBUG] Failed to upload completed sessions, will retry on next sync")
 
             last_update_time = current_time
 
         time.sleep(0.1)
 
 if __name__ == "__main__":
+    _print_debug_help()
     pairing_loop()
     main_alarm_loop()

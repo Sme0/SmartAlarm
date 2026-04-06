@@ -60,9 +60,10 @@ class MemoryPuzzle(Puzzle):
             InputEventType.JOYSTICK_PRESS
         })
 
-        start_time = time.time()
+        self.start_time = time.time()
         while True:
-            if time.time() - start_time > self.time_limit:
+            if time.time() - self.start_time > self.time_limit:
+                self.end_time = time.time()
                 self.output_handler.display_text("Puzzle timeout")
                 return False
 
@@ -87,6 +88,7 @@ class MemoryPuzzle(Puzzle):
 
                 # Original flow: compare after collecting the full sequence.
                 if len(self.direction_values) >= len(self.instructions) or event.event_type == InputEventType.JOYSTICK_PRESS:
+                    self.end_time = time.time()
                     if self.check_answer():
                         self.output_handler.display_text("Correct")
                         return True

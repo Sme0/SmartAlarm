@@ -163,7 +163,7 @@ class Puzzle(ABC):
         class_name = self.__class__.__name__
         return class_name.removesuffix("Puzzle").lower()
 
-    def export_session(self, alarm_session_id: str):
+    def export_session(self, alarm_session_id: str, outcome_action: str | None = None):
         time_taken_seconds = None
         if self.start_time is not None and self.end_time is not None:
             time_taken_seconds = self.end_time - self.start_time
@@ -174,4 +174,5 @@ class Puzzle(ABC):
             "question": self.problem,
             "is_correct": self.check_answer(),
             "time_taken_seconds": time_taken_seconds,
+            "outcome_action": outcome_action,
         }

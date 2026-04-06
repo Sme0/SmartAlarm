@@ -15,6 +15,11 @@ import select
 import sys
 from alarm.alarm_state import AlarmState
 
+try:
+    import msvcrt # Windows-only, used for non-blocking console input in debug mode
+except ImportError:
+    msvcrt = None
+
 # To avoid import errors when not run on the Raspberry Pi
 try:
     from grove_rgb_lcd import *
@@ -133,6 +138,7 @@ class DebugInputHandler(InputHandler):
     def __init__(self):
         """Initialize command-to-event mapping for debug mode."""
         super().__init__()
+        self._line_buffer = ""
 
         self._command_map = {
             "snooze": InputEventType.ALARM_SNOOZE,
@@ -150,6 +156,9 @@ class DebugInputHandler(InputHandler):
 
         :return: Lower-cased command string, or None if no input is available.
         """
+        if msvcrt is not None:
+            return self._read_non_blocking_command_windows()
+
         # select keeps debug mode responsive by avoiding blocking input().
         try:
             has_input = select.select([sys.stdin], [], [], 0)[0]
@@ -162,6 +171,48 @@ class DebugInputHandler(InputHandler):
         if not line:
             return None
         return line.strip().lower()
+
+    def _read_non_blocking_command_windows(self):
+        """
+        Windows-friendly line reader for terminals where select(stdin) is unreliable.
+        Collects typed characters until Enter is pressed, then returns one command.
+        """
+        if msvcrt is None:
+            return None
+
+        while msvcrt.kbhit():
+            char = msvcrt.getwch()
+
+            if char in ("\r", "\n"):
+                command = self._line_buffer.strip().lower()
+                self._line_buffer = ""
+                if command:
+                    print("")
+                    return command
+                print("")
+                return None
+
+            if char == "\003":
+                raise KeyboardInterrupt
+
+            if char == "\b":
+                if self._line_buffer:
+                    self._line_buffer = self._line_buffer[:-1]
+                    sys.stdout.write("\b \b")
+                    sys.stdout.flush()
+                continue
+
+            # Special keys (arrows...) -> skip their second byte and ignore
+            if char in ("\x00", "\xe0"):
+                if msvcrt.kbhit():
+                    msvcrt.getwch()
+                continue
+
+            self._line_buffer += char
+            sys.stdout.write(char)
+            sys.stdout.flush()
+
+        return None
 
     def check_inputs(self, state: AlarmState=None):
         """
