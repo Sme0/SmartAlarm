@@ -140,11 +140,6 @@ Alarms are manually appended. The `FlaskAPIClient` exists but is never used.
 
 Line 7: `DEVELOPMENT_MODE: False` should be `DEVELOPMENT_MODE=False` for `python-dotenv` to parse it.
 
-### Bug 10: Pin number mismatch
-
-Assembly instructions say buzzer on **D4** and button on **D3**, but code uses buzzer on pin **3** and button on pin **5**.
-- **Fix:** Reconcile all pin numbers between `Alarm Clock Assembly Instructions.md`, `alarm clock component examples.py`, and `InputHandler.py`.
-
 ---
 
 ## Stage 1 — Fix All Existing Bugs
