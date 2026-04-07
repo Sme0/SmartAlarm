@@ -60,3 +60,11 @@ class Buzzer:
         Sets the loudness of any noise from the buzzer from 0-25
         """
         self.volume = max(0, min(volume, 25))
+
+
+if __name__ == "__main__":
+    alarm = Buzzer()
+
+    alarm.play_alarm_sound()
+    sleep(4)
+    alarm.stop_alarm_sound()
