@@ -36,6 +36,12 @@ class Buzzer:
                 grovepi.analogWrite(self.pin, 1 * self.volume)
                 sleep(0.1)
 
+                if not self.active:
+                    grovepi.analogWrite(self.pin, 5 * self.volume)
+                    sleep(0.2)
+                    grovepi.analogWrite(self.pin, 0)
+                    return
+
             grovepi.analogWrite(self.pin, 0)
             sleep(0.4)
 
@@ -54,7 +60,6 @@ class Buzzer:
         Stops the alarm if it's playing
         """
         self.active = False
-        sleep(0.1)
 
     def set_alarm_volume(self, volume: int) -> None:
         """
@@ -73,6 +78,8 @@ if __name__ == "__main__":
 
     # set alarm volume to 1 (minimum)
     alarm.set_alarm_volume(1)
+
+    sleep(0.6)
 
     # play alarm again for two seconds
     alarm.play_alarm_sound()
