@@ -17,7 +17,7 @@
 
 3. Connect the joystick to the A0 port on the Grove Pi.
 
-4. Connect the buzzer to the D4 port on the Grove Pi.
+4. Connect the buzzer to the D5 port on the Grove Pi.
 
 5. Connect the button to the D3 port on the Grove Pi.
 
@@ -32,4 +32,3 @@
 ### If using gesture sensor
 
 9. Connect gesture sensor to I2C-2 port on the Grove Pi
-
