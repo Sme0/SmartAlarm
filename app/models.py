@@ -284,4 +284,9 @@ class SleepStage(db.Model):
     source_name = db.Column(db.String(64))
     sleep_session_id = db.Column(db.Integer, db.ForeignKey('sleep_sessions.id'), nullable=False)
 
-
+class DifficultyModel(db.Model):
+    __tablename__ = 'difficulty_models'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    model_blob = db.Column(db.LargeBinary, nullable=False)
+    last_trained = db.Column(db.DateTime(timezone=True), nullable=False)
