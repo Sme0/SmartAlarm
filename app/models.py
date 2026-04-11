@@ -273,6 +273,14 @@ class SleepSession(db.Model):
     end_date = db.Column(db.DateTime(timezone=True), nullable=False)
     total_duration = db.Column(db.Integer, nullable=False)
 
+    sleep_stages = db.relationship(
+        'SleepStage',
+        back_populates='sleep_session',
+        lazy='selectin',
+        order_by='SleepStage.start_date',
+        cascade='all, delete-orphan',
+    )
+
 class SleepStage(db.Model):
     __tablename__ = 'sleep_stages'
     id = db.Column(db.Integer, primary_key=True)
@@ -283,6 +291,8 @@ class SleepStage(db.Model):
     end_date = db.Column(db.DateTime(timezone=True))
     source_name = db.Column(db.String(64))
     sleep_session_id = db.Column(db.Integer, db.ForeignKey('sleep_sessions.id'), nullable=False)
+
+    sleep_session = db.relationship('SleepSession', back_populates='sleep_stages')
 
 class DifficultyModel(db.Model):
     __tablename__ = 'difficulty_models'
