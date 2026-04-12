@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Analytics</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        canvas {
+            max-width: 500px;
+            max-height: 300px;
+        }
+
+        .chart-desc {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+            max-width: 600px;
+        }
+
+        .chart-container {
+            width: 100%;
+            max-width: 600px;   /* chart size */
+            overflow-x: auto;   /* enables scrolling */
+            border: 1px solid #ddd;
+            padding: 10px;
+        }
+
+        .chart-container canvas {
+            min-width: 800px;
+        }
+    </style>
+</head>
+
+<body>
+
+
+<h1>Analytics</h1>  
+
+<h2>Recommendation</h2>
+<p id="recommendation">More data needed</p>
+
+<h2>Success Over Time</h2>
+<p class="chart-desc">
+Shows whether you stayed within a healthy snooze limit (0–1 snoozes per day = success).
+</p>
+<div class="chart-container">
+    <canvas id="dayChart"></canvas>
+</div>
+
+<h2>Alarm Effectiveness</h2>
+<p class="chart-desc">
+Shows how often alarms lead to successfully completed puzzles.
+</p>
+<canvas id="effectivenessChart"></canvas>
+
+<h2>Puzzle Type Comparison</h2>
+<p class="chart-desc">
+Shows performance across different puzzle types.
+</p>
+<canvas id="puzzleChart"></canvas>
+
+<script>
+
+//recommendations section: user notified which settings are most effective for them
+fetch("/api/analytics/recommendation")
+.then(res => res.json())
+.then(data => {
+    console.log("DATA:", data);
+
+    document.getElementById("recommendation").innerHTML =
+        `Best wake-up time: ${data.time}<br>
+         Best puzzle type: ${data.best_puzzle_type ?? "Not enough data yet"}`;
+});
+
+//chart showing the user whether the smart alarm is helping them
+fetch("/api/analytics/success-over-time")
+.then(res => res.json())
+.then(data => {
+
+    new Chart(document.getElementById("dayChart"), {
+        type: "line",
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: "Successful Days (0–7)",
+                data: data.values,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: false,
+            maintainAspectRatio: false
+        }
+    });
+});
+
+//chart showing user how many puzzles they successfully completed
+fetch("/api/analytics/alarm-effectiveness")
+.then(res => res.json())
+.then(data => {
+
+    new Chart(document.getElementById("effectivenessChart"), {
+        type: "pie",
+        data: {
+            labels: data.labels,
+            datasets: [{
+                data: data.values
+            }]
+        }
+    });
+});
+
+//chart where user can compare how they do at each puzzle type
+fetch("/api/analytics/puzzle-types")
+.then(res => res.json())
+.then(data => {
+
+    new Chart(document.getElementById("puzzleChart"), {
+        type: "bar",
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: "Success %",
+                data: data.values
+            }]
+        }
+    });
+});
+
+</script>
+
+</body>
+</html>
