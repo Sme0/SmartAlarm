@@ -11,10 +11,10 @@ from app import app, database as db, login_manager, csrf
 from app.models import User, Device, Alarm, AlarmSession, PuzzleSession, SleepSession, SleepStage
 from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm, EditAlarmForm, DeviceSettingsForm
 from app.utils import group_sleep_records, parse_apple_dt
+from app.analysis import find_suitable_alarm
 from werkzeug.exceptions import InternalServerError
 from sqlalchemy.orm import selectinload
-from app.analysis import find_suitable_alarm
-
+from sqlalchemy import func
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -1524,4 +1524,151 @@ def device_settings(serial):
         form.max_snoozes.data = device.max_snoozes if device.max_snoozes is not None else 3
 
     return render_template('device_settings.html', device=device, form=form)
+
+@app.route("/analytics")
+@login_required
+def analytics():
+    return render_template("analytics.html")
+
+@app.route("/api/analytics/recommendation")
+@login_required
+def recommendation():
+
+    #trains the model on the user's data to give accurate predictions
+    from datetime import datetime
+    from app.analysis import train_user_model
+
+    train_user_model(current_user.id)
+
+    now = datetime.now()
+
+    #currently recommended time will be between 6 and 10, can change this
+    min_time = now.replace(hour=6, minute=0, second=0, microsecond=0)
+    max_time = now.replace(hour=10, minute=0, second=0, microsecond=0)
+
+    result = find_suitable_alarm(current_user.id, min_time, max_time)
+
+    best = result.get("best_candidate")
+
+    if not best:
+        return {
+            "time": None,
+            "best_puzzle_type": None
+        }
+
+    puzzle_results = (
+        db.session.query(
+            PuzzleSession.puzzle_type,
+            func.avg(PuzzleSession.is_correct.cast(db.Integer))
+        )
+        .join(AlarmSession)
+        .filter(AlarmSession.user_id == current_user.id)
+        .group_by(PuzzleSession.puzzle_type)
+        .all()
+    )
+
+    best_type = (
+        max(puzzle_results, key=lambda x: x[1])[0]
+        if puzzle_results else None
+    )
+
+    return {
+        "time": best["candidate_time"].strftime("%H:%M"),
+        "best_puzzle_type": best_type
+    }
+
+
+@app.route("/api/analytics/success-over-time")
+@login_required
+def success_over_time():
+
+    sessions = (
+        db.session.query(AlarmSession)
+        .filter_by(user_id=current_user.id)
+        .order_by(AlarmSession.triggered_at.asc())
+        .all()
+    )
+
+    if not sessions:
+        return {"labels": [], "values": []}
+
+    # group by week number
+    weekly = {}
+
+    for s in sessions:
+        week = s.triggered_at.isocalendar().week
+        year = s.triggered_at.isocalendar().year
+
+        #how the time is displayed on the chart
+        key = f"{year}-W{week}"
+
+        day = s.triggered_at.date()
+
+        snoozes = max(len(s.puzzle_sessions) - 1, 0)
+
+        if key not in weekly:
+            weekly[key] = {}
+
+        if day not in weekly[key]:
+            weekly[key][day] = snoozes
+
+    labels = []
+    values = []
+
+    for week, days in sorted(weekly.items()):
+        # success = days with <=1 snooze
+        success_days = sum(1 for snooze in days.values() if snooze <= 1)
+
+        labels.append(week)
+        values.append(success_days)
+
+    return {
+        "labels": labels,
+        "values": values
+    }
+
+
+@app.route("/api/analytics/alarm-effectiveness")
+@login_required
+def alarm_effectiveness():
+
+    sessions = AlarmSession.query.filter_by(user_id=current_user.id).all()
+
+    total = len(sessions)
+
+    if total == 0:
+        return {"labels": ["No Data"], "values": [100]}
+
+    #calculates success rate
+    success = 0
+
+    for s in sessions:
+        if any(p.is_correct for p in s.puzzle_sessions):
+            success += 1
+
+    return {
+        "labels": ["Effective", "Ineffective"],
+        "values": [success / total * 100, (total - success) / total * 100]
+    }
+
+@app.route("/api/analytics/puzzle-types")
+@login_required
+def puzzle_types():
+
+    #calculates success rate per puzzle type
+    results = (
+        db.session.query(
+            PuzzleSession.puzzle_type,
+            func.avg(PuzzleSession.is_correct.cast(db.Integer))
+        )
+        .join(AlarmSession)
+        .filter(AlarmSession.user_id == current_user.id)
+        .group_by(PuzzleSession.puzzle_type)
+        .all()
+    )
+
+    return {
+        "labels": [r[0] for r in results],
+        "values": [round(r[1] * 100, 2) for r in results]
+    }
 
