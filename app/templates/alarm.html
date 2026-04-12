@@ -66,9 +66,29 @@
                         li.className = 'flex justify-between items-center';
 
                         const left = document.createElement('div');
-                        const span = document.createElement('span');
-                        span.innerHTML = `${alarm.time} — <span class="italic text-indigo-600">${alarm.puzzle_type.charAt(0).toUpperCase() + alarm.puzzle_type.slice(1)}</span>`;
-                        left.appendChild(span);
+                        const topLine = document.createElement('div');
+                        topLine.className = 'flex flex-wrap items-center gap-2';
+
+                        const timeAndPuzzle = document.createElement('span');
+                        timeAndPuzzle.innerHTML = `${alarm.time} — <span class="italic text-indigo-600">${alarm.puzzle_type.charAt(0).toUpperCase() + alarm.puzzle_type.slice(1)}</span>`;
+                        topLine.appendChild(timeAndPuzzle);
+
+                        if (alarm.use_dynamic_alarm) {
+                            const dynamicBadge = document.createElement('span');
+                            dynamicBadge.className = 'inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800';
+                            dynamicBadge.textContent = 'Dynamic';
+                            topLine.appendChild(dynamicBadge);
+                        }
+
+                        left.appendChild(topLine);
+
+                        if (alarm.use_dynamic_alarm && (alarm.dynamic_start_time || alarm.dynamic_end_time)) {
+                            const windowText = document.createElement('div');
+                            windowText.className = 'text-xs text-indigo-700';
+                            windowText.textContent = `Window: ${alarm.dynamic_start_time || '--:--'} to ${alarm.dynamic_end_time || '--:--'}`;
+                            left.appendChild(windowText);
+                        }
+
                         if (currentView === 'all') {
                             const dev = document.createElement('div');
                             dev.className = 'text-xs text-gray-500';

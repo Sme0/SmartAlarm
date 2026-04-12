@@ -18,6 +18,15 @@ from app import login_manager as lm
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
+
+def _as_utc(value: datetime | None) -> datetime | None:
+    """Normalize naive/aware datetimes to timezone-aware UTC for safe comparisons."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
 class User(UserMixin, db.Model):
     """User model for account management."""
 
@@ -135,9 +144,10 @@ class Device(db.Model):
         db.session.commit()
 
     def is_online(self) -> bool:
-        if not self.last_seen:
+        last_seen_utc = _as_utc(self.last_seen)
+        if not last_seen_utc:
             return False
-        return _utc_now() - self.last_seen < timedelta(minutes=2)
+        return _utc_now() - last_seen_utc < timedelta(minutes=2)
 
     def get_alarms(self) -> list['Alarm']:
         return Alarm.query.filter_by(device_serial=self.serial_number, user_id=self.user_id).all()
@@ -170,12 +180,25 @@ class Alarm(db.Model):
     enabled = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime(timezone=True), default=_utc_now)
     puzzle_type = db.Column(db.String(16), nullable=False, default='random')
+    use_dynamic_alarm = db.Column(db.Boolean, nullable=False, default=False)
+    dynamic_start_time = db.Column(db.Time, nullable=True)
+    dynamic_end_time = db.Column(db.Time, nullable=True)
 
     device = db.relationship('Device', backref=db.backref('alarms', lazy='select'))
     user = db.relationship('User', backref=db.backref('alarms', lazy='select'))
 
     @staticmethod
-    def create(device_serial: str, user_id: str, time, day_of_week: int, enabled: bool, puzzle_type: str):
+    def create(
+        device_serial: str,
+        user_id: str,
+        time,
+        day_of_week: int,
+        enabled: bool,
+        puzzle_type: str,
+        use_dynamic_alarm: bool = False,
+        dynamic_start_time=None,
+        dynamic_end_time=None,
+    ):
         alarm = Alarm()
         alarm.device_serial = device_serial
         alarm.user_id = user_id
@@ -184,6 +207,9 @@ class Alarm(db.Model):
         alarm.enabled = enabled
         alarm.created_at = _utc_now()
         alarm.puzzle_type = puzzle_type
+        alarm.use_dynamic_alarm = use_dynamic_alarm
+        alarm.dynamic_start_time = dynamic_start_time
+        alarm.dynamic_end_time = dynamic_end_time
 
         db.session.add(alarm)
         db.session.commit()

@@ -11,6 +11,8 @@ from sqlalchemy.orm import selectinload
 from app.models import AlarmSession, DifficultyModel, SleepSession
 from app import database as db
 
+MODEL_RETRAIN_AFTER_DAYS = 7
+
 feature_names = [
 
     # Context
@@ -289,6 +291,17 @@ def _load_model(user_id):
     model = joblib.load(model_bytes)
     return model
 
+
+def _should_retrain_model(user_id: int, max_age_days: int = MODEL_RETRAIN_AFTER_DAYS) -> bool:
+    """Return True when a user's stored model is missing or older than max_age_days."""
+    user_model = DifficultyModel.query.filter_by(user_id=user_id).first()
+    if not user_model:
+        return True
+
+    last_trained_utc = _as_utc(user_model.last_trained)
+    model_age = datetime.now(timezone.utc) - last_trained_utc
+    return model_age > timedelta(days=max_age_days)
+
 def _extract_features(user_id) -> list[dict] | None:
     """
     Extracts training features from alarm sessions, puzzle sessions, and sleep data for a given user.
@@ -400,8 +413,10 @@ def train_user_model(user_id) -> Pipeline | None:
     :return: The trained scikit-learn Pipeline model, or None if training data is unavailable.
     """
     data = _extract_features(user_id)
-    if not data:
-        print(f"No training data found for user: {user_id}.")
+    MIN_TRAINING_SAMPLES = 10
+
+    if not data or len(data) < MIN_TRAINING_SAMPLES:
+        print(f"Not enough training data for user {user_id}. This requires at least {MIN_TRAINING_SAMPLES} samples.")
         return None
 
     X_rows, y_rows = [], []
@@ -447,9 +462,14 @@ def _predict_user_model(user_id, prediction_data):
                             Columns must correspond to the order of feature_names.
     :return: An array of predicted puzzle solve times (in seconds) for each sample, or None if no model is found.
     """
-    model: Pipeline = _load_model(user_id)
-    if not model:
+    model: Pipeline | None = None
+
+    if _should_retrain_model(user_id):
+        # Try refresh first; if refresh fails due sparse data, keep using existing model if one exists.
         model = train_user_model(user_id)
+
+    if not model:
+        model = _load_model(user_id)
     if not model:
         return None
 
@@ -485,6 +505,14 @@ def find_suitable_alarm(
         return {"best_candidate": None, "candidates": []}
 
     alarm_sessions: list[AlarmSession] = _load_user_alarm_sessions(user_id)
+    MIN_REQUIRED_SESSIONS = 10
+    if len(alarm_sessions) < MIN_REQUIRED_SESSIONS:
+        return {
+            "best_candidate": None,
+            "reason": "not_enough_alarm_data",
+            "required_sessions": MIN_REQUIRED_SESSIONS,
+            "current_sessions": len(alarm_sessions),
+        }
     sleep_sessions: list[SleepSession] = _load_user_sleep_sessions(user_id)
 
     sleep_quality_by_id, sleep_efficiency_by_id = _compute_sleep_statistics(sleep_sessions)
