@@ -161,7 +161,9 @@ class Puzzle(ABC):
 
     def get_puzzle_type(self) -> str:
         class_name = self.__class__.__name__
-        return class_name.removesuffix("Puzzle").lower()
+        if class_name.endswith("Puzzle"):
+            class_name = class_name[:-len("Puzzle")]
+        return class_name.lower()
 
     def export_session(self, alarm_session_id: str):
         time_taken_seconds = None

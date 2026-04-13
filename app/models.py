@@ -18,6 +18,15 @@ from app import login_manager as lm
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
+
+def _to_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+        # Some DB backends/drivers return naive UTC datetimes.
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
 class User(UserMixin, db.Model):
     """User model for account management."""
 
@@ -135,9 +144,10 @@ class Device(db.Model):
         db.session.commit()
 
     def is_online(self) -> bool:
-        if not self.last_seen:
+        last_seen_utc = _to_utc(self.last_seen)
+        if not last_seen_utc:
             return False
-        return _utc_now() - self.last_seen < timedelta(minutes=2)
+        return _utc_now() - last_seen_utc < timedelta(minutes=2)
 
     def get_alarms(self) -> List['Alarm']:
         return Alarm.query.filter_by(device_serial=self.serial_number, user_id=self.user_id).all()
