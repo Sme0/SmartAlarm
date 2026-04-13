@@ -17,6 +17,15 @@ from sqlalchemy.orm import selectinload
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
+
+def _to_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def _resolve_timezone(tz_name: str | None):
     if tz_name:
         try:
@@ -25,8 +34,10 @@ def _resolve_timezone(tz_name: str | None):
             pass
     return timezone.utc, "UTC"
 
+
 def _is_expired(value: datetime | None) -> bool:
-    return value is not None and value < _utc_now()
+    value_utc = _to_utc(value)
+    return value_utc is not None and value_utc < _utc_now()
 
 # Return JSON 401 for API/AJAX requests, otherwise redirect to the login page.
 @login_manager.unauthorized_handler

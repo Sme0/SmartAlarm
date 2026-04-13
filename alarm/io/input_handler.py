@@ -47,6 +47,7 @@ class JoystickDirection(Enum):
     DOWN = "DOWN"
     LEFT = "LEFT"
     RIGHT = "RIGHT"
+    PRESS = "PRESS"
 
 
 @dataclass
@@ -121,6 +122,7 @@ class InputHandler(ABC):
             JoystickDirection.RIGHT: InputEventType.JOYSTICK_RIGHT,
             JoystickDirection.UP: InputEventType.JOYSTICK_UP,
             JoystickDirection.DOWN: InputEventType.JOYSTICK_DOWN,
+            JoystickDirection.PRESS: InputEventType.JOYSTICK_PRESS,
         }
         return mapping.get(direction)
 
@@ -269,7 +271,9 @@ class RaspberryPiInputHandler(InputHandler):
             print("ERROR: Error reading from joystick")
             return JoystickDirection.NEUTRAL
 
-        #TODO: Joystick pressing
+        # Joystick press
+        if x > 1020:
+            return JoystickDirection.PRESS
 
         # up side values
         if x < 385:
