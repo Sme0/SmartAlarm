@@ -140,7 +140,7 @@ class AlarmController:
         
         # Puzzle startup logic. Use whenever a puzzle is being started
         # TODO: Choose game automatically
-        puzzle: Puzzle = MathsPuzzle(self.input_handler, self.output_handler)
+        puzzle: Puzzle = MemoryPuzzle(self.input_handler, self.output_handler)
         result = puzzle.run_puzzle()
         source_alarm_id = str(self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id)
         session = self._pending_sessions[source_alarm_id]
