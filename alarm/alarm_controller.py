@@ -96,7 +96,8 @@ class AlarmController:
         day_of_week = get_current_day_of_week_number()
 
         # Check each alarm and trigger if needed
-        for alarm in (self.alarms + self.snooze_alarms):
+        alarms_to_check = (self.alarms or []) + (self.snooze_alarms or [])
+        for alarm in alarms_to_check:
             if self.state == AlarmState.WAITING and day_of_week == alarm.day_of_week and self.current_time == (alarm.time + ":00"):
                 self.trigger_alarm(alarm)
                 return True
@@ -217,4 +218,3 @@ class AlarmController:
         sessions = self._complete_sessions
         self._complete_sessions = {}
         return sessions
-
