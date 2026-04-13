@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from enum import Enum
 import select
 import sys
-from typing import List
+from typing import List, Set
 
 from alarm.alarm_state import AlarmState
 
@@ -97,7 +97,7 @@ class InputHandler(ABC):
         self._events.clear()
         return events
 
-    def pop_events_by_type(self, event_types: set[InputEventType]) -> List[InputEvent]:
+    def pop_events_by_type(self, event_types: Set[InputEventType]) -> List[InputEvent]:
         """
         Return only events whose type is in `event_types`.
 
