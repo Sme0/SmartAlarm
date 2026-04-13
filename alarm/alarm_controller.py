@@ -2,7 +2,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+import pytz
 
 from alarm.io.output_handler import OutputHandler
 from alarm.io.input_handler import InputHandler
@@ -26,8 +26,8 @@ def _resolve_clock_timezone():
     configured_tz = (os.getenv("DEVICE_TIMEZONE") or "").strip()
     if configured_tz:
         try:
-            return ZoneInfo(configured_tz)
-        except ZoneInfoNotFoundError:
+            return pytz.timezone(configured_tz)
+        except pytz.UnknownTimeZoneError:
             print(f"Invalid DEVICE_TIMEZONE '{configured_tz}', falling back to device timezone")
 
     local_tz = datetime.now().astimezone().tzinfo
