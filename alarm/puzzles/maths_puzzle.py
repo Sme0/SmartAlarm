@@ -7,7 +7,7 @@ from alarm.puzzles.puzzle import Puzzle
 
 
 class MathsPuzzle(Puzzle):
-    def __init__(self, input_handler: InputHandler, output_handler: OutputHandler):
+    def __init__(self, input_handler: InputHandler, output_handler: OutputHandler, gamemode):
         super().__init__(input_handler, output_handler)
 
         #types of maths puzzles to select from
@@ -17,7 +17,10 @@ class MathsPuzzle(Puzzle):
         #to see all:
         #for item in mg.getGenList():
             #print(item[2])
-        self.question_types = [0, 1, 2, 3]
+        if gamemode == "kids":
+            self.question_types = [0, 1]
+        else:
+            self.question_types = [0, 1, 2, 3]
         self.current_selection = 0
 
     def _parse_solution_int(self, raw_solution):
@@ -26,7 +29,7 @@ class MathsPuzzle(Puzzle):
     def _format_problem(self, raw_problem):
         problem = str(raw_problem).replace("$", "")
         problem = problem.replace("\\div", "÷")
-        return problem.replace("\\cdot", "×")
+        return problem.replace("\\cdot", "x") #changed to an 'x' for display purposes
 
     def prepare_puzzle(self):
         #generate maths puzzle
@@ -35,9 +38,14 @@ class MathsPuzzle(Puzzle):
         self.problem = self._format_problem(self.problem)
         self.current_selection = 0
 
+        if str(self.solution).len() > 2:
+            no_choices = 2
+        else:
+            no_choices = 3
+
         # Generate choices
         choices = []
-        while len(choices) < 3:
+        while len(choices) < no_choices:
             offset = random.randint(-10, 10)  # could change to scale to solution?
             incorrect_answer = self.solution + offset
             # may have negative numbers
