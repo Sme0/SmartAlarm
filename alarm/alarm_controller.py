@@ -128,6 +128,7 @@ class AlarmController:
         })
 
         self.output_handler.display_text(f"Alarm Triggered: {_clock_now().strftime('%H:%M')}")
+        self.output_handler.buzzer.play_alarm_sound()
 
     def disarm_alarm(self):
         """
@@ -172,6 +173,8 @@ class AlarmController:
             self.output_handler.display_text("Snooze limit reached")
             return
 
+        self.state = AlarmState.PUZZLE
+
         # Puzzle startup logic. Use whenever a puzzle is being started
         # TODO: Choose game automatically
         puzzle: Puzzle = MathsPuzzle(self.input_handler, self.output_handler)
@@ -207,6 +210,8 @@ class AlarmController:
         if self.state in [AlarmState.TRIGGERED, AlarmState.PUZZLE]:
             print("Alarm Stopped")
             print(f"Active alarms: {self.alarms}, {self.snooze_alarms}")
+
+            self.output_handler.buzzer.stop_alarm_sound()
 
             if self.current_triggered_alarm in self.snooze_alarms:
                 self.snooze_alarms.remove(self.current_triggered_alarm)

@@ -22,14 +22,14 @@ if not SERIAL_NUMBER:
 
 flask_api_client = FlaskAPIClient(serial_number=SERIAL_NUMBER)
 
-if str(os.getenv("DEVICE_DEBUG_MODE")).lower() == "true":
+
+device_debug_mode = str(os.getenv("DEVICE_DEBUG_MODE")).lower() in ["true", "y", "yes", "debug"]
+if device_debug_mode:
     input_handler = DebugInputHandler()
     output_handler = DebugOutputHandler()
-elif str(os.getenv("DEVICE_DEBUG_MODE")).lower() == "false":
+else:
     input_handler = RaspberryPiInputHandler()
     output_handler = RaspberryPiOutputHandler()
-else:
-    raise Exception(f"DEVICE_DEBUG_MODE environment variable either not defined or valid: {os.getenv('DEVICE_DEBUG_MODE')}")
 
 alarm_controller = AlarmController(input_handler, output_handler)
 
@@ -66,7 +66,7 @@ def pairing_loop():
     if pairing_code is None:
         output_handler.display_text("None")
     else:
-        output_handler.display_text(flask_api_client.request_pairing_code())
+        output_handler.display_text(pairing_code)
 
     while True:
         status = flask_api_client.get_pairing_status()

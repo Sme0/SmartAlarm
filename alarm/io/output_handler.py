@@ -6,12 +6,18 @@ logic to present information without depending on a specific output device.
 from abc import ABC, abstractmethod
 from typing import List, Any
 import time
+
+from alarm.io.buzzer import Buzzer, RaspberryPiBuzzer, DebugBuzzer
 from alarm.io.displays import Display, render_maths_question, format_memory_directions
 from alarm.io.input_handler import JoystickDirection
 
 
 class OutputHandler(ABC):
     """Interface for presenting alarm and puzzle output to a user-facing display."""
+
+    def __init__(self, display: Display = None, buzzer: Buzzer = None):
+        self.display = display
+        self.buzzer = buzzer
 
     @abstractmethod
     def display_text(self, text):
@@ -43,8 +49,7 @@ class RaspberryPiOutputHandler(OutputHandler):
     """Output handler that renders content on the LCD screen."""
 
     def __init__(self):
-        """Initialize display driver wrapper for Raspberry Pi hardware output."""
-        self.display = Display()
+        super().__init__(display=Display(), buzzer=RaspberryPiBuzzer())
 
     def display_text(self, text):
         """Write plain text directly to the LCD."""
@@ -69,6 +74,9 @@ class RaspberryPiOutputHandler(OutputHandler):
 
 class DebugOutputHandler(OutputHandler):
     """Console-based output handler for development/debug environments."""
+
+    def __init__(self):
+        super().__init__(buzzer=DebugBuzzer())
 
     def display_text(self, text):
         """Print plain text output with a display prefix for traceability."""
