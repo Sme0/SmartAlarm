@@ -5,6 +5,7 @@ from typing import List
 from alarm.io.input_handler import InputEventType, JoystickDirection
 from alarm.puzzles.puzzle import Puzzle
 
+
 class MemoryPuzzle(Puzzle):
 
     def __init__(self, input_handler, output_handler, puzzle_length: int = 5):
@@ -52,7 +53,6 @@ class MemoryPuzzle(Puzzle):
         self.prepare_puzzle()
         self.display_puzzle()
 
-        # Clear stale movement events from before puzzle start.
         self.input_handler.pop_events_by_type({
             InputEventType.JOYSTICK_LEFT,
             InputEventType.JOYSTICK_RIGHT,
@@ -61,9 +61,10 @@ class MemoryPuzzle(Puzzle):
             InputEventType.JOYSTICK_PRESS
         })
 
-        start_time = time.time()
+        self.start_time = time.time()
         while True:
-            if time.time() - start_time > self.time_limit:
+            if time.time() - self.start_time > self.time_limit:
+                self.end_time = time.time()
                 self.output_handler.display_text("Puzzle timeout")
                 return False
 
@@ -86,8 +87,8 @@ class MemoryPuzzle(Puzzle):
 
                 self.direction_values.append(direction)
 
-                # Original flow: compare after collecting the full sequence.
                 if len(self.direction_values) >= len(self.instructions) or event.event_type == InputEventType.JOYSTICK_PRESS:
+                    self.end_time = time.time()
                     if self.check_answer():
                         self.output_handler.display_text("Correct")
                         return True

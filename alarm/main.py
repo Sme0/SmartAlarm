@@ -7,6 +7,7 @@ import time
 
 from dotenv import load_dotenv
 
+from alarm.io.buzzer import Buzzer, DebugBuzzer
 from alarm.io.input_handler import DebugInputHandler, RaspberryPiInputHandler
 from alarm.io.output_handler import DebugOutputHandler, RaspberryPiOutputHandler
 from alarm.io.input_handler import InputEventType
@@ -22,16 +23,19 @@ if not SERIAL_NUMBER:
 
 flask_api_client = FlaskAPIClient(serial_number=SERIAL_NUMBER)
 
-if str(os.getenv("DEVICE_DEBUG_MODE")).lower() == "true":
+device_debug_mode = str(os.getenv("DEVICE_DEBUG_MODE")).lower()
+if device_debug_mode == "true":
     input_handler = DebugInputHandler()
     output_handler = DebugOutputHandler()
-elif str(os.getenv("DEVICE_DEBUG_MODE")).lower() == "false":
+    buzzer = DebugBuzzer()
+elif device_debug_mode == "false":
     input_handler = RaspberryPiInputHandler()
     output_handler = RaspberryPiOutputHandler()
+    buzzer = Buzzer()
 else:
     raise Exception(f"DEVICE_DEBUG_MODE environment variable either not defined or valid: {os.getenv('DEVICE_DEBUG_MODE')}")
 
-alarm_controller = AlarmController(input_handler, output_handler)
+alarm_controller = AlarmController(input_handler, output_handler, buzzer)
 
 
 def _flush_inputs_on_state_change(previous_state, current_state):
@@ -58,6 +62,7 @@ def _handle_alarm_events():
             alarm_controller.snooze_alarm()
             break
 
+
 def pairing_loop():
     if flask_api_client.get_pairing_status() == PairingStatus.PAIRED:
         return
@@ -66,7 +71,7 @@ def pairing_loop():
     if pairing_code is None:
         output_handler.display_text("None")
     else:
-        output_handler.display_text(flask_api_client.request_pairing_code())
+        output_handler.display_text(pairing_code)
 
     while True:
         status = flask_api_client.get_pairing_status()
@@ -88,23 +93,22 @@ def pairing_loop():
         time.sleep(5)
 
 
-# Main alarm loop
-
-
 def main_alarm_loop():
     last_update_time = time.time()
     previous_state = alarm_controller.state
-    while True:
 
-        # Prepare for state change by clearing old inputs
+    initial_alarms = flask_api_client.get_alarms()
+    if initial_alarms is not None:
+        alarm_controller.alarms = initial_alarms
+        print(f"Initial alarms loaded: {alarm_controller.alarms}")
+
+    while True:
         _flush_inputs_on_state_change(previous_state, alarm_controller.state)
         previous_state = alarm_controller.state
 
-        # Record inputs on this tick
         input_handler.check_inputs(state=alarm_controller.state)
         _handle_alarm_events()
 
-        # Clear old inputs again if state has changed
         _flush_inputs_on_state_change(previous_state, alarm_controller.state)
         previous_state = alarm_controller.state
 
@@ -114,11 +118,11 @@ def main_alarm_loop():
         _flush_inputs_on_state_change(previous_state, alarm_controller.state)
         previous_state = alarm_controller.state
 
-        # Send heartbeat every 30 seconds
-        # Comment out if not using webserver yet
         current_time = time.time()
         if current_time - last_update_time >= 15.0:
-            alarm_controller.alarms = flask_api_client.get_alarms()
+            refreshed_alarms = flask_api_client.get_alarms()
+            if refreshed_alarms is not None:
+                alarm_controller.alarms = refreshed_alarms
             print(f"Active alarms: {alarm_controller.alarms}, {alarm_controller.snooze_alarms}")
 
             complete_sessions = alarm_controller.pull_complete_sessions()
@@ -128,6 +132,7 @@ def main_alarm_loop():
             last_update_time = current_time
 
         time.sleep(0.1)
+
 
 if __name__ == "__main__":
     pairing_loop()
