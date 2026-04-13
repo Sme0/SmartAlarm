@@ -7,7 +7,7 @@ from alarm.puzzles.puzzle import Puzzle
 
 
 class MathsPuzzle(Puzzle):
-    def __init__(self, input_handler: InputHandler, output_handler: OutputHandler, gamemode):
+    def __init__(self, input_handler: InputHandler, output_handler: OutputHandler):
         super().__init__(input_handler, output_handler)
 
         #types of maths puzzles to select from
@@ -17,10 +17,7 @@ class MathsPuzzle(Puzzle):
         #to see all:
         #for item in mg.getGenList():
             #print(item[2])
-        if gamemode == "kids":
-            self.question_types = [0, 1]
-        else:
-            self.question_types = [0, 1, 2, 3]
+        self.question_types = [0, 1, 2, 3]
         self.current_selection = 0
 
     def _parse_solution_int(self, raw_solution):
