@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from enum import Enum
 import select
 import sys
+from typing import List
+
 from alarm.alarm_state import AlarmState
 
 # To avoid import errors when not run on the Raspberry Pi
@@ -89,7 +91,7 @@ class InputHandler(ABC):
         event = InputEvent(event_type=event_type, timestamp=time.time(), payload=payload)
         self._events.append(event)
 
-    def pop_events(self) -> list[InputEvent]:
+    def pop_events(self) -> List[InputEvent]:
         """Return and clear all queued events (FIFO order)."""
         events = list(self._events)
         self._events.clear()

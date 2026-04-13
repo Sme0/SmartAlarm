@@ -2,6 +2,7 @@
 This module implements all the routes for the Flask application.
 """
 from datetime import datetime, timezone
+from typing import List
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import render_template, redirect, url_for, flash, request, jsonify
@@ -799,7 +800,7 @@ def get_alarms():
 
     device.update_heartbeat()
 
-    alarms: list[Alarm] = device.get_alarms()
+    alarms: List[Alarm] = device.get_alarms()
     return jsonify({
         "alarms": [
             {

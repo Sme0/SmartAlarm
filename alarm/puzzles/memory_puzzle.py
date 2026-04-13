@@ -1,5 +1,6 @@
 import random
 import time
+from typing import List
 
 from alarm.io.input_handler import InputEventType, JoystickDirection
 from alarm.puzzles.puzzle import Puzzle
@@ -9,8 +10,8 @@ class MemoryPuzzle(Puzzle):
     def __init__(self, input_handler, output_handler, puzzle_length: int = 5):
         super().__init__(input_handler, output_handler)
         self.puzzle_length = puzzle_length
-        self.instructions: list[JoystickDirection] = []
-        self.direction_values: list[JoystickDirection] = []
+        self.instructions: List[JoystickDirection] = []
+        self.direction_values: List[JoystickDirection] = []
 
     def generatePattern(self):
         directions = [

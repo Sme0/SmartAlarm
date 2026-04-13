@@ -30,7 +30,7 @@ class OutputHandler(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def play_memory_sequence(self, sequence: list[JoystickDirection]):
+    def play_memory_sequence(self, sequence: List[JoystickDirection]):
         """
         Present a memory-game sequence one step at a time.
 

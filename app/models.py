@@ -6,7 +6,7 @@ import random
 import string
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, List
 
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -139,7 +139,7 @@ class Device(db.Model):
             return False
         return _utc_now() - self.last_seen < timedelta(minutes=2)
 
-    def get_alarms(self) -> list['Alarm']:
+    def get_alarms(self) -> List['Alarm']:
         return Alarm.query.filter_by(device_serial=self.serial_number, user_id=self.user_id).all()
     
     def get_alarms_by_day(self):
