@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def group_sleep_records(records: list[dict], night_gap_size=2):
@@ -47,3 +47,11 @@ def parse_apple_dt(value: str | None):
     if len(normalized) >= 5 and (normalized[-5] in ['+', '-']) and normalized[-3] != ':':
         normalized = normalized[:-2] + ':' + normalized[-2:]
     return datetime.fromisoformat(normalized)
+
+def as_utc(value: datetime | None) -> datetime | None:
+    """Normalize naive/aware datetimes to timezone-aware UTC for safe comparisons."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)

@@ -13,19 +13,11 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.exc import IntegrityError
 from app import database as db
 from app import login_manager as lm
+from app.utils import as_utc
 
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def _as_utc(value: datetime | None) -> datetime | None:
-    """Normalize naive/aware datetimes to timezone-aware UTC for safe comparisons."""
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
 
 class User(UserMixin, db.Model):
     """User model for account management."""
@@ -144,7 +136,7 @@ class Device(db.Model):
         db.session.commit()
 
     def is_online(self) -> bool:
-        last_seen_utc = _as_utc(self.last_seen)
+        last_seen_utc = as_utc(self.last_seen)
         if not last_seen_utc:
             return False
         return _utc_now() - last_seen_utc < timedelta(minutes=2)

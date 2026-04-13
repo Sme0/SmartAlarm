@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models import AlarmSession, DifficultyModel, SleepSession
 from app import database as db
+from app.utils import as_utc
 
 MODEL_RETRAIN_AFTER_DAYS = 7
 
@@ -37,18 +38,6 @@ feature_names = [
     "avg_puzzle_time_same_day",
     "avg_puzzle_time_same_time",
 ]
-
-
-def _as_utc(dt: datetime) -> datetime:
-    """
-    Normalize a datetime to UTC, handling both naive and aware datetimes.
-
-    :param dt: The datetime to normalize.
-    :return: The same datetime in UTC timezone-aware format.
-    """
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
 
 def _minutes_after_midnight(dt: datetime) -> int:
     """
@@ -96,7 +85,7 @@ def _compute_sleep_statistics(sleep_sessions: list[SleepSession]) -> tuple[dict[
             if not stage.start_date or not stage.end_date:
                 continue
 
-            duration = max((_as_utc(stage.end_date) - _as_utc(stage.start_date)).total_seconds(), 0.0)
+            duration = max((as_utc(stage.end_date) - as_utc(stage.start_date)).total_seconds(), 0.0)
             if duration <= 0:
                 continue
 
@@ -172,7 +161,7 @@ def _load_user_sleep_sessions(user_id: int) -> list[SleepSession]:
     )
 
     sleep_sessions.sort(
-        key=lambda s: _as_utc(s.end_date) if s.end_date is not None else datetime.max.replace(tzinfo=timezone.utc)
+        key=lambda s: as_utc(s.end_date) if s.end_date is not None else datetime.max.replace(tzinfo=timezone.utc)
     )
     return sleep_sessions
 
@@ -181,7 +170,7 @@ def _build_session_rows(alarm_sessions: list[AlarmSession]) -> list[dict]:
     """Build normalized per-session rows used when computing prior behavioral aggregates."""
     rows = []
     for session in alarm_sessions:
-        when_utc = _as_utc(session.triggered_at)
+        when_utc = as_utc(session.triggered_at)
         rows.append({
             "session_id": session.id,
             "when_utc": when_utc,
@@ -225,7 +214,7 @@ def _advance_recent_sleep_window(
         if sleep.end_date is None:
             sleep_idx += 1
             continue
-        if _as_utc(sleep.end_date) <= reference_time_utc:
+        if as_utc(sleep.end_date) <= reference_time_utc:
             recent_sleep_window.append(sleep)
             sleep_idx += 1
             continue
@@ -298,7 +287,7 @@ def _should_retrain_model(user_id: int, max_age_days: int = MODEL_RETRAIN_AFTER_
     if not user_model:
         return True
 
-    last_trained_utc = _as_utc(user_model.last_trained)
+    last_trained_utc = as_utc(user_model.last_trained)
     model_age = datetime.now(timezone.utc) - last_trained_utc
     return model_age > timedelta(days=max_age_days)
 
@@ -367,7 +356,7 @@ def _extract_features(user_id) -> list[dict] | None:
         sleep_quality = [sleep_quality_by_id.get(sleep.id, 0.0) for sleep in last_three_sleeps]
         sleep_efficiency = [sleep_efficiency_by_id.get(sleep.id, 0.0) for sleep in last_three_sleeps]
         sleep_data_age_days = (
-            (when_utc - _as_utc(last_three_sleeps[-1].end_date)).total_seconds() / 86400.0
+            (when_utc - as_utc(last_three_sleeps[-1].end_date)).total_seconds() / 86400.0
             if last_three_sleeps else 0.0
         )
 
@@ -480,8 +469,8 @@ def find_suitable_alarm(
         min_time: datetime,
         max_time: datetime):
 
-    min_time_utc = _as_utc(min_time)
-    max_time_utc = _as_utc(max_time)
+    min_time_utc = as_utc(min_time)
+    max_time_utc = as_utc(max_time)
 
     # Make time constraints consistent with alarm_time in feature extraction
     min_time_minutes = _minutes_after_midnight(min_time_utc)
@@ -525,7 +514,7 @@ def find_suitable_alarm(
     recent_sleep_window: deque[SleepSession] = deque(maxlen=3)
 
     for candidate_dt in candidate_datetimes:
-        candidate_utc = _as_utc(candidate_dt)
+        candidate_utc = as_utc(candidate_dt)
         alarm_time_minutes = _minutes_after_midnight(candidate_utc)
         day_of_week = candidate_utc.weekday()
 
@@ -547,7 +536,7 @@ def find_suitable_alarm(
         sleep_quality = [sleep_quality_by_id.get(sleep.id, 0.0) for sleep in last_three_sleeps]
         sleep_efficiency = [sleep_efficiency_by_id.get(sleep.id, 0.0) for sleep in last_three_sleeps]
         sleep_data_age_days = (
-            (candidate_utc - _as_utc(last_three_sleeps[-1].end_date)).total_seconds() / 86400.0
+            (candidate_utc - as_utc(last_three_sleeps[-1].end_date)).total_seconds() / 86400.0
             if last_three_sleeps else 0.0
         )
 

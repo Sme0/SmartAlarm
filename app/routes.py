@@ -10,7 +10,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from app import app, database as db, login_manager, csrf
 from app.models import User, Device, Alarm, AlarmSession, PuzzleSession, SleepSession, SleepStage
 from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm, EditAlarmForm, DeviceSettingsForm
-from app.utils import group_sleep_records, parse_apple_dt
+from app.utils import group_sleep_records, parse_apple_dt, as_utc
 from app.analysis import find_suitable_alarm
 from werkzeug.exceptions import InternalServerError
 from sqlalchemy.orm import selectinload
@@ -18,15 +18,6 @@ from sqlalchemy import func
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def _as_utc(value: datetime | None) -> datetime | None:
-    """Normalize naive/aware datetimes to timezone-aware UTC for safe comparisons."""
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
 
 def _resolve_timezone(tz_name: str | None):
     if tz_name:
@@ -37,7 +28,7 @@ def _resolve_timezone(tz_name: str | None):
     return timezone.utc, "UTC"
 
 def _is_expired(value: datetime | None) -> bool:
-    normalized = _as_utc(value)
+    normalized = as_utc(value)
     return normalized is not None and normalized < _utc_now()
 
 
