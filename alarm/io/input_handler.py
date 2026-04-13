@@ -97,7 +97,7 @@ class InputHandler(ABC):
         self._events.clear()
         return events
 
-    def pop_events_by_type(self, event_types: set[InputEventType]) -> list[InputEvent]:
+    def pop_events_by_type(self, event_types: set[InputEventType]) -> List[InputEvent]:
         """
         Return only events whose type is in `event_types`.
 
