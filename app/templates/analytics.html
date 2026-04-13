@@ -126,7 +126,7 @@ fetch("/api/analytics/puzzle-types")
     new Chart(document.getElementById("puzzleChart"), {
         type: "bar",
         data: {
-            labels: data.labels,
+            labels: ["Memory", "Maths"],
             datasets: [{
                 label: "Success %",
                 data: data.values
