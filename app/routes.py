@@ -1619,9 +1619,9 @@ def success_over_time():
     }
 
 
-@app.route("/api/analytics/alarm-effectiveness")
+@app.route("/api/analytics/alarm-success")
 @login_required
-def alarm_effectiveness():
+def alarm_success():
 
     sessions = AlarmSession.query.filter_by(user_id=current_user.id).all()
 
@@ -1638,7 +1638,7 @@ def alarm_effectiveness():
             success += 1
 
     return {
-        "labels": ["Effective", "Ineffective"],
+        "labels": ["Successful", "Unsuccessful"],
         "values": [success / total * 100, (total - success) / total * 100]
     }
 

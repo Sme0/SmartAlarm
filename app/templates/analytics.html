@@ -21,6 +21,7 @@
         .chart-container {
             width: 100%;
             max-width: 600px;   /* chart size */
+            /*max-height: 500px;*/
             overflow-x: auto;   /* enables scrolling */
             border: 1px solid #ddd;
             padding: 10px;
@@ -37,7 +38,7 @@
 
 <h1>Analytics</h1>  
 
-<h2>Recommendation</h2>
+<h2>Recommendations</h2>
 <p id="recommendation">More data needed</p>
 
 <h2>Success Over Time</h2>
@@ -48,11 +49,11 @@ Shows whether you stayed within a healthy snooze limit (0–1 snoozes per day = 
     <canvas id="dayChart"></canvas>
 </div>
 
-<h2>Alarm Effectiveness</h2>
+<h2>Puzzle success</h2>
 <p class="chart-desc">
-Shows how often alarms lead to successfully completed puzzles.
+Shows how often puzzles are successfully completed.
 </p>
-<canvas id="effectivenessChart"></canvas>
+<canvas id="successChart"></canvas>
 
 <h2>Puzzle Type Comparison</h2>
 <p class="chart-desc">
@@ -90,17 +91,23 @@ fetch("/api/analytics/success-over-time")
         },
         options: {
             responsive: false,
-            maintainAspectRatio: false
+            maintainAspectRatio: false,
+            scales : {
+                y : {
+                    min: 0,
+                    max: 7,
+                }
+            }
         }
     });
 });
 
 //chart showing user how many puzzles they successfully completed
-fetch("/api/analytics/alarm-effectiveness")
+fetch("/api/analytics/alarm-success")
 .then(res => res.json())
 .then(data => {
 
-    new Chart(document.getElementById("effectivenessChart"), {
+    new Chart(document.getElementById("successChart"), {
         type: "pie",
         data: {
             labels: data.labels,
@@ -124,6 +131,14 @@ fetch("/api/analytics/puzzle-types")
                 label: "Success %",
                 data: data.values
             }]
+        },
+        options: {
+            scales : {
+                y : {
+                    min: 0,
+                    max: 100,
+                }
+            }
         }
     });
 });
