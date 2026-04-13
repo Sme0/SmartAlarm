@@ -25,8 +25,8 @@ class MathsPuzzle(Puzzle):
 
     def _format_problem(self, raw_problem):
         problem = str(raw_problem).replace("$", "")
-        problem = problem.replace("\\div", "÷")
-        return problem.replace("\\cdot", "x") #changed to an 'x' for display purposes
+        problem = problem.replace("\\div", "/") #changed for display purposes
+        return problem.replace("\\cdot", "x") #changed for display purposes
 
     def prepare_puzzle(self):
         #generate maths puzzle
@@ -35,6 +35,7 @@ class MathsPuzzle(Puzzle):
         self.problem = self._format_problem(self.problem)
         self.current_selection = 0
 
+        # decides how many options can fit on screen
         if str(self.solution).len() > 2:
             no_choices = 2
         else:
