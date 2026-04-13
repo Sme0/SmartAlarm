@@ -141,15 +141,18 @@ class AlarmController:
         # Puzzle startup logic. Use whenever a puzzle is being started
         # TODO: Choose game automatically
         puzzle: Puzzle = MathsPuzzle(self.input_handler, self.output_handler)
-        puzzle.run_puzzle()
+        result = puzzle.run_puzzle()
         source_alarm_id = str(self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id)
         session = self._pending_sessions[source_alarm_id]
         session["puzzle_sessions"].append(puzzle.export_session(source_alarm_id))
 
-        # On alarm completion/disarm
-        self._complete_sessions[source_alarm_id] = session
-        self._pending_sessions.pop(source_alarm_id, None)
-        self.stop_alarm()
+        if result:
+            # On alarm completion/disarm
+            self._complete_sessions[source_alarm_id] = session
+            self._pending_sessions.pop(source_alarm_id, None)
+            self.stop_alarm()
+        else:
+            self.trigger_alarm(self.current_triggered_alarm)
 
     def snooze_alarm(self):
         """
@@ -171,25 +174,27 @@ class AlarmController:
         # Puzzle startup logic. Use whenever a puzzle is being started
         # TODO: Choose game automatically
         puzzle: Puzzle = MathsPuzzle(self.input_handler, self.output_handler)
-        puzzle.run_puzzle()
+        result = puzzle.run_puzzle()
         source_alarm_id = str(self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id)
         session = self._pending_sessions[source_alarm_id]
         session["puzzle_sessions"].append(puzzle.export_session(source_alarm_id))
-
-        # TODO: Make snooze time editable through web
-        snooze_time = (_clock_now() + timedelta(minutes=5)).strftime("%H:%M")
-        source_alarm_id = self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id
-        self.snooze_alarms.append(Alarm(
-            id=f"{source_alarm_id}-Snooze-{current_snooze_count + 1}",
-            time=snooze_time,
-            enabled=True,
-            day_of_week=get_current_day_of_week_number(),
-            puzzle_type=self.current_triggered_alarm.puzzle_type,
-            max_snoozes=max_snoozes,
-            snooze_count=current_snooze_count + 1,
-            source_alarm_id=source_alarm_id,
-        ))
-        self.stop_alarm()
+        if result:
+            # TODO: Make snooze time editable through web
+            snooze_time = (_clock_now() + timedelta(minutes=5)).strftime("%H:%M")
+            source_alarm_id = self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id
+            self.snooze_alarms.append(Alarm(
+                id=f"{source_alarm_id}-Snooze-{current_snooze_count + 1}",
+                time=snooze_time,
+                enabled=True,
+                day_of_week=get_current_day_of_week_number(),
+                puzzle_type=self.current_triggered_alarm.puzzle_type,
+                max_snoozes=max_snoozes,
+                snooze_count=current_snooze_count + 1,
+                source_alarm_id=source_alarm_id,
+            ))
+            self.stop_alarm()
+        else:
+            self.trigger_alarm(self.current_triggered_alarm)
 
 
 
