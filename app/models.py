@@ -433,7 +433,7 @@ def resolve_effective_puzzle_type(alarm: Alarm, device: Device | None = None) ->
     if len(candidates) == 1:
         return candidates[0]
 
-    today_key = _utc_now().date().isoformat()
+    today_key = utc_now().date().isoformat()
 
     seed = _stable_choice_seed(
         getattr(alarm, "id", ""),

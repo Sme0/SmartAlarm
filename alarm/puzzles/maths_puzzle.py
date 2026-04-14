@@ -36,7 +36,7 @@ class MathsPuzzle(Puzzle):
         self.current_selection = 0
 
         # decides how many options can fit on screen
-        if str(self.solution).len() > 2:
+        if len(str(self.solution)) > 2:
             no_choices = 2
         else:
             no_choices = 3

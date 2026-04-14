@@ -4,7 +4,7 @@ logic to present information without depending on a specific output device.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Any
+from typing import List
 import time
 
 from alarm.io.buzzer import Buzzer, RaspberryPiBuzzer, DebugBuzzer
