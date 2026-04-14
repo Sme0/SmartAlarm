@@ -5,11 +5,11 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Copy requirements and install dependencies
-COPY requirements.txt .
+COPY app/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy app code into container
-COPY . .
+COPY .. .
 
 # Default application port across local Python, Docker and Compose
 ENV FLASK_HOST_PORT=5000

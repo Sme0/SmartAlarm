@@ -31,12 +31,12 @@ Below are the following steps to install the project:
 Download the project or clone the project repository, and navigate to the downloaded folder:
 ```commandline
 git clone <repository-url>
-cd <repository-folder>
+cd <repository-root-folder>
 ```
 All dependencies will be automatically installed if running with Docker. If you are not running with Docker, 
 install the python dependencies manually:
 ```commandline
-pip install -r requirements.txt
+pip install -r app/requirements.txt
 ```
 
 #### Physical Device
@@ -44,17 +44,17 @@ TODO: Detailed commands and steps to install dependencies and set up the environ
 
 ### Configuration
 
+#### Web Application
+
 Copy the example environment file as the basis for its .env:
 ```commandline
-cp .env.example .env
+cp app/.env.example .env
 ```
+
 This file contains configuration values such as:
 
 - Database details
 - Flask setup
-- Alarm device details
-
-#### Web Application
 
 By default, the database is set to a local SQLite DB, stored inside the repository. This can be changed by modifying the
 database/db fields to link the project to a production database, by either providing a database url, or filling out the
@@ -101,8 +101,8 @@ docker compose up --build
 
 To run only Docker file and use another database of your choice, run (assuming ports are 5000):
 ```commandline
-docker build -t alarm-web .
-docker run -p 5000:5000 --env-file .env alarm-web
+docker build -t alarm-app .
+docker run -p 5000:5000 --env-file .env alarm-app
 ```
 
 Running one of these sets of commands will start the web application, and link/start the corresponding database.
@@ -114,12 +114,11 @@ This will however depend on where the docker is being run, and the port you have
 
 #### Running directly with Python (Without Docker)
 
-Assuming all dependencies have already been installed (as per above instructions), run the dedicated python script using one
-of the following (depending on operating system):
+Assuming all dependencies have already been installed (as per above instructions), run the dedicated python script.
+Please note some operating systems use `python3` instead of `python`.
 
 ```commandline
-Windows -> python web.py
-MacOS/Linux -> python3 web.py
+python app/run.py
 ```
 Assuming no errors occur, you may now access the web application, for example using:
 ```
