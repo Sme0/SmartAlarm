@@ -8,7 +8,7 @@ from threading import Thread
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from app import app, database as db, login_manager, csrf
-from app.models import User, Device, Alarm, AlarmSession, PuzzleSession, SleepSession, SleepStage
+from app.models import User, Device, Alarm, AlarmSession, PuzzleSession, SleepSession, SleepStage, resolve_effective_puzzle_type
 from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm, EditAlarmForm, DeviceSettingsForm
 from app.utils import (
     group_sleep_records, parse_apple_dt, as_utc, utc_now,
@@ -249,7 +249,9 @@ def session_history():
 
     grouped_by_day: dict[str, dict] = {}
     for alarm_session in alarm_sessions:
-        triggered_at_utc = alarm_session.triggered_at
+        triggered_at_utc = as_utc(alarm_session.triggered_at)
+        if triggered_at_utc is None:
+            continue
         triggered_at_local = triggered_at_utc.astimezone(display_tz)
         day_key = triggered_at_local.date().isoformat()
 
@@ -499,6 +501,7 @@ def dashboard():
 
 
 
+@app.route('/signup', methods=['GET', 'POST'])
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     """
@@ -1184,7 +1187,7 @@ def get_alarms():
                 "time": alarm.time.strftime("%H:%M"),
                 "enabled": alarm.enabled,
                 "day_of_week": getattr(alarm, 'day_of_week', 0),
-                "puzzle_type": getattr(alarm, 'puzzle_type', 'random'),
+                "puzzle_type": resolve_effective_puzzle_type(alarm, device),
                 "use_dynamic_alarm": bool(getattr(alarm, 'use_dynamic_alarm', False)),
                 "dynamic_start_time": alarm.dynamic_start_time.strftime('%H:%M') if getattr(alarm, 'dynamic_start_time', None) else None,
                 "dynamic_end_time": alarm.dynamic_end_time.strftime('%H:%M') if getattr(alarm, 'dynamic_end_time', None) else None,
@@ -1211,7 +1214,8 @@ def submit_complete_sessions():
                         "puzzle_type": "Memory",
                         "question": "1+1",
                         "is_correct": true,
-                        "time_taken_seconds": 4.2
+                        "time_taken_seconds": 4.2,
+                        "outcome_action": "dismissed"
                     }
                 ]
             }
@@ -1260,7 +1264,8 @@ def submit_complete_sessions():
             alarm_session = AlarmSession.create(
                 user_id=device.user_id,
                 device_serial=device.serial_number,
-                triggered_at=when
+                triggered_at=when,
+                commit=False,
             )
 
             puzzle_sessions = session_data.get("puzzle_sessions", [])
@@ -1282,13 +1287,18 @@ def submit_complete_sessions():
                 except (TypeError, ValueError):
                     time_taken_seconds = 0
 
+                outcome_action = puzzle_data.get("outcome_action")
+
                 PuzzleSession.create(
                     alarm_session_id=alarm_session.id,
                     puzzle_type=str(puzzle_type),
                     question=str(question),
                     is_correct=bool(puzzle_data.get("is_correct", False)),
                     time_taken_seconds=time_taken_seconds,
+                    outcome_action=str(outcome_action) if outcome_action is not None else None,
+                    commit=False,
                 )
+        db.session.commit()
     except Exception:
         db.session.rollback()
         return jsonify({"response": "failed", "message": "db error while storing sessions"}), 500

@@ -11,10 +11,20 @@ from typing import Optional, List
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 from app import database as db
 from app import login_manager as lm
 from app.utils import as_utc, utc_now
 
+SUPPORTED_PUZZLE_TYPES = ("maths", "memory")
+SUPPORTED_PUZZLE_OUTCOMES = ("dismissed", "snoozed")
+
+def _stable_choice_seed(*parts) -> int:
+    """
+    Build a deterministic numeric seed without relying on Python's randomized hash().
+    """
+    joined = "|".join("" if part is None else str(part) for part in parts)
+    return sum(ord(char) for char in joined)
 
 class User(UserMixin, db.Model):
     """User model for account management."""
@@ -211,13 +221,19 @@ class AlarmSession(db.Model):
     triggered_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     @staticmethod
-    def create(user_id: int, device_serial: str, triggered_at: datetime | None = None):
+    def create(
+        user_id: int,
+        device_serial: str,
+        triggered_at: datetime | None = None,
+        commit: bool = True,
+    ):
         """
         Create and persist an AlarmSession entry recording when an alarm fired.
 
         :param user_id: id of the user owning the device
         :param device_serial: device serial which triggered
         :param triggered_at: optional timezone-aware datetime; if omitted, now (UTC) is used
+        :param commit: whether to commit immediately; use False when batching work in one transaction
         :return: the created AlarmSession instance
         """
         if triggered_at is None:
@@ -226,10 +242,13 @@ class AlarmSession(db.Model):
         session = AlarmSession()
         session.user_id = user_id
         session.device_serial = device_serial
-        session.triggered_at = triggered_at
+        session.triggered_at = as_utc(triggered_at) or utc_now()
 
         db.session.add(session)
-        db.session.commit()
+        if commit:
+            db.session.commit()
+        else:
+            db.session.flush()
         return session
 
 class PuzzleSession(db.Model):
@@ -245,6 +264,7 @@ class PuzzleSession(db.Model):
     question = db.Column(db.String(64), nullable=False)
     is_correct = db.Column(db.Boolean, nullable=False)
     time_taken_seconds = db.Column(db.Integer, nullable=False)
+    outcome_action = db.Column(db.String(16), nullable=True)
 
     # Let the DB perform cascade deletes; avoid ORM issuing separate DELETEs by using passive_deletes.
     alarm_session = db.relationship(
@@ -261,6 +281,8 @@ class PuzzleSession(db.Model):
         question: str,
         is_correct: bool,
         time_taken_seconds: int,
+        outcome_action: str | None = None,
+        commit: bool = True,
     ):
         """
         :param alarm_session_id: id of the alarm session
@@ -268,6 +290,8 @@ class PuzzleSession(db.Model):
         :param question: question of the puzzle
         :param is_correct: was the answer correct
         :param time_taken_seconds: time to complete the puzzle
+        :param outcome_action: what the user did immediately after the puzzle
+        :param commit: whether to commit immediately; use False when batching work in one transaction
         :return:
         """
         session = PuzzleSession()
@@ -276,8 +300,13 @@ class PuzzleSession(db.Model):
         session.question = question
         session.is_correct = is_correct
         session.time_taken_seconds = time_taken_seconds
+        normalized_outcome = (outcome_action or "").strip().lower()
+        session.outcome_action = normalized_outcome if normalized_outcome in SUPPORTED_PUZZLE_OUTCOMES else None
         db.session.add(session)
-        db.session.commit()
+        if commit:
+            db.session.commit()
+        else:
+            db.session.flush()
         return session
 
 class SleepSession(db.Model):
@@ -315,3 +344,103 @@ class DifficultyModel(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     model_blob = db.Column(db.LargeBinary, nullable=False)
     last_trained = db.Column(db.DateTime(timezone=True), nullable=False)
+
+def resolve_effective_puzzle_type(alarm: Alarm, device: Device | None = None) -> str:
+    """
+    Resolve the actual puzzle type that should be sent to the device.
+
+    Stored alarms may have:
+    - an explicit puzzle type such as ``maths`` or ``memory``
+    - ``random`` meaning the server should choose automatically
+
+    The automatic choice uses recent puzzle history for the same user/device:
+    - avoids repeating the most recent puzzle type
+    - rewards puzzle types solved correctly and quickly
+    - penalizes puzzle types answered incorrectly or very slowly
+    - uses a deterministic tie-breaker so "no history" does not always mean maths
+    """
+    stored_type = (getattr(alarm, "puzzle_type", "") or "").strip().lower()
+    if stored_type in SUPPORTED_PUZZLE_TYPES:
+        return stored_type
+
+    scores = {puzzle_type: 0 for puzzle_type in SUPPORTED_PUZZLE_TYPES}
+    recent_alarm_sessions_query = (
+        AlarmSession.query
+        .filter(AlarmSession.user_id == alarm.user_id)
+        .options(selectinload(AlarmSession.puzzle_sessions))
+    )
+
+    target_device_serial = getattr(device, "serial_number", None) or getattr(alarm, "device_serial", None)
+    if target_device_serial:
+        recent_alarm_sessions_query = recent_alarm_sessions_query.filter(AlarmSession.device_serial == target_device_serial)
+
+    recent_alarm_sessions = (
+        recent_alarm_sessions_query
+        .order_by(AlarmSession.triggered_at.desc(), AlarmSession.id.desc())
+        .limit(6)
+        .all()
+    )
+
+    flattened_recent_puzzles: list[PuzzleSession] = []
+    for alarm_session in recent_alarm_sessions:
+        flattened_recent_puzzles.extend(sorted(alarm_session.puzzle_sessions, key=lambda s: s.id, reverse=True))
+
+    if flattened_recent_puzzles:
+        last_type = (flattened_recent_puzzles[0].puzzle_type or "").strip().lower()
+        if last_type in scores:
+            scores[last_type] -= 3
+
+    for index, alarm_session in enumerate(recent_alarm_sessions):
+        weight = max(1, 5 - index)
+        ordered_puzzle_sessions = sorted(alarm_session.puzzle_sessions, key=lambda s: s.id)
+        snoozed_sessions = [
+            session for session in ordered_puzzle_sessions
+            if (session.outcome_action or "").strip().lower() == "snoozed"
+        ]
+        snooze_count = len(snoozed_sessions)
+
+        for session in ordered_puzzle_sessions:
+            session_type = (session.puzzle_type or "").strip().lower()
+            if session_type not in scores:
+                continue
+
+            if session.is_correct:
+                scores[session_type] += 2 * weight
+                if session.time_taken_seconds is not None:
+                    if session.time_taken_seconds <= 30:
+                        scores[session_type] += weight
+                    elif session.time_taken_seconds >= 90:
+                        scores[session_type] -= weight
+            else:
+                scores[session_type] -= 2 * weight
+
+            outcome_action = (session.outcome_action or "").strip().lower()
+            if outcome_action == "dismissed":
+                scores[session_type] += 3 * weight
+                if snooze_count == 0:
+                    scores[session_type] += 2 * weight
+            elif outcome_action == "snoozed":
+                scores[session_type] -= 3 * weight
+                if snooze_count > 1:
+                    scores[session_type] -= (snooze_count - 1) * weight
+
+    if getattr(alarm, "time", None) and getattr(alarm.time, "hour", 24) < 7:
+        scores["memory"] += 1
+
+    best_score = max(scores.values())
+    candidates = [name for name, score in scores.items() if score == best_score]
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    today_key = _utc_now().date().isoformat()
+
+    seed = _stable_choice_seed(
+        getattr(alarm, "id", ""),
+        getattr(alarm, "device_serial", ""),
+        getattr(alarm, "day_of_week", ""),
+        getattr(alarm, "time", ""),
+        today_key,
+    )
+    return candidates[seed % len(candidates)]
+

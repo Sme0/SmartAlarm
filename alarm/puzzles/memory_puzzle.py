@@ -64,6 +64,7 @@ class MemoryPuzzle(Puzzle):
         self.start_time = time.time()
         while True:
             if time.time() - self.start_time > self.time_limit:
+                self.end_time = time.time()
                 self.output_handler.display_text("Puzzle timeout")
                 return False
 
