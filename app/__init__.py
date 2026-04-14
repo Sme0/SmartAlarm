@@ -4,7 +4,6 @@ and registers application routes.
 """
 import os
 import tempfile
-from multiprocessing.managers import Value
 from urllib.parse import quote_plus
 
 from flask import Flask

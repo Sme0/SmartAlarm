@@ -3,16 +3,20 @@ This module implements all the routes for the Flask application.
 """
 from datetime import datetime, timezone
 from typing import List
+from datetime import datetime, timezone, timedelta
+from threading import Thread
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from app import app, database as db, login_manager, csrf
-from app.models import User, Device, Alarm, AlarmSession, PuzzleSession
+from app.models import User, Device, Alarm, AlarmSession, PuzzleSession, SleepSession, SleepStage
 from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm, EditAlarmForm, DeviceSettingsForm
+from app.utils import group_sleep_records, parse_apple_dt, as_utc
+from app.analysis import find_suitable_alarm
 from werkzeug.exceptions import InternalServerError
 from sqlalchemy.orm import selectinload
-
+from sqlalchemy import func
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -34,10 +38,141 @@ def _resolve_timezone(tz_name: str | None):
             pass
     return timezone.utc, "UTC"
 
-
 def _is_expired(value: datetime | None) -> bool:
-    value_utc = _to_utc(value)
-    return value_utc is not None and value_utc < _utc_now()
+    normalized = as_utc(value)
+    return normalized is not None and normalized < _utc_now()
+
+
+def _next_weekday_utc(day_of_week: int, time_value) -> datetime:
+    """Return the next UTC datetime for a target weekday/time."""
+    now = _utc_now()
+    base = now.replace(hour=time_value.hour, minute=time_value.minute, second=0, microsecond=0)
+    days_ahead = (day_of_week - base.weekday()) % 7
+    candidate = base + timedelta(days=days_ahead)
+    if candidate <= now:
+        candidate += timedelta(days=7)
+    return candidate
+
+
+def _parse_hhmm_time(value: str | None):
+    """Parse HH:MM user input into a time object."""
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, '%H:%M').time()
+    except Exception:
+        return None
+
+
+def _resolve_alarm_time(
+    user_id: int,
+    day_of_week: int,
+    preferred_time,
+    use_dynamic_alarm: bool,
+    dynamic_start_time=None,
+    dynamic_end_time=None,
+):
+    """Resolve final alarm time, using analysis when dynamic mode is enabled."""
+    if not use_dynamic_alarm:
+        return preferred_time, False
+
+    try:
+        start_time = dynamic_start_time or preferred_time
+        end_time = dynamic_end_time or preferred_time
+
+        min_dt = _next_weekday_utc(day_of_week=day_of_week, time_value=start_time)
+        max_dt = min_dt.replace(hour=end_time.hour, minute=end_time.minute, second=0, microsecond=0)
+        if max_dt <= min_dt:
+            max_dt += timedelta(days=1)
+
+        result = find_suitable_alarm(user_id=user_id, min_time=min_dt, max_time=max_dt)
+        best = (result or {}).get("best_candidate") or {}
+        best_time = best.get("candidate_time")
+
+        if isinstance(best_time, datetime):
+            return best_time.timetz().replace(tzinfo=None), True
+    except Exception:
+        pass
+
+    return preferred_time, False
+
+
+def _run_dynamic_alarm_optimization(
+    alarm_id: str,
+    user_id: int,
+    day_of_week: int,
+    preferred_time,
+    dynamic_start_time,
+    dynamic_end_time,
+    expected_alarm_time,
+    expected_dynamic_start_time,
+    expected_dynamic_end_time,
+):
+    """Background worker that updates Alarm.time with model-selected time."""
+    with app.app_context():
+        try:
+            resolved_time, _ = _resolve_alarm_time(
+                user_id=user_id,
+                day_of_week=day_of_week,
+                preferred_time=preferred_time,
+                use_dynamic_alarm=True,
+                dynamic_start_time=dynamic_start_time,
+                dynamic_end_time=dynamic_end_time,
+            )
+
+            alarm = Alarm.query.get(alarm_id)
+            if not alarm or not getattr(alarm, 'use_dynamic_alarm', False):
+                return
+
+            # Prevent stale background jobs from overwriting newer user edits.
+            if alarm.time != expected_alarm_time:
+                return
+            if alarm.dynamic_start_time != expected_dynamic_start_time:
+                return
+            if alarm.dynamic_end_time != expected_dynamic_end_time:
+                return
+
+            alarm.time = resolved_time
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        finally:
+            db.session.remove()
+
+
+def _schedule_dynamic_alarm_optimization(
+    alarm_id: str,
+    user_id: int,
+    day_of_week: int,
+    preferred_time,
+    dynamic_start_time,
+    dynamic_end_time,
+    expected_alarm_time,
+    expected_dynamic_start_time,
+    expected_dynamic_end_time,
+):
+    """Start a detached thread to optimize one dynamic alarm without blocking the request."""
+    Thread(
+        target=_run_dynamic_alarm_optimization,
+        args=(
+            alarm_id,
+            user_id,
+            day_of_week,
+            preferred_time,
+            dynamic_start_time,
+            dynamic_end_time,
+            expected_alarm_time,
+            expected_dynamic_start_time,
+            expected_dynamic_end_time,
+        ),
+        daemon=True,
+    ).start()
+
+
+def _dynamic_alarm_ui_state(user_id: int) -> tuple[int, bool]:
+    """Return alarm-session count and whether dynamic UI should be enabled (>10 sessions)."""
+    alarm_session_count = AlarmSession.query.filter_by(user_id=user_id).count()
+    return alarm_session_count, alarm_session_count > 10
 
 # Return JSON 401 for API/AJAX requests, otherwise redirect to the login page.
 @login_manager.unauthorized_handler
@@ -233,6 +368,122 @@ def delete_puzzle_session(puzzle_session_id):
 
     return redirect(url_for('session_history', day=day, tz=tz_name) if day else url_for('session_history', tz=tz_name))
 
+@app.route('/sleep-data', methods=['GET', 'POST'])
+@login_required
+def sleep_data():
+    return render_template("sleep_data.html")
+
+@app.route('/sleep-data/update', methods=['POST'])
+@login_required
+@csrf.exempt
+def update_sleep_data():
+
+    # Data must be in JSON format
+    if not request.is_json:
+        return jsonify({'response': 'failed', 'message': 'request must be JSON'}), 400
+
+    payload = request.get_json(silent=True) or {}
+    raw_sleep_data = payload.get('sleep_data')
+
+    # Basic validation
+    if raw_sleep_data is None:
+        return jsonify({'response': 'failed', "message": "missing sleep data"}), 400
+
+    if not isinstance(raw_sleep_data, list):
+        return jsonify({"response": "failed", "message": "sleep data must be a list"}), 400
+
+    parsed_data = []
+    for record in raw_sleep_data:
+        if not isinstance(record, dict):
+            continue
+
+        try:
+
+            stage_raw = record.get('stage')
+
+            # Bad data, if so ignore
+            if not isinstance(stage_raw, str):
+                continue
+
+            # Extract data
+            stage = stage_raw.replace('HKCategoryValueSleepAnalysis', '')
+            start_time = parse_apple_dt(record.get('start_date'))
+            end_time = parse_apple_dt(record.get('end_date'))
+            creation_date = parse_apple_dt(record.get('creation_date'))
+            source_name = record.get('source_name')
+        except (ValueError, TypeError):
+            continue
+
+        parsed_data.append({
+            'stage': stage,
+            'start_time': start_time,
+            'end_time': end_time,
+            'source_name': source_name,
+            'creation_date': creation_date,
+        })
+
+    if not parsed_data:
+        return jsonify({'response': 'failed', 'message': 'no valid sleep records found'}), 400
+
+    # Groups the stage data into a night session
+    grouped_nights = group_sleep_records(parsed_data)
+    if not grouped_nights:
+        return jsonify({'response': 'failed', 'message': 'no sleep sessions grouped'}), 400
+
+    # Determine import time range
+    min_date = min(r['start_time'] for r in parsed_data)
+    max_date = max(r['end_time'] for r in parsed_data)
+
+    # Delete existing sleep stages in this range
+    SleepStage.query.filter(
+        SleepStage.user_id == current_user.id,
+        SleepStage.start_date <= max_date,
+        SleepStage.end_date >= min_date
+    ).delete(synchronize_session=False)
+
+    # Delete existing sleep sessions in this range
+    SleepSession.query.filter(
+        SleepSession.user_id == current_user.id,
+        SleepSession.start_date <= max_date,
+        SleepSession.end_date >= min_date
+    ).delete(synchronize_session=False)
+
+    try:
+        for night_records in grouped_nights:
+            start_time = night_records[0]['start_time']
+            end_time = night_records[-1]['end_time']
+            total_duration = int(sum(
+                (r['end_time'] - r['start_time']).total_seconds()
+                for r in night_records
+                if r['stage'].lower() != 'awake'
+            ))
+
+            sleep_session = SleepSession()
+            sleep_session.user_id = current_user.id
+            sleep_session.start_date = start_time
+            sleep_session.end_date = end_time
+            sleep_session.total_duration = total_duration
+
+            db.session.add(sleep_session)
+            db.session.flush()
+
+            for record in night_records:
+                stage = SleepStage()
+                stage.user_id = current_user.id
+                stage.stage = record['stage']
+                stage.start_date = record['start_time']
+                stage.end_date = record['end_time']
+                stage.creation_date = record['creation_date']
+                stage.source_name = record['source_name']
+                stage.sleep_session_id = sleep_session.id
+                db.session.add(stage)
+
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'response': 'failed', 'message': 'database error while saving sleep data'}), 500
+
+    return jsonify({'response': 'ok', 'message': f'imported {len(grouped_nights)} sleep sessions'}), 200
 
 @app.route('/dashboard')
 @login_required
@@ -290,7 +541,6 @@ def dashboard():
 
 
 
-@app.route('/signup', methods=['GET', 'POST'])
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     """
@@ -407,29 +657,68 @@ def add_alarm():
         for d in current_user.devices
     ]
 
+    alarm_session_count, can_use_dynamic_alarm = _dynamic_alarm_ui_state(current_user.id)
+
     if request.method == 'GET':
         preselected = request.args.get('device')
         if preselected and any(d.serial_number == preselected for d in current_user.devices):
             form.device.data = preselected
+        form.use_dynamic_alarm.data = False
+        form.dynamic_start_time.data = ''
+        form.dynamic_end_time.data = ''
 
     if form.validate_on_submit():
         selected_serial = form.device.data
         device = Device.query.filter_by(serial_number=selected_serial, user_id=current_user.id).first() if selected_serial else None
         if device is None:
             flash('Please select one of your paired devices.', 'danger')
-            return render_template('add_alarm.html', form=form)
+            return render_template(
+                'add_alarm.html',
+                form=form,
+                can_use_dynamic_alarm=can_use_dynamic_alarm,
+                alarm_session_count=alarm_session_count,
+            )
 
-        try:
-            alarm_time = datetime.strptime(form.time.data, '%H:%M').time()
-        except Exception:
+        if form.use_dynamic_alarm.data and not can_use_dynamic_alarm:
+            flash('Dynamic alarms unlock after more than 10 completed alarm sessions.', 'info')
+            form.use_dynamic_alarm.data = False
+
+        dynamic_start_time = None
+        dynamic_end_time = None
+        alarm_time = _parse_hhmm_time(form.time.data)
+        if form.use_dynamic_alarm.data:
+            dynamic_start_time = _parse_hhmm_time(form.dynamic_start_time.data)
+            dynamic_end_time = _parse_hhmm_time(form.dynamic_end_time.data)
+            if dynamic_start_time is None or dynamic_end_time is None:
+                flash('For dynamic alarms, select a valid start and end time window.', 'danger')
+                return render_template(
+                    'add_alarm.html',
+                    form=form,
+                    can_use_dynamic_alarm=can_use_dynamic_alarm,
+                    alarm_session_count=alarm_session_count,
+                )
+            if alarm_time is None:
+                alarm_time = dynamic_start_time
+        elif alarm_time is None:
             flash('Please choose a valid time (HH:MM).', 'danger')
-            return render_template('add_alarm.html', form=form)
+            return render_template(
+                'add_alarm.html',
+                form=form,
+                can_use_dynamic_alarm=can_use_dynamic_alarm,
+                alarm_session_count=alarm_session_count,
+            )
 
         selected_days = sorted(set(form.days_of_week.data or []))
         if not selected_days:
             flash('Select at least one day.', 'danger')
-            return render_template('add_alarm.html', form=form)
+            return render_template(
+                'add_alarm.html',
+                form=form,
+                can_use_dynamic_alarm=can_use_dynamic_alarm,
+                alarm_session_count=alarm_session_count,
+            )
 
+        dynamic_jobs = []
         try:
             for day_idx in selected_days:
                 alarm = Alarm()
@@ -440,17 +729,59 @@ def add_alarm():
                 alarm.enabled = True
                 alarm.created_at = _utc_now()
                 alarm.puzzle_type = form.puzzle_type.data
+                alarm.use_dynamic_alarm = bool(form.use_dynamic_alarm.data)
+                alarm.dynamic_start_time = dynamic_start_time if form.use_dynamic_alarm.data else None
+                alarm.dynamic_end_time = dynamic_end_time if form.use_dynamic_alarm.data else None
                 db.session.add(alarm)
+                db.session.flush()
+
+                if form.use_dynamic_alarm.data:
+                    dynamic_jobs.append({
+                        'alarm_id': alarm.id,
+                        'day_of_week': day_idx,
+                        'preferred_time': alarm_time,
+                        'dynamic_start_time': dynamic_start_time,
+                        'dynamic_end_time': dynamic_end_time,
+                        'expected_alarm_time': alarm.time,
+                        'expected_dynamic_start_time': alarm.dynamic_start_time,
+                        'expected_dynamic_end_time': alarm.dynamic_end_time,
+                    })
             db.session.commit()
         except Exception:
             db.session.rollback()
             flash('Failed to add alarms. Please try again.', 'danger')
-            return render_template('add_alarm.html', form=form)
+            return render_template(
+                'add_alarm.html',
+                form=form,
+                can_use_dynamic_alarm=can_use_dynamic_alarm,
+                alarm_session_count=alarm_session_count,
+            )
 
-        flash(f'Added {len(selected_days)} alarm(s).', 'success')
+        for job in dynamic_jobs:
+            _schedule_dynamic_alarm_optimization(
+                alarm_id=job['alarm_id'],
+                user_id=current_user.id,
+                day_of_week=job['day_of_week'],
+                preferred_time=job['preferred_time'],
+                dynamic_start_time=job['dynamic_start_time'],
+                dynamic_end_time=job['dynamic_end_time'],
+                expected_alarm_time=job['expected_alarm_time'],
+                expected_dynamic_start_time=job['expected_dynamic_start_time'],
+                expected_dynamic_end_time=job['expected_dynamic_end_time'],
+            )
+
+        if form.use_dynamic_alarm.data:
+            flash('Dynamic alarms saved. Optimization is running in the background.', 'success')
+        else:
+            flash(f'Added {len(selected_days)} alarm(s).', 'success')
         return redirect(url_for('alarms', view_device=device.serial_number))
 
-    return render_template('add_alarm.html', form=form)
+    return render_template(
+        'add_alarm.html',
+        form=form,
+        can_use_dynamic_alarm=can_use_dynamic_alarm,
+        alarm_session_count=alarm_session_count,
+    )
 
 
 @app.route('/alarms/<string:alarm_id>/edit', methods=['GET', 'POST'])
@@ -466,6 +797,7 @@ def edit_alarm(alarm_id):
         return redirect(url_for('alarms'))
 
     form = EditAlarmForm()
+    alarm_session_count, can_use_dynamic_alarm = _dynamic_alarm_ui_state(current_user.id)
     form.device.choices = [
         (d.serial_number, d.name if d.name else d.serial_number)
         for d in current_user.devices
@@ -475,37 +807,100 @@ def edit_alarm(alarm_id):
         form.device.data = alarm.device_serial
         form.time.data = alarm.time.strftime('%H:%M') if alarm.time else ''
         form.puzzle_type.data = alarm.puzzle_type or 'random'
+        form.use_dynamic_alarm.data = bool(getattr(alarm, 'use_dynamic_alarm', False))
+        form.dynamic_start_time.data = alarm.dynamic_start_time.strftime('%H:%M') if getattr(alarm, 'dynamic_start_time', None) else ''
+        form.dynamic_end_time.data = alarm.dynamic_end_time.strftime('%H:%M') if getattr(alarm, 'dynamic_end_time', None) else ''
 
     if form.validate_on_submit():
         selected_serial = form.device.data
         device = Device.query.filter_by(serial_number=selected_serial, user_id=current_user.id).first() if selected_serial else None
         if device is None:
             flash('Please select one of your paired devices.', 'danger')
-            return render_template('edit_alarm.html', form=form, alarm=alarm)
+            return render_template(
+                'edit_alarm.html',
+                form=form,
+                alarm=alarm,
+                can_use_dynamic_alarm=can_use_dynamic_alarm,
+                alarm_session_count=alarm_session_count,
+            )
 
-        try:
-            alarm_time = datetime.strptime(form.time.data, '%H:%M').time()
-        except Exception:
+        if form.use_dynamic_alarm.data and not can_use_dynamic_alarm:
+            flash('Dynamic alarms unlock after more than 10 completed alarm sessions.', 'info')
+            form.use_dynamic_alarm.data = False
+
+        dynamic_start_time = None
+        dynamic_end_time = None
+        alarm_time = _parse_hhmm_time(form.time.data)
+        if form.use_dynamic_alarm.data:
+            dynamic_start_time = _parse_hhmm_time(form.dynamic_start_time.data)
+            dynamic_end_time = _parse_hhmm_time(form.dynamic_end_time.data)
+            if dynamic_start_time is None or dynamic_end_time is None:
+                flash('For dynamic alarms, select a valid start and end time window.', 'danger')
+                return render_template(
+                    'edit_alarm.html',
+                    form=form,
+                    alarm=alarm,
+                    can_use_dynamic_alarm=can_use_dynamic_alarm,
+                    alarm_session_count=alarm_session_count,
+                )
+            if alarm_time is None:
+                alarm_time = dynamic_start_time
+        elif alarm_time is None:
             flash('Please choose a valid time (HH:MM).', 'danger')
-            return render_template('edit_alarm.html', form=form, alarm=alarm)
+            return render_template(
+                'edit_alarm.html',
+                form=form,
+                alarm=alarm,
+                can_use_dynamic_alarm=can_use_dynamic_alarm,
+                alarm_session_count=alarm_session_count,
+            )
 
         try:
             alarm.device_serial = device.serial_number
             alarm.time = alarm_time
             alarm.puzzle_type = form.puzzle_type.data
+            alarm.use_dynamic_alarm = bool(form.use_dynamic_alarm.data)
+            alarm.dynamic_start_time = dynamic_start_time if form.use_dynamic_alarm.data else None
+            alarm.dynamic_end_time = dynamic_end_time if form.use_dynamic_alarm.data else None
             db.session.commit()
         except Exception:
             db.session.rollback()
             flash('Failed to update alarm. Please try again.', 'danger')
-            return render_template('edit_alarm.html', form=form, alarm=alarm)
+            return render_template(
+                'edit_alarm.html',
+                form=form,
+                alarm=alarm,
+                can_use_dynamic_alarm=can_use_dynamic_alarm,
+                alarm_session_count=alarm_session_count,
+            )
 
         view_device = request.args.get('view_device')
-        flash('Alarm updated.', 'success')
+        if form.use_dynamic_alarm.data:
+            _schedule_dynamic_alarm_optimization(
+                alarm_id=alarm.id,
+                user_id=current_user.id,
+                day_of_week=alarm.day_of_week,
+                preferred_time=alarm_time,
+                dynamic_start_time=dynamic_start_time,
+                dynamic_end_time=dynamic_end_time,
+                expected_alarm_time=alarm.time,
+                expected_dynamic_start_time=alarm.dynamic_start_time,
+                expected_dynamic_end_time=alarm.dynamic_end_time,
+            )
+            flash('Alarm updated. Dynamic optimization is running in the background.', 'success')
+        else:
+            flash('Alarm updated.', 'success')
         if view_device and view_device != 'all':
             return redirect(url_for('alarms', view_device=view_device))
         return redirect(url_for('alarms', view_device=device.serial_number))
 
-    return render_template('edit_alarm.html', form=form, alarm=alarm)
+    return render_template(
+        'edit_alarm.html',
+        form=form,
+        alarm=alarm,
+        can_use_dynamic_alarm=can_use_dynamic_alarm,
+        alarm_session_count=alarm_session_count,
+    )
 
 
 @app.route('/alarms/delete', methods=['POST'])
@@ -562,6 +957,9 @@ def api_get_alarms():
                         'id': alarm.id,
                         'time': alarm.time.strftime('%H:%M'),
                         'puzzle_type': getattr(alarm, 'puzzle_type', 'random'),
+                        'use_dynamic_alarm': bool(getattr(alarm, 'use_dynamic_alarm', False)),
+                        'dynamic_start_time': alarm.dynamic_start_time.strftime('%H:%M') if getattr(alarm, 'dynamic_start_time', None) else None,
+                        'dynamic_end_time': alarm.dynamic_end_time.strftime('%H:%M') if getattr(alarm, 'dynamic_end_time', None) else None,
                         'device_serial': alarm.device_serial,
                         'device_name': alarm.device.name if alarm.device and alarm.device.name else None
                     })
@@ -574,6 +972,9 @@ def api_get_alarms():
                         'id': alarm.id,
                         'time': alarm.time.strftime('%H:%M'),
                         'puzzle_type': getattr(alarm, 'puzzle_type', 'random'),
+                        'use_dynamic_alarm': bool(getattr(alarm, 'use_dynamic_alarm', False)),
+                        'dynamic_start_time': alarm.dynamic_start_time.strftime('%H:%M') if getattr(alarm, 'dynamic_start_time', None) else None,
+                        'dynamic_end_time': alarm.dynamic_end_time.strftime('%H:%M') if getattr(alarm, 'dynamic_end_time', None) else None,
                         'device_serial': alarm.device_serial,
                         'device_name': device.name if device.name else None
                     })
@@ -638,6 +1039,9 @@ def api_create_alarm():
             alarm.enabled = True
             alarm.created_at = _utc_now()
             alarm.puzzle_type = puzzle_type
+            alarm.use_dynamic_alarm = False
+            alarm.dynamic_start_time = None
+            alarm.dynamic_end_time = None
             db.session.add(alarm)
             created_alarms.append(alarm)
         db.session.commit()
@@ -652,6 +1056,9 @@ def api_create_alarm():
                 'id': alarm.id,
                 'time': alarm.time.strftime('%H:%M'),
                 'puzzle_type': alarm.puzzle_type,
+                'use_dynamic_alarm': bool(getattr(alarm, 'use_dynamic_alarm', False)),
+                'dynamic_start_time': alarm.dynamic_start_time.strftime('%H:%M') if getattr(alarm, 'dynamic_start_time', None) else None,
+                'dynamic_end_time': alarm.dynamic_end_time.strftime('%H:%M') if getattr(alarm, 'dynamic_end_time', None) else None,
                 'device_serial': alarm.device_serial,
                 'device_name': device.name if device.name else None,
                 'day_of_week': alarm.day_of_week
@@ -820,6 +1227,9 @@ def get_alarms():
                 "enabled": alarm.enabled,
                 "day_of_week": getattr(alarm, 'day_of_week', 0),
                 "puzzle_type": getattr(alarm, 'puzzle_type', 'random'),
+                "use_dynamic_alarm": bool(getattr(alarm, 'use_dynamic_alarm', False)),
+                "dynamic_start_time": alarm.dynamic_start_time.strftime('%H:%M') if getattr(alarm, 'dynamic_start_time', None) else None,
+                "dynamic_end_time": alarm.dynamic_end_time.strftime('%H:%M') if getattr(alarm, 'dynamic_end_time', None) else None,
                 "max_snoozes": device.max_snoozes if device.max_snoozes is not None else 3
             }
             for alarm in alarms
@@ -840,7 +1250,7 @@ def submit_complete_sessions():
                 "triggered_at": "2026-03-29T12:00:00",
                 "puzzle_sessions": [
                     {
-                        "puzzle_type": "memory",
+                        "puzzle_type": "Memory",
                         "question": "1+1",
                         "is_correct": true,
                         "time_taken_seconds": 4.2
@@ -972,6 +1382,7 @@ def dev_sample_data():
     """
     Development utility: create a sample user, log them in, create a device, and generate sample alarms.
     """
+    import random
     from flask_login import login_user
     # Create or get sample user
     email = "sampleuser@example.com"
@@ -980,12 +1391,96 @@ def dev_sample_data():
         user = User.register(email, "samplepass", "Sample User")
     # Log in the user
     login_user(user)
-    # Create or get a device
+    # Create or get devices
     device = Device.query.filter_by(user_id=user.id).first()
     if not device:
         Device.register(serial_number="SAMPLE123", name="Jeff's Alarm", user=user)
         Device.register(serial_number="SAMPLE456", name="Bob's Alarm", user=user)
-    flash("Sample user, device, and alarms created. You are now logged in as the sample user.", "success")
+
+    device = Device.query.filter_by(user_id=user.id).order_by(Device.serial_number.asc()).first()
+
+    # Reset sample sessions so rerunning this route produces a consistent sample dataset size.
+    existing_sessions = AlarmSession.query.filter_by(user_id=user.id).all()
+    existing_session_ids = [s.id for s in existing_sessions]
+    if existing_session_ids:
+        PuzzleSession.query.filter(PuzzleSession.alarm_session_id.in_(existing_session_ids)).delete(synchronize_session=False)
+        AlarmSession.query.filter(AlarmSession.id.in_(existing_session_ids)).delete(synchronize_session=False)
+        db.session.commit()
+
+    # Generate 15-20 sessions on different calendar days, each between 06:00 and 10:59 UTC.
+    # Earlier alarms are intentionally a bit harder (more attempts + slower solve times).
+    session_count = random.randint(15, 20)
+    total_puzzle_rows = 0
+    snoozed_session_count = 0
+    now_utc = _utc_now()
+    for index in range(session_count):
+        day_anchor = (now_utc - timedelta(days=index + 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        hour = random.randint(6, 10)
+        minute = random.randint(0, 59)
+        triggered_at = day_anchor.replace(hour=hour, minute=minute)
+
+        alarm_session = AlarmSession(
+            user_id=user.id,
+            device_serial=device.serial_number,
+            triggered_at=triggered_at,
+        )
+        db.session.add(alarm_session)
+        db.session.flush()
+
+        # 06:00 is hardest, 10:59 is easiest.
+        hardness = max(0, 10 - hour)
+        attempts = min(6, random.randint(1 + (hardness // 2), 2 + hardness))
+
+        # Ensure at least some sessions represent snoozing behavior (multiple successful puzzles).
+        if attempts == 1 and random.random() < 0.35:
+            attempts = 2
+        if attempts > 1:
+            snoozed_session_count += 1
+
+        # Earlier alarms are more error-prone; inject occasional incorrect attempts.
+        incorrect_attempt_indexes = set()
+        if hardness >= 3 and attempts >= 2 and random.random() < 0.6:
+            incorrect_attempt_indexes.add(random.randint(0, attempts - 2))
+        if hardness >= 4 and attempts >= 3 and random.random() < 0.35:
+            incorrect_attempt_indexes.add(random.randint(0, attempts - 2))
+
+        for attempt_idx in range(attempts):
+            puzzle_type = random.choice(["Maths", "Memory"])
+            if puzzle_type == "Maths":
+                a = random.randint(1, 12)
+                b = random.randint(1, 12)
+                question = f"{a} + {b}"
+            else:
+                question = "Repeat pattern"
+
+            # Earlier hours generally take longer.
+            base_seconds = 7 + (hardness * 5)
+            time_taken_seconds = max(3, base_seconds + random.randint(-3, 8) + (attempt_idx * 3))
+
+            # Keep final attempt correct, but allow some earlier mistakes (more common for early alarms).
+            if attempt_idx == attempts - 1:
+                is_correct = True
+            else:
+                is_correct = attempt_idx not in incorrect_attempt_indexes
+
+            db.session.add(PuzzleSession(
+                alarm_session_id=alarm_session.id,
+                puzzle_type=puzzle_type,
+                question=question,
+                is_correct=is_correct,
+                time_taken_seconds=time_taken_seconds,
+            ))
+            total_puzzle_rows += 1
+
+    db.session.commit()
+
+    flash(
+        (
+            f"Sample user prepared with {session_count} alarm sessions, "
+            f"{total_puzzle_rows} puzzle sessions, and {snoozed_session_count} snoozed alarms."
+        ),
+        "success",
+    )
     return redirect(url_for("dashboard"))
 
 
@@ -1030,4 +1525,158 @@ def device_settings(serial):
         form.max_snoozes.data = device.max_snoozes if device.max_snoozes is not None else 3
 
     return render_template('device_settings.html', device=device, form=form)
+
+@app.route("/analytics")
+@login_required
+def analytics():
+    return render_template("analytics.html")
+
+@app.route("/api/analytics/recommendation")
+@login_required
+def recommendation():
+
+    #trains the model on the user's data to give accurate predictions
+    from datetime import datetime
+    from app.analysis import train_user_model
+
+    train_user_model(current_user.id)
+
+    now = datetime.now()
+
+    #currently recommended time will be between 6 and 10, can change this
+    min_time = now.replace(hour=6, minute=0, second=0, microsecond=0)
+    max_time = now.replace(hour=10, minute=0, second=0, microsecond=0)
+
+    result = find_suitable_alarm(current_user.id, min_time, max_time)
+
+    best = result.get("best_candidate")
+
+    if not best:
+        return {
+            "time": None,
+            "best_puzzle_type": None
+        }
+
+    puzzle_results = (
+        db.session.query(
+            PuzzleSession.puzzle_type,
+            func.avg(PuzzleSession.is_correct.cast(db.Integer))
+        )
+        .join(AlarmSession)
+        .filter(AlarmSession.user_id == current_user.id)
+        .group_by(PuzzleSession.puzzle_type)
+        .all()
+    )
+
+    best_type = (
+        max(puzzle_results, key=lambda x: x[1])[0]
+        if puzzle_results else None
+    )
+
+    return {
+        "time": best["candidate_time"].strftime("%H:%M"),
+        "best_puzzle_type": best_type
+    }
+
+
+@app.route("/api/analytics/success-over-time")
+@login_required
+def success_over_time():
+
+    sessions = (
+        db.session.query(AlarmSession)
+        .filter_by(user_id=current_user.id)
+        .order_by(AlarmSession.triggered_at.asc())
+        .all()
+    )
+
+    if not sessions:
+        return {"labels": [], "values": []}
+
+    weekly = {}
+
+    for s in sessions:
+        iso = s.triggered_at.isocalendar()
+
+        week_start = datetime.fromisocalendar(iso.year, iso.week, 1).date()
+
+        day = s.triggered_at.date()
+        snoozes = max(len(s.puzzle_sessions) - 1, 0)
+
+        weekly.setdefault(week_start, {})
+        weekly[week_start][day] = snoozes
+
+    sorted_weeks = sorted(weekly.keys())
+
+    first_week = sorted_weeks[0]
+    last_week = sorted_weeks[-1]
+
+    labels = []
+    values = []
+
+    current = first_week
+
+    while current <= last_week:
+        days = weekly.get(current, {})
+        success_days = sum(1 for snooze in days.values() if snooze <= 1)
+        week_start = current
+        week_end = current + timedelta(days=6)
+
+        labels.append(
+            f"{week_start.strftime('%d %b')} – {week_end.strftime('%d %b %Y')}"
+        )
+
+        values.append(success_days)
+
+        current += timedelta(weeks=1)
+
+    return {
+        "labels": labels,
+        "values": values
+    }
+
+
+@app.route("/api/analytics/alarm-success")
+@login_required
+def alarm_success():
+
+    sessions = AlarmSession.query.filter_by(user_id=current_user.id).all()
+
+    total = len(sessions)
+
+    if total == 0:
+        return {"labels": ["No Data"], "values": [100]}
+
+    #calculates success rate
+    success = 0
+
+    for s in sessions:
+        if any(p.is_correct for p in s.puzzle_sessions):
+            success += 1
+
+    return {
+        "labels": ["Successful", "Unsuccessful"],
+        "values": [success / total * 100, (total - success) / total * 100]
+    }
+
+@app.route("/api/analytics/puzzle-types")
+@login_required
+def puzzle_types():
+
+    #calculates success rate per puzzle type
+    results = (
+        db.session.query(
+            PuzzleSession.puzzle_type,
+            func.avg(PuzzleSession.is_correct.cast(db.Integer))
+        )
+        .join(AlarmSession)
+        .filter(AlarmSession.user_id == current_user.id)
+        .group_by(PuzzleSession.puzzle_type)
+        .all()
+    )
+
+    return {
+        "labels": [r[0] for r in results],
+        "values": [round(r[1] * 100, 2) for r in results]
+    }
 

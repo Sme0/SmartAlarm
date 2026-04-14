@@ -131,7 +131,10 @@ class AlarmForm(FlaskForm):
     Form for creating or editing alarms.
     """
     device = SelectField('Device', choices=[])
-    time = StringField('Alarm Time', validators=[DataRequired()])
+    time = StringField('Alarm Time')
+    use_dynamic_alarm = BooleanField('Use Dynamic Alarm')
+    dynamic_start_time = StringField('Dynamic Window Start')
+    dynamic_end_time = StringField('Dynamic Window End')
     days_of_week = SelectMultipleField(
         'Days of Week',
         choices=[
@@ -162,7 +165,10 @@ class AlarmForm(FlaskForm):
 class EditAlarmForm(FlaskForm):
     """Form for editing an existing alarm without changing its day."""
     device = SelectField('Device', choices=[])
-    time = StringField('Alarm Time', validators=[DataRequired()])
+    time = StringField('Alarm Time')
+    use_dynamic_alarm = BooleanField('Use Dynamic Alarm (AI Picks Best Time)')
+    dynamic_start_time = StringField('Dynamic Window Start')
+    dynamic_end_time = StringField('Dynamic Window End')
     puzzle_type = SelectField('Puzzle Type', choices=[('maths', 'Maths'), ('memory', 'Memory'), ('random', 'Random')], validators=[DataRequired()])
     submit = SubmitField('Update Alarm')
 

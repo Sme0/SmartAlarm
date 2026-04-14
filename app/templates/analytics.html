@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics{% endblock %}
+
+{% block content %}
+<main class="max-w-6xl mx-auto mt-8 px-6 pb-10">
+
+    <!-- Header -->
+    <section class="bg-white rounded-xl shadow border border-gray-100 p-6">
+        <h1 class="text-2xl font-bold text-gray-900">Analytics</h1>
+        <p class="text-gray-600 mt-2">
+            Insights into your alarm performance and behaviour over time.
+        </p>
+    </section>
+
+    <!-- Recommendation -->
+    <section class="bg-white rounded-xl shadow border border-gray-100 p-6 mt-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-2">Recommendations</h2>
+        <p id="recommendation" class="text-gray-700">
+            More data needed
+        </p>
+    </section>
+
+    <!-- Success Over Time -->
+    <section class="bg-white rounded-xl shadow border border-gray-100 p-6 mt-6">
+        <h2 class="text-xl font-semibold text-gray-900">Success Over Time</h2>
+        <p class="text-sm text-gray-500 mb-4">
+            Shows how many days per week you stayed within a healthy snooze limit (0–1 snoozes = success).
+        </p>
+
+<div id="chartContainer" class="w-full overflow-x-auto overflow-y-hidden border border-gray-100 rounded-lg p-3">
+    <div id="chartInner" class="h-80">
+        <canvas id="dayChart"></canvas>
+    </div>
+</div>
+    </section>
+
+<!-- Side-by-side charts -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6 w-full">
+
+    <!-- Puzzle success -->
+    <div class="bg-white rounded-xl shadow border border-gray-100 p-5 w-full">
+        <h2 class="text-lg font-semibold text-gray-900 mb-2">Puzzle success</h2>
+        <p class="text-sm text-gray-500 mb-3">
+            Shows how often puzzles are successfully completed.
+        </p>
+        <div class="w-full h-72">
+            <canvas id="successChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Puzzle type comparison -->
+    <div class="bg-white rounded-xl shadow border border-gray-100 p-5 w-full">
+        <h2 class="text-lg font-semibold text-gray-900 mb-2">Puzzle Type Comparison</h2>
+        <p class="text-sm text-gray-500 mb-3">
+            Shows performance across different puzzle types.
+        </p>
+        <div class="w-full h-72">
+            <canvas id="puzzleChart"></canvas>
+        </div>
+    </div>
+
+</div>
+
+</section>
+
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+//recommendations section: user notified which settings are most effective for them
+fetch("/api/analytics/recommendation")
+.then(res => res.json())
+.then(data => {
+    console.log("DATA:", data);
+
+    document.getElementById("recommendation").innerHTML =
+        `Best wake-up time: ${data.time || "Not enough data yet"}<br>
+         Best puzzle type: ${data.best_puzzle_type || "Not enough data yet"}`;
+});
+
+//chart showing the user whether the smart alarm is helping them
+fetch("/api/analytics/success-over-time")
+.then(res => res.json())
+.then(data => {
+
+    const container = document.getElementById("chartContainer");
+    const inner = document.getElementById("chartInner");
+    const canvas = document.getElementById("dayChart");
+
+    const width = Math.max(800, data.labels.length * 130);
+    inner.style.minWidth = width + "px";
+
+    new Chart(canvas, {
+        type: "line",
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: "Successful Days (0–7)",
+                data: data.values,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    min: 0,
+                    max: 7
+                }
+            }
+        }
+    });
+
+    requestAnimationFrame(() => {
+        container.scrollLeft = container.scrollWidth;
+    });
+
+});
+
+//chart showing user how many puzzles they successfully completed
+fetch("/api/analytics/alarm-success")
+.then(res => res.json())
+.then(data => {
+
+    new Chart(document.getElementById("successChart"), {
+        type: "pie",
+        data: {
+            labels: data.labels,
+            datasets: [{
+                data: data.values
+            }]
+        }
+    });
+});
+
+//chart where user can compare how they do at each puzzle type
+fetch("/api/analytics/puzzle-types")
+.then(res => res.json())
+.then(data => {
+
+    const puzzleNameMap = {
+        "logic" : "Memory",
+        "math" : "Maths"
+    }
+
+    new Chart(document.getElementById("puzzleChart"), {
+        type: "bar",
+        data: {
+            labels: data.labels.map(label => puzzleNameMap[label] || label),
+            datasets: [{
+                label: "Success %",
+                data: data.values,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    min: 0,
+                    max: 100
+                }
+            }
+        }
+    });
+});
+
+</script>
+{% endblock %}

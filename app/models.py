@@ -13,6 +13,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.exc import IntegrityError
 from app import database as db
 from app import login_manager as lm
+from app.utils import as_utc
 
 
 def _utc_now() -> datetime:
@@ -144,7 +145,7 @@ class Device(db.Model):
         db.session.commit()
 
     def is_online(self) -> bool:
-        last_seen_utc = _to_utc(self.last_seen)
+        last_seen_utc = as_utc(self.last_seen)
         if not last_seen_utc:
             return False
         return _utc_now() - last_seen_utc < timedelta(minutes=2)
@@ -180,12 +181,25 @@ class Alarm(db.Model):
     enabled = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime(timezone=True), default=_utc_now)
     puzzle_type = db.Column(db.String(16), nullable=False, default='random')
+    use_dynamic_alarm = db.Column(db.Boolean, nullable=False, default=False)
+    dynamic_start_time = db.Column(db.Time, nullable=True)
+    dynamic_end_time = db.Column(db.Time, nullable=True)
 
     device = db.relationship('Device', backref=db.backref('alarms', lazy='select'))
     user = db.relationship('User', backref=db.backref('alarms', lazy='select'))
 
     @staticmethod
-    def create(device_serial: str, user_id: str, time, day_of_week: int, enabled: bool, puzzle_type: str):
+    def create(
+        device_serial: str,
+        user_id: str,
+        time,
+        day_of_week: int,
+        enabled: bool,
+        puzzle_type: str,
+        use_dynamic_alarm: bool = False,
+        dynamic_start_time=None,
+        dynamic_end_time=None,
+    ):
         alarm = Alarm()
         alarm.device_serial = device_serial
         alarm.user_id = user_id
@@ -194,6 +208,9 @@ class Alarm(db.Model):
         alarm.enabled = enabled
         alarm.created_at = _utc_now()
         alarm.puzzle_type = puzzle_type
+        alarm.use_dynamic_alarm = use_dynamic_alarm
+        alarm.dynamic_start_time = dynamic_start_time
+        alarm.dynamic_end_time = dynamic_end_time
 
         db.session.add(alarm)
         db.session.commit()
@@ -275,3 +292,38 @@ class PuzzleSession(db.Model):
         db.session.commit()
         return session
 
+class SleepSession(db.Model):
+    __tablename__ = 'sleep_sessions'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    start_date = db.Column(db.DateTime(timezone=True), nullable=False)
+    end_date = db.Column(db.DateTime(timezone=True), nullable=False)
+    total_duration = db.Column(db.Integer, nullable=False)
+
+    sleep_stages = db.relationship(
+        'SleepStage',
+        back_populates='sleep_session',
+        lazy='selectin',
+        order_by='SleepStage.start_date',
+        cascade='all, delete-orphan',
+    )
+
+class SleepStage(db.Model):
+    __tablename__ = 'sleep_stages'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    stage = db.Column(db.String(64), nullable=False)
+    creation_date = db.Column(db.DateTime(timezone=True))
+    start_date = db.Column(db.DateTime(timezone=True))
+    end_date = db.Column(db.DateTime(timezone=True))
+    source_name = db.Column(db.String(64))
+    sleep_session_id = db.Column(db.Integer, db.ForeignKey('sleep_sessions.id'), nullable=False)
+
+    sleep_session = db.relationship('SleepSession', back_populates='sleep_stages')
+
+class DifficultyModel(db.Model):
+    __tablename__ = 'difficulty_models'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    model_blob = db.Column(db.LargeBinary, nullable=False)
+    last_trained = db.Column(db.DateTime(timezone=True), nullable=False)

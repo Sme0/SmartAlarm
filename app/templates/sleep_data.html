@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Health Data Import{% endblock %}
+
+{% block content %}
+<main class="max-w-4xl mx-auto mt-8 px-6 pb-10">
+    <section class="bg-white rounded-2xl shadow border border-gray-100 p-6 md:p-8">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+                <p class="text-sm text-indigo-600 font-semibold uppercase tracking-wide">Health</p>
+                <h1 class="text-2xl md:text-3xl font-bold text-gray-900 mt-1">Import Sleep Data</h1>
+                <p class="text-sm text-gray-600 mt-2">Upload your Apple Health <code>export.xml</code> file to import sleep sessions.</p>
+            </div>
+            <a href="{{ url_for('account') }}" class="ui-back-btn">Back to account</a>
+        </div>
+
+        <div class="mt-6 p-4 rounded-lg border border-gray-200 bg-gray-50">
+            <label for="xmlFile" class="block text-sm font-medium text-gray-700 mb-2">XML file</label>
+            <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
+                <input id="xmlFile" type="file" accept=".xml,text/xml" class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:border-0 file:rounded-md file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
+                <button id="parseBtn" type="button" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed">Import sleep data</button>
+            </div>
+        </div>
+
+        <div id="status" class="mt-4 hidden rounded-lg border px-3 py-2 text-sm"></div>
+
+        <div id="loadingWrap" class="hidden mt-4 p-4 rounded-lg border border-indigo-200 bg-indigo-50" aria-live="polite">
+            <div class="flex items-center gap-3">
+                <div class="h-5 w-5 rounded-full border-2 border-indigo-200 border-t-indigo-600 animate-spin"></div>
+                <div>
+                    <p id="loadingTitle" class="text-sm font-semibold text-indigo-900">Processing upload...</p>
+                </div>
+            </div>
+            <div id="progressTrack" class="mt-3 h-2 w-full rounded-full bg-indigo-100 overflow-hidden" role="progressbar" aria-label="Health data import in progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0%">
+                <div id="progressBar" class="h-full w-0 bg-indigo-600 rounded-full transition-all duration-300 ease-out"></div>
+            </div>
+            <p id="progressLabel" class="mt-2 text-xs text-indigo-900">0% complete</p>
+        </div>
+
+        <div id="summary" class="mt-4"></div>
+        <div id="tableContainer" class="mt-4"></div>
+    </section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/ParseXML.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sleep_import.js') }}"></script>
+{% endblock %}
+

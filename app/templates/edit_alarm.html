@@ -39,12 +39,43 @@
                     {{ form.device(class_="ui-select") }}
                 </div>
 
-                <div>
+                <div id="normal_time_field">
                     {{ form.time.label(class_="block text-sm font-medium text-gray-700") }}
                     {{ form.time(class_="mt-1 block w-full border-gray-300 rounded-md shadow-sm", type="time") }}
                     {% if form.time.errors %}
                         <p class="mt-1 text-sm text-red-600">{{ form.time.errors[0] }}</p>
                     {% endif %}
+                </div>
+
+                <div class="rounded-xl border-2 border-indigo-200 bg-indigo-50 p-4">
+                    <label class="flex items-start gap-3 cursor-pointer">
+                        {{ form.use_dynamic_alarm(class_="mt-1 h-5 w-5 text-indigo-600 border-indigo-400 rounded", id="use_dynamic_alarm", disabled=(not can_use_dynamic_alarm)) }}
+                        <span>
+                            <span class="inline-flex items-center gap-2 text-sm font-semibold text-indigo-900">
+                                <span aria-hidden="true">&#10024;</span>
+                                Dynamic Alarm Time
+                            </span>
+                            <span class="block text-xs text-indigo-800 mt-1">
+                                Choose a start/end window and recalculate this alarm inside it.
+                            </span>
+                            {% if not can_use_dynamic_alarm %}
+                            <span class="block text-xs text-amber-700 mt-1">
+                                Unlocks after more than 10 alarm sessions (current: {{ alarm_session_count }}).
+                            </span>
+                            {% endif %}
+                        </span>
+                    </label>
+
+                    <div id="dynamic_window_fields" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 hidden">
+                        <div>
+                            {{ form.dynamic_start_time.label(class_="block text-xs font-medium text-indigo-900") }}
+                            {{ form.dynamic_start_time(class_="mt-1 block w-full border-indigo-200 rounded-md shadow-sm", type="time", disabled=(not can_use_dynamic_alarm)) }}
+                        </div>
+                        <div>
+                            {{ form.dynamic_end_time.label(class_="block text-xs font-medium text-indigo-900") }}
+                            {{ form.dynamic_end_time(class_="mt-1 block w-full border-indigo-200 rounded-md shadow-sm", type="time", disabled=(not can_use_dynamic_alarm)) }}
+                        </div>
+                    </div>
                 </div>
 
 
@@ -59,5 +90,24 @@
             </form>
         </section>
     </main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const dynamicEnabled = {{ 'true' if can_use_dynamic_alarm else 'false' }};
+    const dynamicToggle = document.getElementById('use_dynamic_alarm');
+    const dynamicFields = document.getElementById('dynamic_window_fields');
+    const normalTimeField = document.getElementById('normal_time_field');
+
+    function syncDynamicWindowVisibility() {
+        if (!dynamicToggle || !dynamicFields || !normalTimeField) return;
+        const shouldShowDynamic = dynamicEnabled && dynamicToggle.checked;
+        dynamicFields.classList.toggle('hidden', !shouldShowDynamic);
+        normalTimeField.classList.toggle('hidden', shouldShowDynamic);
+    }
+
+    dynamicToggle?.addEventListener('change', syncDynamicWindowVisibility);
+    syncDynamicWindowVisibility();
+</script>
 {% endblock %}
 
