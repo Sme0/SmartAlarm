@@ -1,68 +1,76 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Analytics</title>
+{% extends "base.html" %}
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% block title %}Analytics{% endblock %}
 
-    <style>
-        canvas {
-            max-width: 500px;
-            max-height: 300px;
-        }
+{% block content %}
+<main class="max-w-6xl mx-auto mt-8 px-6 pb-10">
 
-        .chart-desc {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 10px;
-            max-width: 600px;
-        }
+    <!-- Header -->
+    <section class="bg-white rounded-xl shadow border border-gray-100 p-6">
+        <h1 class="text-2xl font-bold text-gray-900">Analytics</h1>
+        <p class="text-gray-600 mt-2">
+            Insights into your alarm performance and behaviour over time.
+        </p>
+    </section>
 
-        .chart-container {
-            width: 100%;
-            max-width: 600px;   /* chart size */
-            /*max-height: 500px;*/
-            overflow-x: auto;   /* enables scrolling */
-            border: 1px solid #ddd;
-            padding: 10px;
-        }
+    <!-- Recommendation -->
+    <section class="bg-white rounded-xl shadow border border-gray-100 p-6 mt-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-2">Recommendations</h2>
+        <p id="recommendation" class="text-gray-700">
+            More data needed
+        </p>
+    </section>
 
-        .chart-container canvas {
-            min-width: 800px;
-        }
-    </style>
-</head>
+    <!-- Success Over Time -->
+    <section class="bg-white rounded-xl shadow border border-gray-100 p-6 mt-6">
+        <h2 class="text-xl font-semibold text-gray-900">Success Over Time</h2>
+        <p class="text-sm text-gray-500 mb-4">
+            Shows how many days per week you stayed within a healthy snooze limit (0–1 snoozes = success).
+        </p>
 
-<body>
+<div id="chartContainer" class="w-full overflow-x-auto overflow-y-hidden border border-gray-100 rounded-lg p-3">
+    <div id="chartInner" class="h-80">
+        <canvas id="dayChart"></canvas>
+    </div>
+</div>
+    </section>
 
+<!-- Side-by-side charts -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6 w-full">
 
-<h1>Analytics</h1>  
+    <!-- Puzzle success -->
+    <div class="bg-white rounded-xl shadow border border-gray-100 p-5 w-full">
+        <h2 class="text-lg font-semibold text-gray-900 mb-2">Puzzle success</h2>
+        <p class="text-sm text-gray-500 mb-3">
+            Shows how often puzzles are successfully completed.
+        </p>
+        <div class="w-full h-72">
+            <canvas id="successChart"></canvas>
+        </div>
+    </div>
 
-<h2>Recommendations</h2>
-<p id="recommendation">More data needed</p>
+    <!-- Puzzle type comparison -->
+    <div class="bg-white rounded-xl shadow border border-gray-100 p-5 w-full">
+        <h2 class="text-lg font-semibold text-gray-900 mb-2">Puzzle Type Comparison</h2>
+        <p class="text-sm text-gray-500 mb-3">
+            Shows performance across different puzzle types.
+        </p>
+        <div class="w-full h-72">
+            <canvas id="puzzleChart"></canvas>
+        </div>
+    </div>
 
-<h2>Success Over Time</h2>
-<p class="chart-desc">
-Shows whether you stayed within a healthy snooze limit (0–1 snoozes per day = success).
-</p>
-<div class="chart-container">
-    <canvas id="dayChart"></canvas>
 </div>
 
-<h2>Puzzle success</h2>
-<p class="chart-desc">
-Shows how often puzzles are successfully completed.
-</p>
-<canvas id="successChart"></canvas>
+</section>
 
-<h2>Puzzle Type Comparison</h2>
-<p class="chart-desc">
-Shows performance across different puzzle types.
-</p>
-<canvas id="puzzleChart"></canvas>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-
 //recommendations section: user notified which settings are most effective for them
 fetch("/api/analytics/recommendation")
 .then(res => res.json())
@@ -70,8 +78,8 @@ fetch("/api/analytics/recommendation")
     console.log("DATA:", data);
 
     document.getElementById("recommendation").innerHTML =
-        `Best wake-up time: ${data.time}<br>
-         Best puzzle type: ${data.best_puzzle_type ?? "Not enough data yet"}`;
+        `Best wake-up time: ${data.time || "Not enough data yet"}<br>
+         Best puzzle type: ${data.best_puzzle_type || "Not enough data yet"}`;
 });
 
 //chart showing the user whether the smart alarm is helping them
@@ -79,7 +87,14 @@ fetch("/api/analytics/success-over-time")
 .then(res => res.json())
 .then(data => {
 
-    new Chart(document.getElementById("dayChart"), {
+    const container = document.getElementById("chartContainer");
+    const inner = document.getElementById("chartInner");
+    const canvas = document.getElementById("dayChart");
+
+    const width = Math.max(800, data.labels.length * 130);
+    inner.style.minWidth = width + "px";
+
+    new Chart(canvas, {
         type: "line",
         data: {
             labels: data.labels,
@@ -90,16 +105,21 @@ fetch("/api/analytics/success-over-time")
             }]
         },
         options: {
-            responsive: false,
+            responsive: true,
             maintainAspectRatio: false,
-            scales : {
-                y : {
+            scales: {
+                y: {
                     min: 0,
-                    max: 7,
+                    max: 7
                 }
             }
         }
     });
+
+    requestAnimationFrame(() => {
+        container.scrollLeft = container.scrollWidth;
+    });
+
 });
 
 //chart showing user how many puzzles they successfully completed
@@ -123,20 +143,28 @@ fetch("/api/analytics/puzzle-types")
 .then(res => res.json())
 .then(data => {
 
+    const puzzleNameMap = {
+        "logic" : "Memory",
+        "math" : "Maths"
+    }
+
     new Chart(document.getElementById("puzzleChart"), {
         type: "bar",
         data: {
-            labels: ["Memory", "Maths"],
+            labels: data.labels.map(label => puzzleNameMap[label] || label),
             datasets: [{
                 label: "Success %",
-                data: data.values
+                data: data.values,
+                borderWidth: 1
             }]
         },
         options: {
-            scales : {
-                y : {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
                     min: 0,
-                    max: 100,
+                    max: 100
                 }
             }
         }
@@ -144,6 +172,4 @@ fetch("/api/analytics/puzzle-types")
 });
 
 </script>
-
-</body>
-</html>
+{% endblock %}

@@ -1240,7 +1240,7 @@ def submit_complete_sessions():
                 "triggered_at": "2026-03-29T12:00:00",
                 "puzzle_sessions": [
                     {
-                        "puzzle_type": "memory",
+                        "puzzle_type": "Memory",
                         "question": "1+1",
                         "is_correct": true,
                         "time_taken_seconds": 4.2
@@ -1435,8 +1435,8 @@ def dev_sample_data():
             incorrect_attempt_indexes.add(random.randint(0, attempts - 2))
 
         for attempt_idx in range(attempts):
-            puzzle_type = random.choice(["maths", "memory"])
-            if puzzle_type == "maths":
+            puzzle_type = random.choice(["Maths", "Memory"])
+            if puzzle_type == "Maths":
                 a = random.randint(1, 12)
                 b = random.randint(1, 12)
                 question = f"{a} + {b}"
@@ -1583,35 +1583,42 @@ def success_over_time():
     if not sessions:
         return {"labels": [], "values": []}
 
-    # group by week number
     weekly = {}
 
     for s in sessions:
-        week = s.triggered_at.isocalendar().week
-        year = s.triggered_at.isocalendar().year
+        iso = s.triggered_at.isocalendar()
 
-        #how the time is displayed on the chart
-        key = f"{year}-W{week}"
+        week_start = datetime.fromisocalendar(iso.year, iso.week, 1).date()
 
         day = s.triggered_at.date()
-
         snoozes = max(len(s.puzzle_sessions) - 1, 0)
 
-        if key not in weekly:
-            weekly[key] = {}
+        weekly.setdefault(week_start, {})
+        weekly[week_start][day] = snoozes
 
-        if day not in weekly[key]:
-            weekly[key][day] = snoozes
+    sorted_weeks = sorted(weekly.keys())
+
+    first_week = sorted_weeks[0]
+    last_week = sorted_weeks[-1]
 
     labels = []
     values = []
 
-    for week, days in sorted(weekly.items()):
-        # success = days with <=1 snooze
-        success_days = sum(1 for snooze in days.values() if snooze <= 1)
+    current = first_week
 
-        labels.append(week)
+    while current <= last_week:
+        days = weekly.get(current, {})
+        success_days = sum(1 for snooze in days.values() if snooze <= 1)
+        week_start = current
+        week_end = current + timedelta(days=6)
+
+        labels.append(
+            f"{week_start.strftime('%d %b')} – {week_end.strftime('%d %b %Y')}"
+        )
+
         values.append(success_days)
+
+        current += timedelta(weeks=1)
 
     return {
         "labels": labels,
