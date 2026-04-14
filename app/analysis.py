@@ -17,20 +17,20 @@ MODEL_RETRAIN_AFTER_DAYS = 7
 feature_names = [
 
     # Context
-    "alarm_time_minutes", # Minutes after midnight the original alarm is set for
-    "day_of_week", # Day of the week the alarm is set for
+    "alarm_time_minutes",
+    "day_of_week",
 
     # Sleep data
-    "avg_sleep_hours_last_3", # Average sleep hours over the last 3 nights
-    "avg_sleep_quality_last_3", # Average of how well the user has slept over the last 3 nights
+    "avg_sleep_hours_last_3",
+    "avg_sleep_quality_last_3",
     "avg_sleep_efficiency_last_3",
     "num_sleep_days_used",
     "sleep_data_age_days",
 
     # Behaviour (recent)
-    "avg_snoozes_last_10", # Average number of snoozes in the last 10 alarms
-    "avg_puzzle_time_last_10", # Average puzzle time over the last 10 alarms
-    "avg_attempts_last_10", # Average puzzle attempts over the last 10 alarms
+    "avg_snoozes_last_10",
+    "avg_puzzle_time_last_10",
+    "avg_attempts_last_10",
 
     # Behaviour (context)
     "avg_snoozes_same_day",
@@ -85,10 +85,13 @@ def _compute_sleep_statistics(sleep_sessions: list[SleepSession]) -> tuple[dict[
             if not stage.start_date or not stage.end_date:
                 continue
 
+            # Calculate duration of stage
             duration = max((as_utc(stage.end_date) - as_utc(stage.start_date)).total_seconds(), 0.0)
             if duration <= 0:
                 continue
 
+            # Calculate asleep seconds and restorative seconds
+            # Deep and core sleep stages count as restorative
             stage_name = (stage.stage or "").lower()
             in_bed_seconds += duration
             if "awake" not in stage_name:
@@ -108,34 +111,34 @@ def _compute_sleep_statistics(sleep_sessions: list[SleepSession]) -> tuple[dict[
 def _build_feature_dict(
     alarm_time_minutes: int,
     day_of_week: int,
-    sleep_hours: list[float],
-    sleep_quality: list[float],
-    sleep_efficiency: list[float],
+    avg_sleep_hours_last_3: list[float],
+    avg_sleep_quality_last_3: list[float],
+    avg_sleep_efficiency_last_3: list[float],
     sleep_data_age_days: float,
-    recent_snoozes: list[float],
-    recent_puzzle_times: list[float],
-    recent_attempts: list[float],
-    same_day_snoozes: list[float],
-    same_time_snoozes: list[float],
-    same_day_puzzle_times: list[float],
-    same_time_puzzle_times: list[float],
+    avg_snoozes_last_10: list[float],
+    avg_puzzle_time_last_10: list[float],
+    avg_attempts_last_10: list[float],
+    avg_snoozes_same_day: list[float],
+    avg_snoozes_same_time: list[float],
+    avg_puzzle_time_same_day: list[float],
+    avg_puzzle_time_same_time: list[float],
 ) -> dict[str, float]:
     """Build the canonical feature dictionary used for both training and prediction."""
     return {
         "alarm_time_minutes": float(alarm_time_minutes),
         "day_of_week": float(day_of_week),
-        "avg_sleep_hours_last_3": _safe_avg(sleep_hours),
-        "avg_sleep_quality_last_3": _safe_avg(sleep_quality),
-        "avg_sleep_efficiency_last_3": _safe_avg(sleep_efficiency),
-        "num_sleep_days_used": float(len(sleep_hours)),
+        "avg_sleep_hours_last_3": _safe_avg(avg_sleep_hours_last_3),
+        "avg_sleep_quality_last_3": _safe_avg(avg_sleep_quality_last_3),
+        "avg_sleep_efficiency_last_3": _safe_avg(avg_sleep_efficiency_last_3),
+        "num_sleep_days_used": float(len(avg_sleep_hours_last_3)),
         "sleep_data_age_days": float(max(sleep_data_age_days, 0.0)),
-        "avg_snoozes_last_10": _safe_avg(recent_snoozes),
-        "avg_puzzle_time_last_10": _safe_avg(recent_puzzle_times),
-        "avg_attempts_last_10": _safe_avg(recent_attempts),
-        "avg_snoozes_same_day": _safe_avg(same_day_snoozes),
-        "avg_snoozes_same_time": _safe_avg(same_time_snoozes),
-        "avg_puzzle_time_same_day": _safe_avg(same_day_puzzle_times),
-        "avg_puzzle_time_same_time": _safe_avg(same_time_puzzle_times),
+        "avg_snoozes_last_10": _safe_avg(avg_snoozes_last_10),
+        "avg_puzzle_time_last_10": _safe_avg(avg_puzzle_time_last_10),
+        "avg_attempts_last_10": _safe_avg(avg_attempts_last_10),
+        "avg_snoozes_same_day": _safe_avg(avg_snoozes_same_day),
+        "avg_snoozes_same_time": _safe_avg(avg_snoozes_same_time),
+        "avg_puzzle_time_same_day": _safe_avg(avg_puzzle_time_same_day),
+        "avg_puzzle_time_same_time": _safe_avg(avg_puzzle_time_same_time),
     }
 
 
@@ -226,9 +229,10 @@ def _save_model(user_id, model):
     """
     Serializes and persists a trained scikit-learn model to the database for the given user.
 
-    Converts the model to binary using joblib, stores it in the DifficultyModel table,
-    and records the training timestamp. If a model already exists for the user, it is updated;
-    otherwise, a new record is created.
+    Converts the model to binary using joblib.
+
+    If a model already exists for the user, it is updated,
+    otherwise a new record is created.
 
     :param user_id: The user ID for whom the model is being saved.
     :param model: The scikit-learn Pipeline model to serialize and store.
@@ -257,7 +261,7 @@ def _save_model(user_id, model):
         db.session.add(user_model)
     db.session.commit()
 
-def _load_model(user_id):
+def _load_model(user_id) -> Pipeline | None:
     """
     Deserializes and retrieves a previously trained model for the given user from the database.
 
@@ -324,14 +328,16 @@ def _extract_features(user_id) -> list[dict] | None:
     if none_end_count:
         print(f"Found {none_end_count} SleepSession(s) with missing end_date; they will be placed at the end of the list.")
 
-    # Calculating sleep statistics
     sleep_quality_by_id, sleep_efficiency_by_id = _compute_sleep_statistics(sleep_sessions)
 
     extracted_data = []
     session_rows = _build_session_rows(alarm_sessions)
 
     sleep_idx = 0
+
+    # Data structure that only stores 3 values, FIFO when deque reaches its maximum
     recent_sleep_window: deque[SleepSession] = deque(maxlen=3)
+
     for index, row in enumerate(session_rows):
         when_utc = row["when_utc"]
         alarm_time_minutes = row["alarm_time_minutes"]
@@ -344,6 +350,7 @@ def _extract_features(user_id) -> list[dict] | None:
             alarm_time_minutes=alarm_time_minutes,
         )
 
+        # Get last 3 sleeps date
         sleep_idx, last_three_sleeps = _advance_recent_sleep_window(
             sleep_sessions=sleep_sessions,
             sleep_idx=sleep_idx,
@@ -364,17 +371,17 @@ def _extract_features(user_id) -> list[dict] | None:
         features = _build_feature_dict(
             alarm_time_minutes=alarm_time_minutes,
             day_of_week=day_of_week,
-            sleep_hours=sleep_hours,
-            sleep_quality=sleep_quality,
-            sleep_efficiency=sleep_efficiency,
+            avg_sleep_hours_last_3=sleep_hours,
+            avg_sleep_quality_last_3=sleep_quality,
+            avg_sleep_efficiency_last_3=sleep_efficiency,
             sleep_data_age_days=sleep_data_age_days,
-            recent_snoozes=behavior["recent_snoozes"],
-            recent_puzzle_times=behavior["recent_puzzle_times"],
-            recent_attempts=behavior["recent_attempts"],
-            same_day_snoozes=behavior["same_day_snoozes"],
-            same_time_snoozes=behavior["same_time_snoozes"],
-            same_day_puzzle_times=behavior["same_day_puzzle_times"],
-            same_time_puzzle_times=behavior["same_time_puzzle_times"],
+            avg_snoozes_last_10=behavior["recent_snoozes"],
+            avg_puzzle_time_last_10=behavior["recent_puzzle_times"],
+            avg_attempts_last_10=behavior["recent_attempts"],
+            avg_snoozes_same_day=behavior["same_day_snoozes"],
+            avg_snoozes_same_time=behavior["same_time_snoozes"],
+            avg_puzzle_time_same_day=behavior["same_day_puzzle_times"],
+            avg_puzzle_time_same_time=behavior["same_time_puzzle_times"],
         )
 
         # Collect all data
@@ -469,6 +476,7 @@ def find_suitable_alarm(
         min_time: datetime,
         max_time: datetime):
 
+    # Convert time limits to UTC
     min_time_utc = as_utc(min_time)
     max_time_utc = as_utc(max_time)
 
@@ -484,16 +492,18 @@ def find_suitable_alarm(
         candidate_specs = [(minute, 0) for minute in range(min_time_minutes, 24 * 60, 15)]
         candidate_specs.extend((minute, 1) for minute in range(0, max_time_minutes + 1, 15))
 
+    # Select candidate alarm times
     midnight = min_time_utc.replace(hour=0, minute=0, second=0, microsecond=0)
     candidate_datetimes: list[datetime] = [
         midnight + timedelta(days=day_offset, minutes=minute)
         for minute, day_offset in candidate_specs
     ]
-
     if not candidate_datetimes:
         return {"best_candidate": None, "candidates": []}
 
     alarm_sessions: list[AlarmSession] = _load_user_alarm_sessions(user_id)
+
+    # Check if user has over the minimum required alarm sessions to train the model
     MIN_REQUIRED_SESSIONS = 10
     if len(alarm_sessions) < MIN_REQUIRED_SESSIONS:
         return {
@@ -507,17 +517,20 @@ def find_suitable_alarm(
     sleep_quality_by_id, sleep_efficiency_by_id = _compute_sleep_statistics(sleep_sessions)
 
     session_rows = _build_session_rows(alarm_sessions)
-
     candidate_payload = []
 
     sleep_idx = 0
+
+    # Data structure that only stores 3 values, FIFO when deque reaches its maximum
     recent_sleep_window: deque[SleepSession] = deque(maxlen=3)
 
+    # Loop through each of the candidate alarm times
     for candidate_dt in candidate_datetimes:
         candidate_utc = as_utc(candidate_dt)
         alarm_time_minutes = _minutes_after_midnight(candidate_utc)
         day_of_week = candidate_utc.weekday()
 
+        # Calculate statistics based on previous sessions
         prior_rows = [row for row in session_rows if row["when_utc"] < candidate_utc]
         behavior = _extract_prior_behavior_lists(
             prior_rows=prior_rows,
@@ -525,6 +538,7 @@ def find_suitable_alarm(
             alarm_time_minutes=alarm_time_minutes,
         )
 
+        # Get the last three sleeps
         sleep_idx, last_three_sleeps = _advance_recent_sleep_window(
             sleep_sessions=sleep_sessions,
             sleep_idx=sleep_idx,
@@ -532,6 +546,7 @@ def find_suitable_alarm(
             reference_time_utc=candidate_utc,
         )
 
+        # Calculate sleep statistics
         sleep_hours = [float(sleep.total_duration) / 3600.0 for sleep in last_three_sleeps]
         sleep_quality = [sleep_quality_by_id.get(sleep.id, 0.0) for sleep in last_three_sleeps]
         sleep_efficiency = [sleep_efficiency_by_id.get(sleep.id, 0.0) for sleep in last_three_sleeps]
@@ -543,17 +558,17 @@ def find_suitable_alarm(
         features = _build_feature_dict(
             alarm_time_minutes=alarm_time_minutes,
             day_of_week=day_of_week,
-            sleep_hours=sleep_hours,
-            sleep_quality=sleep_quality,
-            sleep_efficiency=sleep_efficiency,
+            avg_sleep_hours_last_3=sleep_hours,
+            avg_sleep_quality_last_3=sleep_quality,
+            avg_sleep_efficiency_last_3=sleep_efficiency,
             sleep_data_age_days=sleep_data_age_days,
-            recent_snoozes=behavior["recent_snoozes"],
-            recent_puzzle_times=behavior["recent_puzzle_times"],
-            recent_attempts=behavior["recent_attempts"],
-            same_day_snoozes=behavior["same_day_snoozes"],
-            same_time_snoozes=behavior["same_time_snoozes"],
-            same_day_puzzle_times=behavior["same_day_puzzle_times"],
-            same_time_puzzle_times=behavior["same_time_puzzle_times"],
+            avg_snoozes_last_10=behavior["recent_snoozes"],
+            avg_puzzle_time_last_10=behavior["recent_puzzle_times"],
+            avg_attempts_last_10=behavior["recent_attempts"],
+            avg_snoozes_same_day=behavior["same_day_snoozes"],
+            avg_snoozes_same_time=behavior["same_time_snoozes"],
+            avg_puzzle_time_same_day=behavior["same_day_puzzle_times"],
+            avg_puzzle_time_same_time=behavior["same_time_puzzle_times"],
         )
 
         candidate_payload.append({
@@ -562,15 +577,18 @@ def find_suitable_alarm(
             "feature_row": [float(features.get(name, 0.0)) for name in feature_names],
         })
 
+    # Prepares features ready for prediction
     prediction_matrix = np.array([item["feature_row"] for item in candidate_payload])
     predictions = _predict_user_model(user_id, prediction_matrix)
 
     if predictions is None:
         return {"best_candidate": None, "candidates": candidate_payload}
 
+    # Extract predicted data
     for item, pred in zip(candidate_payload, predictions):
         item["predicted_puzzle_time_seconds"] = float(pred)
 
+    # Find the best candidate (lowest difficulty score)
     best_candidate = min(
         candidate_payload,
         key=lambda row: row.get("predicted_puzzle_time_seconds", float("inf")),
