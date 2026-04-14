@@ -1,68 +1,26 @@
 """
 This module implements all the routes for the Flask application.
 """
-from datetime import datetime, timezone
 from typing import List
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from threading import Thread
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from app import app, database as db, login_manager, csrf
 from app.models import User, Device, Alarm, AlarmSession, PuzzleSession, SleepSession, SleepStage
 from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm, EditAlarmForm, DeviceSettingsForm
-from app.utils import group_sleep_records, parse_apple_dt, as_utc
+from app.utils import (
+    group_sleep_records, parse_apple_dt, as_utc, utc_now,
+    next_weekday_utc, parse_hhmm_time, resolve_timezone)
 from app.analysis import find_suitable_alarm
 from werkzeug.exceptions import InternalServerError
 from sqlalchemy.orm import selectinload
 from sqlalchemy import func
 
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _to_utc(value: datetime | None) -> datetime | None:
-    if value is None:
-        return None
-    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
-
-
-def _resolve_timezone(tz_name: str | None):
-    if tz_name:
-        try:
-            return ZoneInfo(tz_name), tz_name
-        except ZoneInfoNotFoundError:
-            pass
-    return timezone.utc, "UTC"
-
 def _is_expired(value: datetime | None) -> bool:
     normalized = as_utc(value)
-    return normalized is not None and normalized < _utc_now()
-
-
-def _next_weekday_utc(day_of_week: int, time_value) -> datetime:
-    """Return the next UTC datetime for a target weekday/time."""
-    now = _utc_now()
-    base = now.replace(hour=time_value.hour, minute=time_value.minute, second=0, microsecond=0)
-    days_ahead = (day_of_week - base.weekday()) % 7
-    candidate = base + timedelta(days=days_ahead)
-    if candidate <= now:
-        candidate += timedelta(days=7)
-    return candidate
-
-
-def _parse_hhmm_time(value: str | None):
-    """Parse HH:MM user input into a time object."""
-    if not value:
-        return None
-    try:
-        return datetime.strptime(value, '%H:%M').time()
-    except Exception:
-        return None
-
+    return normalized is not None and normalized < utc_now()
 
 def _resolve_alarm_time(
     user_id: int,
@@ -80,7 +38,7 @@ def _resolve_alarm_time(
         start_time = dynamic_start_time or preferred_time
         end_time = dynamic_end_time or preferred_time
 
-        min_dt = _next_weekday_utc(day_of_week=day_of_week, time_value=start_time)
+        min_dt = next_weekday_utc(day_of_week=day_of_week, time_value=start_time)
         max_dt = min_dt.replace(hour=end_time.hour, minute=end_time.minute, second=0, microsecond=0)
         if max_dt <= min_dt:
             max_dt += timedelta(days=1)
@@ -203,7 +161,7 @@ def unauthorized_callback():
 @app.route("/status")
 def status():
     """
-    Simple health-check route used to verify that the server is running.
+    Simple health check route used to verify that the server is running.
     Useful for debugging or monitoring.
     """ 
     return "Server is running!"
@@ -273,7 +231,7 @@ def account():
 @login_required
 def session_history():
     """Show recorded alarm/puzzle sessions grouped by day for the current user."""
-    display_tz, active_tz = _resolve_timezone((request.args.get("tz") or "").strip())
+    display_tz, active_tz = resolve_timezone((request.args.get("tz") or "").strip())
 
     # Only use names for devices owned by the current user; otherwise fallback to serial number.
     serial_to_device_name = {
@@ -498,7 +456,7 @@ def dashboard():
 
     next_alarm = None
     if enabled_alarms:
-        now = _utc_now()
+        now = utc_now()
         current_day = now.weekday()
         current_minutes = now.hour * 60 + now.minute
 
@@ -685,10 +643,10 @@ def add_alarm():
 
         dynamic_start_time = None
         dynamic_end_time = None
-        alarm_time = _parse_hhmm_time(form.time.data)
+        alarm_time = parse_hhmm_time(form.time.data)
         if form.use_dynamic_alarm.data:
-            dynamic_start_time = _parse_hhmm_time(form.dynamic_start_time.data)
-            dynamic_end_time = _parse_hhmm_time(form.dynamic_end_time.data)
+            dynamic_start_time = parse_hhmm_time(form.dynamic_start_time.data)
+            dynamic_end_time = parse_hhmm_time(form.dynamic_end_time.data)
             if dynamic_start_time is None or dynamic_end_time is None:
                 flash('For dynamic alarms, select a valid start and end time window.', 'danger')
                 return render_template(
@@ -727,7 +685,7 @@ def add_alarm():
                 alarm.time = alarm_time
                 alarm.day_of_week = day_idx
                 alarm.enabled = True
-                alarm.created_at = _utc_now()
+                alarm.created_at = utc_now()
                 alarm.puzzle_type = form.puzzle_type.data
                 alarm.use_dynamic_alarm = bool(form.use_dynamic_alarm.data)
                 alarm.dynamic_start_time = dynamic_start_time if form.use_dynamic_alarm.data else None
@@ -830,10 +788,10 @@ def edit_alarm(alarm_id):
 
         dynamic_start_time = None
         dynamic_end_time = None
-        alarm_time = _parse_hhmm_time(form.time.data)
+        alarm_time = parse_hhmm_time(form.time.data)
         if form.use_dynamic_alarm.data:
-            dynamic_start_time = _parse_hhmm_time(form.dynamic_start_time.data)
-            dynamic_end_time = _parse_hhmm_time(form.dynamic_end_time.data)
+            dynamic_start_time = parse_hhmm_time(form.dynamic_start_time.data)
+            dynamic_end_time = parse_hhmm_time(form.dynamic_end_time.data)
             if dynamic_start_time is None or dynamic_end_time is None:
                 flash('For dynamic alarms, select a valid start and end time window.', 'danger')
                 return render_template(
@@ -1037,7 +995,7 @@ def api_create_alarm():
             alarm.time = alarm_time
             alarm.day_of_week = day_idx
             alarm.enabled = True
-            alarm.created_at = _utc_now()
+            alarm.created_at = utc_now()
             alarm.puzzle_type = puzzle_type
             alarm.use_dynamic_alarm = False
             alarm.dynamic_start_time = None
@@ -1297,7 +1255,7 @@ def submit_complete_sessions():
                 except (TypeError, ValueError):
                     return jsonify({"response": "failed", "message": "invalid session datetime"}), 400
             else:
-                when = _utc_now()
+                when = utc_now()
 
             alarm_session = AlarmSession.create(
                 user_id=device.user_id,
@@ -1412,7 +1370,7 @@ def dev_sample_data():
     session_count = random.randint(15, 20)
     total_puzzle_rows = 0
     snoozed_session_count = 0
-    now_utc = _utc_now()
+    now_utc = utc_now()
     for index in range(session_count):
         day_anchor = (now_utc - timedelta(days=index + 1)).replace(hour=0, minute=0, second=0, microsecond=0)
         hour = random.randint(6, 10)

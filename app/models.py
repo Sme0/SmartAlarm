@@ -13,20 +13,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.exc import IntegrityError
 from app import database as db
 from app import login_manager as lm
-from app.utils import as_utc
+from app.utils import as_utc, utc_now
 
-
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _to_utc(value: datetime | None) -> datetime | None:
-    if value is None:
-        return None
-    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
-        # Some DB backends/drivers return naive UTC datetimes.
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
 
 class User(UserMixin, db.Model):
     """User model for account management."""
@@ -130,7 +118,7 @@ class Device(db.Model):
                 break
 
         self.pairing_code = code
-        self.pairing_expiry = _utc_now() + timedelta(minutes=5)
+        self.pairing_expiry = utc_now() + timedelta(minutes=5)
         db.session.commit()
         return self.pairing_code, self.pairing_expiry
 
@@ -141,14 +129,14 @@ class Device(db.Model):
         db.session.commit()
 
     def update_heartbeat(self):
-        self.last_seen = _utc_now()
+        self.last_seen = utc_now()
         db.session.commit()
 
     def is_online(self) -> bool:
         last_seen_utc = as_utc(self.last_seen)
         if not last_seen_utc:
             return False
-        return _utc_now() - last_seen_utc < timedelta(minutes=2)
+        return utc_now() - last_seen_utc < timedelta(minutes=2)
 
     def get_alarms(self) -> List['Alarm']:
         return Alarm.query.filter_by(device_serial=self.serial_number, user_id=self.user_id).all()
@@ -179,7 +167,7 @@ class Alarm(db.Model):
     time = db.Column(db.Time, nullable=False)
     day_of_week = db.Column(db.Integer, nullable=False, default=0)  # 0=Monday, 6=Sunday
     enabled = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime(timezone=True), default=_utc_now)
+    created_at = db.Column(db.DateTime(timezone=True), default=utc_now)
     puzzle_type = db.Column(db.String(16), nullable=False, default='random')
     use_dynamic_alarm = db.Column(db.Boolean, nullable=False, default=False)
     dynamic_start_time = db.Column(db.Time, nullable=True)
@@ -206,7 +194,7 @@ class Alarm(db.Model):
         alarm.time = time
         alarm.day_of_week = day_of_week
         alarm.enabled = enabled
-        alarm.created_at = _utc_now()
+        alarm.created_at = utc_now()
         alarm.puzzle_type = puzzle_type
         alarm.use_dynamic_alarm = use_dynamic_alarm
         alarm.dynamic_start_time = dynamic_start_time
@@ -220,7 +208,7 @@ class AlarmSession(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     device_serial = db.Column(db.String(64), db.ForeignKey('devices.serial_number'), nullable=False)
-    triggered_at = db.Column(db.DateTime(timezone=True), nullable=False, default=_utc_now)
+    triggered_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     @staticmethod
     def create(user_id: int, device_serial: str, triggered_at: datetime | None = None):

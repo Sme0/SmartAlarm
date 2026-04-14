@@ -10,9 +10,10 @@ from sqlalchemy.orm import selectinload
 
 from app.models import AlarmSession, DifficultyModel, SleepSession
 from app import database as db
-from app.utils import as_utc
+from app.utils import as_utc, minutes_after_midnight, safe_avg
 
 MODEL_RETRAIN_AFTER_DAYS = 7
+MIN_TRAINING_SAMPLES = 10
 
 feature_names = [
 
@@ -39,25 +40,10 @@ feature_names = [
     "avg_puzzle_time_same_time",
 ]
 
-def _minutes_after_midnight(dt: datetime) -> int:
-    """
-    Convert a datetime to minutes elapsed since midnight.
-
-    :param dt: The datetime to convert.
-    :return: Minutes after midnight (0-1439).
-    """
-    return (dt.hour * 60) + dt.minute
-
-
-def _safe_avg(values: list[float]) -> float:
-    """Safely compute the average of a list, returning 0.0 for empty input."""
-    return float(sum(values) / len(values)) if values else 0.0
-
-
 def _session_metrics(session: AlarmSession) -> dict[str, float]:
     """Compute attempts/snoozes/average puzzle time metrics for an alarm session."""
     attempts = len(session.puzzle_sessions)
-    avg_puzzle_time = _safe_avg([float(p.time_taken_seconds) for p in session.puzzle_sessions])
+    avg_puzzle_time = safe_avg([float(p.time_taken_seconds) for p in session.puzzle_sessions])
     return {
         "attempts": float(attempts),
         "snoozes": float(max(attempts - 1, 0)),
@@ -127,18 +113,18 @@ def _build_feature_dict(
     return {
         "alarm_time_minutes": float(alarm_time_minutes),
         "day_of_week": float(day_of_week),
-        "avg_sleep_hours_last_3": _safe_avg(avg_sleep_hours_last_3),
-        "avg_sleep_quality_last_3": _safe_avg(avg_sleep_quality_last_3),
-        "avg_sleep_efficiency_last_3": _safe_avg(avg_sleep_efficiency_last_3),
+        "avg_sleep_hours_last_3": safe_avg(avg_sleep_hours_last_3),
+        "avg_sleep_quality_last_3": safe_avg(avg_sleep_quality_last_3),
+        "avg_sleep_efficiency_last_3": safe_avg(avg_sleep_efficiency_last_3),
         "num_sleep_days_used": float(len(avg_sleep_hours_last_3)),
         "sleep_data_age_days": float(max(sleep_data_age_days, 0.0)),
-        "avg_snoozes_last_10": _safe_avg(avg_snoozes_last_10),
-        "avg_puzzle_time_last_10": _safe_avg(avg_puzzle_time_last_10),
-        "avg_attempts_last_10": _safe_avg(avg_attempts_last_10),
-        "avg_snoozes_same_day": _safe_avg(avg_snoozes_same_day),
-        "avg_snoozes_same_time": _safe_avg(avg_snoozes_same_time),
-        "avg_puzzle_time_same_day": _safe_avg(avg_puzzle_time_same_day),
-        "avg_puzzle_time_same_time": _safe_avg(avg_puzzle_time_same_time),
+        "avg_snoozes_last_10": safe_avg(avg_snoozes_last_10),
+        "avg_puzzle_time_last_10": safe_avg(avg_puzzle_time_last_10),
+        "avg_attempts_last_10": safe_avg(avg_attempts_last_10),
+        "avg_snoozes_same_day": safe_avg(avg_snoozes_same_day),
+        "avg_snoozes_same_time": safe_avg(avg_snoozes_same_time),
+        "avg_puzzle_time_same_day": safe_avg(avg_puzzle_time_same_day),
+        "avg_puzzle_time_same_time": safe_avg(avg_puzzle_time_same_time),
     }
 
 
@@ -177,7 +163,7 @@ def _build_session_rows(alarm_sessions: list[AlarmSession]) -> list[dict]:
         rows.append({
             "session_id": session.id,
             "when_utc": when_utc,
-            "alarm_time_minutes": _minutes_after_midnight(when_utc),
+            "alarm_time_minutes": minutes_after_midnight(when_utc),
             "day_of_week": when_utc.weekday(),
             "metrics": _session_metrics(session),
         })
@@ -409,7 +395,6 @@ def train_user_model(user_id) -> Pipeline | None:
     :return: The trained scikit-learn Pipeline model, or None if training data is unavailable.
     """
     data = _extract_features(user_id)
-    MIN_TRAINING_SAMPLES = 10
 
     if not data or len(data) < MIN_TRAINING_SAMPLES:
         print(f"Not enough training data for user {user_id}. This requires at least {MIN_TRAINING_SAMPLES} samples.")
@@ -481,8 +466,8 @@ def find_suitable_alarm(
     max_time_utc = as_utc(max_time)
 
     # Make time constraints consistent with alarm_time in feature extraction
-    min_time_minutes = _minutes_after_midnight(min_time_utc)
-    max_time_minutes = _minutes_after_midnight(max_time_utc)
+    min_time_minutes = minutes_after_midnight(min_time_utc)
+    max_time_minutes = minutes_after_midnight(max_time_utc)
 
     if min_time_minutes <= max_time_minutes:
         # Same day window
@@ -527,7 +512,7 @@ def find_suitable_alarm(
     # Loop through each of the candidate alarm times
     for candidate_dt in candidate_datetimes:
         candidate_utc = as_utc(candidate_dt)
-        alarm_time_minutes = _minutes_after_midnight(candidate_utc)
+        alarm_time_minutes = minutes_after_midnight(candidate_utc)
         day_of_week = candidate_utc.weekday()
 
         # Calculate statistics based on previous sessions
