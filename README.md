@@ -118,7 +118,7 @@ Assuming all dependencies have already been installed (as per above instructions
 Please note some operating systems use `python3` instead of `python`.
 
 ```commandline
-python app/run.py
+python -m app.run
 ```
 Assuming no errors occur, you may now access the web application, for example using:
 ```
