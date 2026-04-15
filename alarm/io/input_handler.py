@@ -36,7 +36,7 @@ class InputEventType(Enum):
     the InputHandler.
     """
 
-    ALARM_DISARM = "ALARM_DISARM"
+    ALARM_DISMISS = "ALARM_DISMISS"
     ALARM_SNOOZE = "ALARM_SNOOZE"
     JOYSTICK_LEFT = "JOYSTICK_LEFT"
     JOYSTICK_RIGHT = "JOYSTICK_RIGHT"
@@ -146,7 +146,7 @@ class DebugInputHandler(InputHandler):
 
         self._command_map = {
             "snooze": InputEventType.ALARM_SNOOZE,
-            "disarm": InputEventType.ALARM_DISARM,
+            "dismiss": InputEventType.ALARM_DISMISS,
             "left": InputEventType.JOYSTICK_LEFT,
             "right": InputEventType.JOYSTICK_RIGHT,
             "up": InputEventType.JOYSTICK_UP,
@@ -250,16 +250,16 @@ class RaspberryPiInputHandler(InputHandler):
             raise RuntimeError("RaspberryPiInputHandler requires grovepi to be installed and importable.")
 
         # Initialise pins
-        self.disarm_button = 5
+        self.dismiss_button = 5
         self.joystick_x = 0
         self.joystick_y = 1
 
         # Links pins to button
-        grovepi.pinMode(self.disarm_button, "INPUT")
+        grovepi.pinMode(self.dismiss_button, "INPUT")
         grovepi.pinMode(self.joystick_x, "INPUT")
         grovepi.pinMode(self.joystick_y, "INPUT")
 
-        self.last_disarm_button_state = 1
+        self.last_dismiss_button_state = 1
         self.last_joystick_direction = JoystickDirection.NEUTRAL
         self.last_event_time = {}
         self.debounce_seconds = 0.18
@@ -282,19 +282,19 @@ class RaspberryPiInputHandler(InputHandler):
         """
         Poll hardware once and enqueue button/joystick events.
 
-        - Disarm button uses edge-triggering (transition to pressed).
+        - Dismiss button uses edge-triggering (transition to pressed).
         - Joystick emits events only on direction changes.
         - Debounce guards against repeated noise/bounce events.
         """
         try:
-            disarm_button_state = grovepi.digitalRead(self.disarm_button)
+            dismiss_button_state = grovepi.digitalRead(self.dismiss_button)
 
             # Trigger once when button transitions from not pressed -> pressed.
-            if disarm_button_state == 0 and self.last_disarm_button_state != 0:
-                if self._is_debounced(InputEventType.ALARM_DISARM):
-                    self.push_event(InputEventType.ALARM_DISARM)
+            if dismiss_button_state == 0 and self.last_dismiss_button_state != 0:
+                if self._is_debounced(InputEventType.ALARM_DISMISS):
+                    self.push_event(InputEventType.ALARM_DISMISS)
 
-            self.last_disarm_button_state = disarm_button_state
+            self.last_dismiss_button_state = dismiss_button_state
 
             direction = self.read_joystick()
             if direction is not None and direction != self.last_joystick_direction:

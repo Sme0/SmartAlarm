@@ -56,7 +56,7 @@ class DebugBuzzer(Buzzer):
 
     def stop_alarm_sound(self) -> None:
         if self.active:
-            print("[DEBUG BUZZER] alarm stopped")
+            print("[DEBUG BUZZER] alarm sound stopped")
         self.active = False
 
     def set_alarm_volume(self, volume: int) -> None:

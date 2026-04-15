@@ -39,8 +39,8 @@ def _print_debug_help():
         return
 
     print("[DEBUG] SmartAlarm terminal controls")
-    print("[DEBUG] When alarm is ringing: type 'disarm' or 'snooze' and press Enter.")
-    print("[DEBUG] Maths puzzle controls: 'left', 'right', 'joy_press'.")
+    print("[DEBUG] When alarm is ringing: type 'dismiss' and press Enter.")
+    print("[DEBUG] Maths puzzle / disarm-snooze selection controls: 'left', 'right', 'joy_press'.")
     print("[DEBUG] Memory puzzle controls: 'up', 'down', 'left', 'right'.")
     print("[DEBUG] Commands are read from this terminal while the program is running.\n")
 
@@ -53,7 +53,7 @@ def _flush_inputs_on_state_change(previous_state, current_state):
 
 def _handle_alarm_events():
     events = input_handler.pop_events_by_type({
-        InputEventType.ALARM_DISARM,
+        InputEventType.ALARM_DISMISS,
         InputEventType.ALARM_SNOOZE,
     })
 
@@ -61,12 +61,8 @@ def _handle_alarm_events():
         if alarm_controller.state != AlarmState.TRIGGERED:
             continue
 
-        if event.event_type == InputEventType.ALARM_DISARM:
-            alarm_controller.disarm_alarm()
-            break
-
-        if event.event_type == InputEventType.ALARM_SNOOZE:
-            alarm_controller.snooze_alarm()
+        if event.event_type == InputEventType.ALARM_DISMISS:
+            alarm_controller.run_alarm_interaction()
             break
 
 def pairing_loop():

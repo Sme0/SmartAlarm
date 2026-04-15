@@ -2,10 +2,11 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
+import time
 import pytz
 
 from alarm.io.output_handler import OutputHandler, DebugOutputHandler
-from alarm.io.input_handler import InputHandler
+from alarm.io.input_handler import InputHandler, InputEventType
 from alarm.alarm_state import AlarmState
 from alarm.puzzles.maths_puzzle import MathsPuzzle
 from alarm.puzzles.memory_puzzle import MemoryPuzzle
@@ -41,7 +42,7 @@ def _clock_now() -> datetime:
     return datetime.now(CLOCK_TIMEZONE)
 
 
-def get_current_day_of_week_number():
+def _get_current_day_of_week_number():
     """
     Returns the current day of the week as a number (Monday=0, Sunday=6)
     """
@@ -92,6 +93,51 @@ class AlarmController:
             return MemoryPuzzle(self.input_handler, self.output_handler)
         return MathsPuzzle(self.input_handler, self.output_handler)
 
+    def _decision_selection(self, options: List[str]) -> str | None:
+        MAX_TIME = 30
+        selected_idx = 0
+        start_time = time.time()
+
+        update_display = True
+
+        while True:
+
+            if time.time() - start_time > MAX_TIME:
+                return "trigger"
+
+            if update_display:
+                rendered_options = options.copy()
+                rendered_options[selected_idx] = f">{options[selected_idx]}""<"
+                self.output_handler.display_text('   '.join(rendered_options))
+                update_display = False
+
+            self.input_handler.check_inputs()
+            events = self.input_handler.pop_events_by_type({
+                InputEventType.JOYSTICK_LEFT,
+                InputEventType.JOYSTICK_RIGHT,
+                InputEventType.JOYSTICK_PRESS,
+                InputEventType.ALARM_DISMISS
+            })
+
+            if not events:
+                time.sleep(0.05)
+                continue
+
+            for event in events:
+                if event.event_type in [InputEventType.JOYSTICK_PRESS, InputEventType.ALARM_DISMISS]:
+                    return options[selected_idx]
+
+                if len(options) == 1:
+                    continue
+
+                if event.event_type == InputEventType.JOYSTICK_LEFT:
+                    selected_idx = (selected_idx - 1) % len(options)
+                    update_display = True
+                elif event.event_type == InputEventType.JOYSTICK_RIGHT:
+                    selected_idx = (selected_idx + 1) % len(options)
+                    update_display = True
+
+
     def update(self):
         # Update current time
         self.current_time = _clock_now().strftime("%H:%M:%S")
@@ -103,7 +149,7 @@ class AlarmController:
         :return: If an alarm has been triggered
         """
         current_minute = _clock_now().minute
-        day_of_week = get_current_day_of_week_number()
+        day_of_week = _get_current_day_of_week_number()
 
         # Check each alarm and trigger if needed
         alarms_to_check = (self.alarms or []) + (self.snooze_alarms or [])
@@ -140,60 +186,40 @@ class AlarmController:
         self.output_handler.display_text(f"Alarm Triggered: {_clock_now().strftime('%H:%M')}")
         self.output_handler.buzzer.play_alarm_sound()
         if isinstance(self.output_handler, DebugOutputHandler):
-            print("[DEBUG] Type 'disarm' to solve and dismiss, or 'snooze' to solve and snooze.")
+            print("[DEBUG] Type 'dismiss' to solve puzzle.")
 
-    def disarm_alarm(self):
-        """
-        Disarms the current alarm
-        :return:
-        """
+
+    def run_alarm_interaction(self):
+
         if not self.current_triggered_alarm:
             return
 
         self.state = AlarmState.PUZZLE
-        
-        # Puzzle startup logic. Use whenever a puzzle is being started
+
+        self.output_handler.buzzer.stop_alarm_sound()
         puzzle = self._build_puzzle_for_current_alarm()
         solved = puzzle.run_puzzle()
         source_alarm_id = str(self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id)
         session = self._pending_sessions[source_alarm_id]
         session["puzzle_sessions"].append(puzzle.export_session(source_alarm_id))
 
-        if solved:
-            # On alarm completion/disarm
-            session["puzzle_sessions"][-1]["outcome_action"] = "dismissed"
-            self._complete_sessions[source_alarm_id] = session
-            self._pending_sessions.pop(source_alarm_id, None)
-            self.stop_alarm()
-        else:
+        if not solved:
             self.trigger_alarm(self.current_triggered_alarm)
-
-    def snooze_alarm(self):
-        """
-        Snoozes the current alarm by 5 minutes
-        :return:
-        """
-        if not self.current_triggered_alarm:
             return
 
-        max_snoozes = int(self.current_triggered_alarm.max_snoozes)
-        if max_snoozes < 0:
-            max_snoozes = 0
+        options = ["Dismiss"]
 
+        max_snoozes = max(0, int(self.current_triggered_alarm.max_snoozes))
         current_snooze_count = self.current_triggered_alarm.snooze_count
-        if current_snooze_count >= max_snoozes:
-            self.output_handler.display_text("Snooze limit reached")
-            return
+        if not current_snooze_count >= max_snoozes:
+            options.append("Snooze")
 
-        self.state = AlarmState.PUZZLE
+        choice = self._decision_selection(options)
+        if choice:
+            choice = choice.lower()
 
-        # Puzzle startup logic. Use whenever a puzzle is being started
-        puzzle = self._build_puzzle_for_current_alarm()
-        solved = puzzle.run_puzzle()
-        source_alarm_id = str(self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id)
-        session = self._pending_sessions[source_alarm_id]
-        session["puzzle_sessions"].append(puzzle.export_session(source_alarm_id))
-        if solved:
+        if choice == "snooze":
+
             # TODO: Make snooze time editable through web
             session["puzzle_sessions"][-1]["outcome_action"] = "snoozed"
             snooze_time = (_clock_now() + timedelta(minutes=5)).strftime("%H:%M")
@@ -202,15 +228,25 @@ class AlarmController:
                 id=f"{source_alarm_id}-Snooze-{current_snooze_count + 1}",
                 time=snooze_time,
                 enabled=True,
-                day_of_week=get_current_day_of_week_number(),
+                day_of_week=_get_current_day_of_week_number(),
                 puzzle_type=self.current_triggered_alarm.puzzle_type,
                 max_snoozes=max_snoozes,
                 snooze_count=current_snooze_count + 1,
                 source_alarm_id=source_alarm_id,
             ))
             self.stop_alarm()
-        else:
+
+        elif choice == "dismiss":
+            session["puzzle_sessions"][-1]["outcome_action"] = "dismissed"
+            self._complete_sessions[source_alarm_id] = session
+            self._pending_sessions.pop(source_alarm_id, None)
+            self.stop_alarm()
+
+        elif choice == "trigger":
             self.trigger_alarm(self.current_triggered_alarm)
+        else:
+            # Unhandled choice (shouldn't happen), ensure cleanup
+            self.stop_alarm()
 
 
 
@@ -222,8 +258,6 @@ class AlarmController:
         if self.state in [AlarmState.TRIGGERED, AlarmState.PUZZLE]:
             print("Alarm Stopped")
             print(f"Active alarms: {self.alarms}, {self.snooze_alarms}")
-
-            self.output_handler.buzzer.stop_alarm_sound()
 
             if self.current_triggered_alarm in self.snooze_alarms:
                 self.snooze_alarms.remove(self.current_triggered_alarm)
