@@ -43,6 +43,39 @@
                                     </summary>
 
                                     <div class="px-4 pb-4 pt-1 border-t border-gray-100 space-y-2">
+                                        <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 py-2">
+                                            <div>
+                                                <p class="text-sm text-gray-500">Wake difficulty (1-10)</p>
+                                                <p class="text-sm font-medium text-gray-900">
+                                                    {% if alarm_session.waking_difficulty is not none %}
+                                                        {{ alarm_session.waking_difficulty }}/10
+                                                    {% else %}
+                                                        Not set
+                                                    {% endif %}
+                                                </p>
+                                            </div>
+                                            <form method="POST" action="{{ url_for('update_alarm_session_waking_difficulty', alarm_session_id=alarm_session.id) }}" class="flex items-center gap-2">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="day" value="{{ group.day_key }}">
+                                                <input type="hidden" name="tz" value="{{ active_tz }}">
+                                                <label for="wake-difficulty-{{ alarm_session.id }}" class="sr-only">Wake difficulty</label>
+                                                <input
+                                                    id="wake-difficulty-{{ alarm_session.id }}"
+                                                    name="waking_difficulty"
+                                                    type="number"
+                                                    min="1"
+                                                    max="10"
+                                                    step="1"
+                                                    value="{{ alarm_session.waking_difficulty if alarm_session.waking_difficulty is not none else '' }}"
+                                                    placeholder="1-10"
+                                                    class="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+                                                >
+                                                <button type="submit" class="rounded-md bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700">
+                                                    {% if alarm_session.waking_difficulty is not none %}Update{% else %}Add{% endif %}
+                                                </button>
+                                            </form>
+                                        </div>
+
                                         <div class="flex items-center justify-end">
                                             <form method="POST" action="{{ url_for('delete_alarm_session', alarm_session_id=alarm_session.id) }}" onsubmit="return confirm('Delete this alarm session and all puzzle attempts in it?');">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

@@ -159,7 +159,8 @@ class FlaskAPIClient:
                         "is_correct": True,
                         "time_taken_seconds": 12.4
                     }
-                ]
+                ],
+                "waking_difficulty": 5
             }
         }
         :param complete_sessions: alarm/puzzle session data in the above format

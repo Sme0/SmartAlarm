@@ -48,6 +48,7 @@ def _session_metrics(session: AlarmSession) -> dict[str, float]:
         "attempts": float(attempts),
         "snoozes": float(max(attempts - 1, 0)),
         "avg_puzzle_time": avg_puzzle_time,
+        "waking_difficulty": session.waking_difficulty
     }
 
 
@@ -325,10 +326,14 @@ def _extract_features(user_id) -> list[dict] | None:
     recent_sleep_window: deque[SleepSession] = deque(maxlen=3)
 
     for index, row in enumerate(session_rows):
+        current_metrics = row["metrics"]
+
+        if current_metrics["waking_difficulty"] is None:
+            continue
+
         when_utc = row["when_utc"]
         alarm_time_minutes = row["alarm_time_minutes"]
         day_of_week = row["day_of_week"]
-        current_metrics = row["metrics"]
 
         behavior = _extract_prior_behavior_lists(
             prior_rows=session_rows[:index],
@@ -374,8 +379,7 @@ def _extract_features(user_id) -> list[dict] | None:
         extracted_data.append({
             "alarm_session_id": row["session_id"],
             "features": features,
-            #TODO: Change target to a user defined value of difficulty rating
-            "target": current_metrics["avg_puzzle_time"],
+            "target": current_metrics["waking_difficulty"],
         })
 
     return extracted_data

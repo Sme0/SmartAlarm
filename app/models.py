@@ -218,6 +218,7 @@ class AlarmSession(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     device_serial = db.Column(db.String(64), db.ForeignKey('devices.serial_number'), nullable=False)
+    waking_difficulty = db.Column(db.Integer, nullable=True)
     triggered_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     @staticmethod
@@ -225,6 +226,7 @@ class AlarmSession(db.Model):
         user_id: int,
         device_serial: str,
         triggered_at: datetime | None = None,
+        waking_difficulty: int = None,
         commit: bool = True,
     ):
         """
@@ -243,6 +245,7 @@ class AlarmSession(db.Model):
         session.user_id = user_id
         session.device_serial = device_serial
         session.triggered_at = as_utc(triggered_at) or utc_now()
+        session.waking_difficulty = waking_difficulty
 
         db.session.add(session)
         if commit:

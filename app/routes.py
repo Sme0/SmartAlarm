@@ -267,6 +267,7 @@ def session_history():
             "device_serial": alarm_session.device_serial,
             "device_display_name": serial_to_device_name.get(alarm_session.device_serial, alarm_session.device_serial),
             "triggered_at": triggered_at_local,
+            "waking_difficulty": alarm_session.waking_difficulty,
             "puzzle_sessions": sorted(alarm_session.puzzle_sessions, key=lambda s: s.id),
         })
 
@@ -279,6 +280,43 @@ def session_history():
         selected_day=selected_day,
         active_tz=active_tz,
     )
+
+
+@app.route('/account/session-history/alarm/<int:alarm_session_id>/waking-difficulty', methods=['POST'])
+@login_required
+def update_alarm_session_waking_difficulty(alarm_session_id):
+    alarm_session = AlarmSession.query.get(alarm_session_id)
+    day = request.form.get('day')
+    tz_name = request.form.get('tz')
+
+    if alarm_session is None or alarm_session.user_id != current_user.id:
+        flash('Alarm session not found.', 'danger')
+        return redirect(url_for('session_history', day=day, tz=tz_name) if day else url_for('session_history', tz=tz_name))
+
+    raw_score = (request.form.get('waking_difficulty') or '').strip()
+    if not raw_score:
+        alarm_session.waking_difficulty = None
+    else:
+        try:
+            score = int(raw_score)
+        except ValueError:
+            flash('Wake difficulty must be a whole number between 1 and 10.', 'danger')
+            return redirect(url_for('session_history', day=day, tz=tz_name) if day else url_for('session_history', tz=tz_name))
+
+        if score < 1 or score > 10:
+            flash('Wake difficulty must be between 1 and 10.', 'danger')
+            return redirect(url_for('session_history', day=day, tz=tz_name) if day else url_for('session_history', tz=tz_name))
+
+        alarm_session.waking_difficulty = score
+
+    try:
+        db.session.commit()
+        flash('Wake difficulty saved.', 'success')
+    except Exception:
+        db.session.rollback()
+        flash('Failed to save wake difficulty.', 'danger')
+
+    return redirect(url_for('session_history', day=day, tz=tz_name) if day else url_for('session_history', tz=tz_name))
 
 
 @app.route('/account/session-history/alarm/<int:alarm_session_id>/delete', methods=['POST'])
@@ -1217,7 +1255,8 @@ def submit_complete_sessions():
                         "time_taken_seconds": 4.2,
                         "outcome_action": "dismissed"
                     }
-                ]
+                ],
+                "waking_difficulty": 5
             }
         }
     }
@@ -1261,10 +1300,13 @@ def submit_complete_sessions():
             else:
                 when = utc_now()
 
+            waking_difficulty = session_data.get("waking_difficulty")
+
             alarm_session = AlarmSession.create(
                 user_id=device.user_id,
                 device_serial=device.serial_number,
                 triggered_at=when,
+                waking_difficulty=waking_difficulty,
                 commit=False,
             )
 

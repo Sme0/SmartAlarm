@@ -137,6 +137,47 @@ class AlarmController:
                     selected_idx = (selected_idx + 1) % len(options)
                     update_display = True
 
+    def _get_user_waking_difficulty(self):
+        MAX_TIME = 60
+        selected_value = 5
+        start_time = time.time()
+
+        update_display = True
+
+        while True:
+            if time.time() - start_time > MAX_TIME:
+                return None
+
+            if update_display:
+                output = f"How difficult was it to wake up today? (10 = hard)\n>{selected_value}<"
+                self.output_handler.display_text(output)
+                update_display = False
+
+            self.input_handler.check_inputs()
+            events = self.input_handler.pop_events_by_type({
+                InputEventType.JOYSTICK_LEFT,
+                InputEventType.JOYSTICK_RIGHT,
+                InputEventType.JOYSTICK_PRESS,
+                InputEventType.ALARM_DISMISS
+            })
+
+            if not events:
+                time.sleep(0.05)
+                continue
+
+            for event in events:
+                if event.event_type in [InputEventType.JOYSTICK_PRESS, InputEventType.ALARM_DISMISS]:
+                    return selected_value
+
+                if event.event_type in [InputEventType.JOYSTICK_LEFT, InputEventType.JOYSTICK_DOWN]:
+                    selected_value = max(1, selected_value - 1)
+                    update_display = True
+                elif event.event_type in [InputEventType.JOYSTICK_RIGHT, InputEventType.JOYSTICK_UP]:
+                    selected_value = min(10, selected_value + 1)
+                    update_display = True
+
+
+
 
     def update(self):
         # Update current time
@@ -237,7 +278,9 @@ class AlarmController:
             self.stop_alarm()
 
         elif choice == "dismiss":
+            waking_difficulty = self._get_user_waking_difficulty()
             session["puzzle_sessions"][-1]["outcome_action"] = "dismissed"
+            session["waking_difficulty"] = waking_difficulty
             self._complete_sessions[source_alarm_id] = session
             self._pending_sessions.pop(source_alarm_id, None)
             self.stop_alarm()
