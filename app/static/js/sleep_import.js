@@ -6,6 +6,7 @@ const loadingTitleEl = document.getElementById("loadingTitle");
 const progressTrackEl = document.getElementById("progressTrack");
 const progressBarEl = document.getElementById("progressBar");
 const progressLabelEl = document.getElementById("progressLabel");
+const importedRangeLabelEl = document.getElementById("importedRangeLabel");
 
 let isImporting = false;
 
@@ -47,6 +48,13 @@ function setParsingState(isParsing, title = "Processing upload...") {
     } else {
         setProgress(0, "0% complete");
     }
+}
+
+function formatImportedRangeValue(value) {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toLocaleString();
 }
 
 window.addEventListener("beforeunload", (event) => {
@@ -99,6 +107,14 @@ parseBtn.addEventListener("click", async () => {
 
         setProgress(100, "Import successful");
         setStatus('Sleep data uploaded successfully.');
+
+        if (importedRangeLabelEl) {
+            const start = formatImportedRangeValue(data.imported_range_start);
+            const end = formatImportedRangeValue(data.imported_range_end);
+            importedRangeLabelEl.textContent = (start && end)
+                ? `${start} to ${end}`
+                : 'No sleep data imported yet.';
+        }
 
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

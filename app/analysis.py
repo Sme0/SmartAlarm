@@ -272,7 +272,7 @@ def _load_model(user_id) -> Pipeline | None:
     return model
 
 
-def _should_retrain_model(user_id: int, max_age_days: int = MODEL_RETRAIN_AFTER_DAYS) -> bool:
+def should_retrain_model(user_id: int, max_age_days: int = MODEL_RETRAIN_AFTER_DAYS) -> bool:
     """Return True when a user's stored model is missing or older than max_age_days."""
     user_model = DifficultyModel.query.filter_by(user_id=user_id).first()
     if not user_model:
@@ -449,7 +449,7 @@ def _predict_user_model(user_id, prediction_data):
     """
     model: Pipeline | None = None
 
-    if _should_retrain_model(user_id):
+    if should_retrain_model(user_id):
         # Try refresh first; if refresh fails due sparse data, keep using existing model if one exists.
         model = train_user_model(user_id)
 

@@ -13,7 +13,7 @@ from app.forms import LoginForm, RegistrationForm, PairDeviceForm, AlarmForm, Ed
 from app.utils import (
     group_sleep_records, parse_apple_dt, as_utc, utc_now,
     next_weekday_utc, parse_hhmm_time, resolve_timezone)
-from app.analysis import find_suitable_alarm
+from app.analysis import find_suitable_alarm, should_retrain_model
 from werkzeug.exceptions import InternalServerError
 from sqlalchemy.orm import selectinload
 from sqlalchemy import func
@@ -372,7 +372,60 @@ def delete_puzzle_session(puzzle_session_id):
 @app.route('/sleep-data', methods=['GET', 'POST'])
 @login_required
 def sleep_data():
-    return render_template("sleep_data.html")
+    range_start, range_end = (
+        db.session.query(
+            func.min(SleepSession.start_date),
+            func.max(SleepSession.end_date),
+        )
+        .filter(SleepSession.user_id == current_user.id)
+        .first()
+    )
+
+    return render_template(
+        "sleep_data.html",
+        imported_range_start=range_start,
+        imported_range_end=range_end,
+    )
+
+
+@app.route('/sleep-data/delete-all', methods=['POST'])
+@login_required
+def delete_all_sleep_data():
+    try:
+        deleted_stages = (
+            SleepStage.query
+            .filter(SleepStage.user_id == current_user.id)
+            .delete(synchronize_session=False)
+        )
+        deleted_sessions = (
+            SleepSession.query
+            .filter(SleepSession.user_id == current_user.id)
+            .delete(synchronize_session=False)
+        )
+        db.session.commit()
+        flash(
+            f'Deleted {deleted_sessions} sleep session(s) and {deleted_stages} stage record(s).',
+            'success',
+        )
+
+        # Train model in background without blocking
+        def train_model():
+            with app.app_context():
+                try:
+                    from app.analysis import train_user_model
+                    train_user_model(current_user.id)
+                except Exception:
+                    pass
+                finally:
+                    db.session.remove()
+
+        Thread(target=train_model, daemon=True).start()
+
+    except Exception:
+        db.session.rollback()
+        flash('Failed to delete sleep data.', 'danger')
+
+    return redirect(url_for('sleep_data'))
 
 @app.route('/sleep-data/update', methods=['POST'])
 @login_required
@@ -484,7 +537,33 @@ def update_sleep_data():
         db.session.rollback()
         return jsonify({'response': 'failed', 'message': 'database error while saving sleep data'}), 500
 
-    return jsonify({'response': 'ok', 'message': f'imported {len(grouped_nights)} sleep sessions'}), 200
+    imported_range_start, imported_range_end = (
+        db.session.query(
+            func.min(SleepSession.start_date),
+            func.max(SleepSession.end_date),
+        )
+        .filter(SleepSession.user_id == current_user.id)
+        .first()
+    )
+
+    # Train model in background without blocking
+    def train_model():
+        with app.app_context():
+            try:
+                from app.analysis import train_user_model
+                train_user_model(current_user.id)
+            except Exception:
+                pass
+            finally:
+                db.session.remove()
+    Thread(target=train_model, daemon=True).start()
+
+    return jsonify({
+        'response': 'ok',
+        'message': f'imported {len(grouped_nights)} sleep sessions',
+        'imported_range_start': imported_range_start.isoformat() if imported_range_start else None,
+        'imported_range_end': imported_range_end.isoformat() if imported_range_end else None,
+    }), 200
 
 @app.route('/dashboard')
 @login_required
@@ -1557,7 +1636,8 @@ def recommendation():
     from datetime import datetime
     from app.analysis import train_user_model
 
-    train_user_model(current_user.id)
+    if should_retrain_model(current_user.id):
+        train_user_model(current_user.id)
 
     now = datetime.now()
 
