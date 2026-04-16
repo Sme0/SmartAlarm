@@ -157,6 +157,8 @@ class AlarmController:
             events = self.input_handler.pop_events_by_type({
                 InputEventType.JOYSTICK_LEFT,
                 InputEventType.JOYSTICK_RIGHT,
+                InputEventType.JOYSTICK_UP,
+                InputEventType.JOYSTICK_DOWN,
                 InputEventType.JOYSTICK_PRESS,
                 InputEventType.ALARM_DISMISS
             })
