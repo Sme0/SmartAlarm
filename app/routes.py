@@ -322,15 +322,18 @@ def update_alarm_session_waking_difficulty(alarm_session_id):
 @app.route('/account/session-history/alarm/<int:alarm_session_id>/delete', methods=['POST'])
 @login_required
 def delete_alarm_session(alarm_session_id):
-    alarm_session = AlarmSession.query.get(alarm_session_id)
+    alarm_session = AlarmSession.query.filter_by(id=alarm_session_id, user_id=current_user.id).first()
     day = request.form.get('day')
     tz_name = request.form.get('tz')
 
-    if alarm_session is None or alarm_session.user_id != current_user.id:
+    if alarm_session is None:
         flash('Alarm session not found.', 'danger')
         return redirect(url_for('session_history', day=day, tz=tz_name) if day else url_for('session_history', tz=tz_name))
 
     try:
+        # Explicitly remove child puzzle sessions so this works even on older DB schemas
+        # that may not yet enforce ON DELETE CASCADE at the database level.
+        PuzzleSession.query.filter_by(alarm_session_id=alarm_session.id).delete(synchronize_session=False)
         db.session.delete(alarm_session)
         db.session.commit()
         flash('Alarm session deleted.', 'success')
@@ -1423,8 +1426,8 @@ def dev_sample_data():
     total_puzzle_rows = 0
     snoozed_session_count = 0
     now_utc = utc_now()
-    for index in range(session_count):
-        day_anchor = (now_utc - timedelta(days=index + 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    for i in range(session_count):
+        day_anchor = (now_utc - timedelta(days=i + 1)).replace(hour=0, minute=0, second=0, microsecond=0)
         hour = random.randint(6, 10)
         minute = random.randint(0, 59)
         triggered_at = day_anchor.replace(hour=hour, minute=minute)
