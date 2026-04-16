@@ -1429,17 +1429,22 @@ def dev_sample_data():
         minute = random.randint(0, 59)
         triggered_at = day_anchor.replace(hour=hour, minute=minute)
 
+        # 06:00 is hardest, 10:59 is easiest.
+        hardness = max(0, 10 - hour)
+        attempts = min(6, random.randint(1 + (hardness // 2), 2 + hardness))
+
+        # Build a 1-10 wake difficulty target (1=easiest, 10=hardest) with light noise.
+        waking_difficulty = max(1, min(10, hardness + random.randint(-1, 2)))
+
         alarm_session = AlarmSession(
             user_id=user.id,
             device_serial=device.serial_number,
             triggered_at=triggered_at,
+            waking_difficulty=waking_difficulty,
         )
         db.session.add(alarm_session)
         db.session.flush()
 
-        # 06:00 is hardest, 10:59 is easiest.
-        hardness = max(0, 10 - hour)
-        attempts = min(6, random.randint(1 + (hardness // 2), 2 + hardness))
 
         # Ensure at least some sessions represent snoozing behavior (multiple successful puzzles).
         if attempts == 1 and random.random() < 0.35:
