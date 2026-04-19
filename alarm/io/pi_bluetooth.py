@@ -91,7 +91,7 @@ class BluetoothConfirmation:
 if __name__ == "__main__":
     # initialise bluetooth confirmation class
     # 8 second wait time for a response, and enable console output
-    connection = BluetoothConfirmation(20, True) 
+    connection = BluetoothConfirmation(8, True) 
 
     
     # send a confirmation request
