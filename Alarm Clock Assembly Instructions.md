@@ -42,21 +42,19 @@
 ## Bluetooth connection
 1. Open a new terminal window on the Pi
 
-2. Ensuring the arduino is on and running, run:
-  `sudo rfcomm connect hci0 00:0E:EA:CF:6D:A5`
+2. Ensuring the arduino is on and running, run:  
+  `sudo rfcomm connect hci0 00:0E:EA:CF:6D:A5`  
 
 3. If a connection is successful, minimise the terminal window
 
-4. If a connection is unable to be made, run the following commands:
-`
-bluetoothctl
-remove 00:0E:EA:CF:6D:A5
-scan on
-[wait for 00:0E:EA:CF:6D:A5 to show up]
-scan off
-pair 00:0E:EA:CF:6D:A5
-[pin]: 1234
-trust 00:0E:EA:CF:6D:A5
-quit
-sudo rfcomm connect hci0 00:0E:EA:CF:6D:A5
-`
+4. If a connection is unable to be made, run the following commands:  
+`bluetoothctl`  
+`remove 00:0E:EA:CF:6D:A5`  
+`scan on`  
+[wait for 00:0E:EA:CF:6D:A5 to show up]  
+`scan off`  
+`pair 00:0E:EA:CF:6D:A5`  
+[pin]: `1234`  
+`trust 00:0E:EA:CF:6D:A5`  
+`quit`  
+`sudo rfcomm connect hci0 00:0E:EA:CF:6D:A5`
