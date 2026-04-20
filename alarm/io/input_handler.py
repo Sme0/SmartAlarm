@@ -259,7 +259,7 @@ class RaspberryPiInputHandler(InputHandler):
             raise RuntimeError("RaspberryPiInputHandler requires grovepi to be installed and importable.")
 
         # Initialise pins
-        self.dismiss_button = 5
+        self.dismiss_button = 4
         self.joystick_x = 0
         self.joystick_y = 1
 
