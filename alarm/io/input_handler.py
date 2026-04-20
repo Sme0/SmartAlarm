@@ -16,6 +16,7 @@ import sys
 from typing import List, Set
 
 from alarm.alarm_state import AlarmState
+from alarm.io.grovepi_lock import grovepi_lock
 from alarm.thingsboard_client import ThingsBoardClient
 
 try:
@@ -263,9 +264,10 @@ class RaspberryPiInputHandler(InputHandler):
         self.joystick_y = 1
 
         # Links pins to button
-        grovepi.pinMode(self.dismiss_button, "INPUT")
-        grovepi.pinMode(self.joystick_x, "INPUT")
-        grovepi.pinMode(self.joystick_y, "INPUT")
+        with grovepi_lock:
+            grovepi.pinMode(self.dismiss_button, "INPUT")
+            grovepi.pinMode(self.joystick_x, "INPUT")
+            grovepi.pinMode(self.joystick_y, "INPUT")
 
         self.last_dismiss_button_state = 1
         self.last_joystick_direction = JoystickDirection.NEUTRAL
@@ -295,7 +297,8 @@ class RaspberryPiInputHandler(InputHandler):
         - Debounce guards against repeated noise/bounce events.
         """
         try:
-            dismiss_button_state = grovepi.digitalRead(self.dismiss_button)
+            with grovepi_lock:
+                dismiss_button_state = grovepi.digitalRead(self.dismiss_button)
 
             # Trigger once when button transitions from not pressed -> pressed.
             if dismiss_button_state == 0 and self.last_dismiss_button_state != 0:
@@ -324,8 +327,9 @@ class RaspberryPiInputHandler(InputHandler):
         :return: The JoystickDirection for the given x and y
         """
         try:
-            x = grovepi.analogRead(self.joystick_x)
-            y = grovepi.analogRead(self.joystick_y)
+            with grovepi_lock:
+                x = grovepi.analogRead(self.joystick_x)
+                y = grovepi.analogRead(self.joystick_y)
         except IOError:
             print("ERROR: Error reading from joystick")
             return JoystickDirection.NEUTRAL
