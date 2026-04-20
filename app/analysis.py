@@ -497,15 +497,15 @@ def _predict_user_model(user_id, prediction_data):
                             Columns must correspond to the order of feature_names.
     :return: An array of predicted puzzle solve times (in seconds) for each sample, or None if no model is found.
     """
-    model: Pipeline
+    model: Pipeline | None = None
 
     if should_retrain_model(user_id):
         # Try refresh first; if refresh fails due sparse data, keep using existing model if one exists.
         model = train_user_model(user_id)
 
-    if not model:
+    if model is None:
         model = _load_model(user_id)
-    if not model:
+    if model is None:
         return None
 
     return model.predict(prediction_data)
