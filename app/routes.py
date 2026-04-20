@@ -727,7 +727,7 @@ def dashboard():
                 "id": alarm_obj.id,
                 "day_name": day_name,
                 "time": alarm_obj.time.strftime("%H:%M"),
-                "puzzle_type": getattr(alarm_obj, "puzzle_type", "random"),
+                "puzzle_type": getattr(alarm_obj, "puzzle_type", "recommended"),
                 "device_name": alarm_obj.device.name
                 if alarm_obj.device and alarm_obj.device.name
                 else alarm_obj.device_serial,
@@ -1063,7 +1063,7 @@ def edit_alarm(alarm_id):
     if request.method == "GET":
         form.device.data = alarm.device_serial
         form.time.data = alarm.time.strftime("%H:%M") if alarm.time else ""
-        form.puzzle_type.data = alarm.puzzle_type or "random"
+        form.puzzle_type.data = alarm.puzzle_type or "recommended"
         form.use_dynamic_alarm.data = bool(getattr(alarm, "use_dynamic_alarm", False))
         form.dynamic_start_time.data = (
             alarm.dynamic_start_time.strftime("%H:%M")
@@ -1261,7 +1261,7 @@ def api_get_alarms():
                         {
                             "id": alarm.id,
                             "time": alarm.time.strftime("%H:%M"),
-                            "puzzle_type": getattr(alarm, "puzzle_type", "random"),
+                            "puzzle_type": getattr(alarm, "puzzle_type", "recommended"),
                             "use_dynamic_alarm": bool(
                                 getattr(alarm, "use_dynamic_alarm", False)
                             ),
@@ -1290,7 +1290,7 @@ def api_get_alarms():
                         {
                             "id": alarm.id,
                             "time": alarm.time.strftime("%H:%M"),
-                            "puzzle_type": getattr(alarm, "puzzle_type", "random"),
+                            "puzzle_type": getattr(alarm, "puzzle_type", "recommended"),
                             "use_dynamic_alarm": bool(
                                 getattr(alarm, "use_dynamic_alarm", False)
                             ),
@@ -1322,7 +1322,7 @@ def api_create_alarm():
     time_str = data.get("time")
     day_of_week = data.get("day_of_week")
     days_of_week = data.get("days_of_week")
-    puzzle_type = data.get("puzzle_type", "random")
+    puzzle_type = data.get("puzzle_type", "recommended")
 
     # Resolve device
     device = None

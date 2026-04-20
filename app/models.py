@@ -198,7 +198,7 @@ class Alarm(db.Model):
     day_of_week = db.Column(db.Integer, nullable=False, default=0)  # 0=Monday, 6=Sunday
     enabled = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime(timezone=True), default=utc_now)
-    puzzle_type = db.Column(db.String(16), nullable=False, default="random")
+    puzzle_type = db.Column(db.String(16), nullable=False, default="recommended")
     use_dynamic_alarm = db.Column(db.Boolean, nullable=False, default=False)
     dynamic_start_time = db.Column(db.Time, nullable=True)
     dynamic_end_time = db.Column(db.Time, nullable=True)
@@ -390,7 +390,7 @@ def resolve_effective_puzzle_type(alarm: Alarm, device: Device = None) -> str:
 
     Stored alarms may have:
     - an explicit puzzle type such as ``maths`` or ``memory``
-    - ``random`` meaning the server should choose automatically
+    - ``recommended`` meaning the server should choose automatically
 
     The automatic choice uses recent puzzle history for the same user/device:
     - avoids repeating the most recent puzzle type

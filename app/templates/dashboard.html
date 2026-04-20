@@ -68,7 +68,7 @@
                     {% set day_idx = next_alarm.day_of_week|int %}
                     <p class="mt-3 text-2xl font-bold text-gray-900">{{ weekdays[day_idx] }} {{ next_alarm.time.strftime('%H:%M') }}</p>
                     <p class="text-sm text-gray-500 mt-1">{{ next_alarm.device.name if next_alarm.device and next_alarm.device.name else next_alarm.device_serial }}</p>
-                    <p class="text-sm text-gray-500">{{ (next_alarm.puzzle_type or 'random')|capitalize }} puzzle</p>
+                    <p class="text-sm text-gray-500">{{ (next_alarm.puzzle_type or 'recommended')|capitalize }} puzzle</p>
                 {% else %}
                     <p class="text-gray-500 mt-3">No enabled alarms set.</p>
                 {% endif %}
@@ -92,4 +92,3 @@
         </section>
     </main>
 {% endblock %}
-

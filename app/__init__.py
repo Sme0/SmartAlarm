@@ -115,3 +115,4 @@ from app import models
 # Initialise database
 with app.app_context():
     database.create_all()
+

@@ -151,7 +151,7 @@ class AlarmForm(FlaskForm):
         widget=widgets.ListWidget(prefix_label=False),
         validators=[]
     )
-    puzzle_type = SelectField('Puzzle Type', choices=[('maths', 'Maths'), ('memory', 'Memory'), ('random', 'Random')], validators=[DataRequired()])
+    puzzle_type = SelectField('Puzzle Type', choices=[('maths', 'Maths'), ('memory', 'Memory'), ('recommended', 'Recommended')], validators=[DataRequired()])
     submit = SubmitField('Save Alarm')
 
     def validate_days_of_week(self, field):
@@ -169,7 +169,7 @@ class EditAlarmForm(FlaskForm):
     use_dynamic_alarm = BooleanField('Use Dynamic Alarm (AI Picks Best Time)')
     dynamic_start_time = StringField('Dynamic Window Start')
     dynamic_end_time = StringField('Dynamic Window End')
-    puzzle_type = SelectField('Puzzle Type', choices=[('maths', 'Maths'), ('memory', 'Memory'), ('random', 'Random')], validators=[DataRequired()])
+    puzzle_type = SelectField('Puzzle Type', choices=[('maths', 'Maths'), ('memory', 'Memory'), ('recommended', 'Recommended')], validators=[DataRequired()])
     submit = SubmitField('Update Alarm')
 
 
