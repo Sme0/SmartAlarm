@@ -282,6 +282,7 @@ class AlarmController:
             self.trigger_alarm(self.current_triggered_alarm)
             return
 
+        self.output_handler.display_text("Get up and press\nthe button")
         self.bluetooth_connection.send_confirmation_request()
         self.bluetooth_connection.await_confirmation()
         confirmed = self.bluetooth_connection.check_confirmation()
