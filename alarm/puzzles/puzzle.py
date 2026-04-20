@@ -1,8 +1,9 @@
-from abc import ABC, abstractmethod
 import time
+from abc import ABC, abstractmethod
 
-from alarm.io.input_handler import InputHandler, InputEventType
+from alarm.io.input_handler import InputEventType, InputHandler
 from alarm.io.output_handler import OutputHandler
+
 
 class Puzzle(ABC):
     def __init__(self, input_handler: InputHandler, output_handler: OutputHandler):
@@ -19,7 +20,7 @@ class Puzzle(ABC):
         # For puzzles that require selecting from a set of choices
         self.current_selection = None
 
-        #TODO: Move snooze logic to AlarmController
+        # TODO: Move snooze logic to AlarmController
         self.num_snoozes = 0
         self.snooze_cap = 3
 
@@ -27,10 +28,8 @@ class Puzzle(ABC):
         self.end_time = None
         self.time_limit = 120
 
-
-
     @abstractmethod
-    def prepare_puzzle(self): #could add difficulty option
+    def prepare_puzzle(self):  # could add difficulty option
         """
         Prepares the puzzle's question and potential possible answers
         :return:
@@ -111,7 +110,7 @@ class Puzzle(ABC):
             self.on_joystick_down()
             self.display_puzzle()
 
-    #TODO: Move to AlarmController
+    # TODO: Move to AlarmController
     def check_snooze_cap(self):
         return self.num_snoozes >= self.snooze_cap
 
@@ -120,11 +119,11 @@ class Puzzle(ABC):
         Default method to run a puzzle. May be overridden if logic for a specific puzzle is different
         :return:
         """
-        #create and display question and possible answers (if applicable)
+        # create and display question and possible answers (if applicable)
         self.prepare_puzzle()
         self.display_puzzle()
 
-        #may need to fix so that timer isn't paused while waiting for input, depends on how inputhandler works
+        # may need to fix so that timer isn't paused while waiting for input, depends on how inputhandler works
         self.start_time = time.time()
 
         # Poll input events until timeout and only submit when a submit event arrives.
@@ -134,20 +133,21 @@ class Puzzle(ABC):
                 return False
 
             self.input_handler.check_inputs()
-            events = self.input_handler.pop_events_by_type({
-                InputEventType.JOYSTICK_LEFT,
-                InputEventType.JOYSTICK_RIGHT,
-                InputEventType.JOYSTICK_UP,
-                InputEventType.JOYSTICK_DOWN,
-                InputEventType.JOYSTICK_PRESS,
-            })
+            events = self.input_handler.pop_events_by_type(
+                {
+                    InputEventType.JOYSTICK_LEFT,
+                    InputEventType.JOYSTICK_RIGHT,
+                    InputEventType.JOYSTICK_UP,
+                    InputEventType.JOYSTICK_DOWN,
+                    InputEventType.JOYSTICK_PRESS,
+                }
+            )
 
             if not events:
                 time.sleep(0.05)
                 continue
 
             for event in events:
-
                 if event.event_type == InputEventType.JOYSTICK_PRESS:
                     self.end_time = time.time()
                     if self.check_answer():
@@ -162,10 +162,10 @@ class Puzzle(ABC):
     def get_puzzle_type(self) -> str:
         class_name = self.__class__.__name__
         if class_name.endswith("Puzzle"):
-            class_name = class_name[:-len("Puzzle")]
+            class_name = class_name[: -len("Puzzle")]
         return class_name.lower()
 
-    def export_session(self, alarm_session_id: str, outcome_action: str | None = None):
+    def export_session(self, alarm_session_id: str, outcome_action: str):
         time_taken_seconds = None
         if self.start_time is not None and self.end_time is not None:
             time_taken_seconds = self.end_time - self.start_time

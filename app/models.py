@@ -2,22 +2,25 @@
 This module contains the database models, including only data that Flask relies on,
 and not telemetry data that will be recorded on ThingsBoard.
 """
+
 import random
 import string
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional, List
+from typing import List, Optional
 
 from flask_login import UserMixin
-from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
+from werkzeug.security import check_password_hash, generate_password_hash
+
 from app import database as db
 from app import login_manager as lm
 from app.utils import as_utc, utc_now
 
 SUPPORTED_PUZZLE_TYPES = ("maths", "memory")
 SUPPORTED_PUZZLE_OUTCOMES = ("dismissed", "snoozed")
+
 
 def _stable_choice_seed(*parts) -> int:
     """
@@ -26,10 +29,11 @@ def _stable_choice_seed(*parts) -> int:
     joined = "|".join("" if part is None else str(part) for part in parts)
     return sum(ord(char) for char in joined)
 
+
 class User(UserMixin, db.Model):
     """User model for account management."""
 
-    __tablename__ = 'users'
+    __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
     email_address = db.Column(db.String(64), nullable=False, index=True, unique=True)
     preferred_name = db.Column(db.String(32), nullable=False)
@@ -48,7 +52,7 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
 
     @staticmethod
-    def register(email_address, password, preferred_name) -> 'User':
+    def register(email_address, password, preferred_name) -> "User":
         """
         Creates a new user account and saves it to the database.
         :param email_address: The user's unique email address
@@ -57,9 +61,11 @@ class User(UserMixin, db.Model):
         """
 
         # Normalize inputs
-        email_address = (email_address or '').strip().lower()
+        email_address = (email_address or "").strip().lower()
         if not preferred_name:
-            preferred_name = email_address.split('@')[0] if '@' in email_address else email_address
+            preferred_name = (
+                email_address.split("@")[0] if "@" in email_address else email_address
+            )
 
         # Fill out attributes
         user = User()
@@ -75,11 +81,11 @@ class User(UserMixin, db.Model):
         except IntegrityError:
             db.session.rollback()
             # Surface a clear exception to callers so they can respond appropriately
-            raise ValueError('email already registered')
+            raise ValueError("email already registered")
 
     @staticmethod
     @lm.user_loader
-    def get(user_id: int) -> 'User':
+    def get(user_id: int) -> "User":
         return User.query.get(int(user_id))
 
 
@@ -87,20 +93,22 @@ class Device(db.Model):
     """
     Device model representing a physical alarm clock registered by the user.
     """
-    __tablename__ = 'devices'
+
+    __tablename__ = "devices"
     serial_number = db.Column(db.String(64), primary_key=True)
     name = db.Column(db.String(64), nullable=True)
     max_snoozes = db.Column(db.Integer, nullable=False, default=3)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     pairing_code = db.Column(db.String(6), nullable=True, unique=True)
     pairing_expiry = db.Column(db.DateTime(timezone=True), nullable=True)
     last_seen = db.Column(db.DateTime(timezone=True), nullable=True)
 
-    user = db.relationship('User', backref=db.backref('devices', lazy='select'))
-
+    user = db.relationship("User", backref=db.backref("devices", lazy="select"))
 
     @staticmethod
-    def register(serial_number: str, name: Optional[str], user: Optional[User]) -> 'Device':
+    def register(
+        serial_number: str, name: Optional[str], user: Optional[User]
+    ) -> "Device":
         """
         Creates a new device associated with the given User, and
         saves it to the database.
@@ -123,7 +131,7 @@ class Device(db.Model):
 
     def generate_pairing_code(self) -> tuple[str, datetime]:
         while True:
-            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            code = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
             if not Device.query.filter_by(pairing_code=code).first():
                 break
 
@@ -148,18 +156,28 @@ class Device(db.Model):
             return False
         return utc_now() - last_seen_utc < timedelta(minutes=2)
 
-    def get_alarms(self) -> List['Alarm']:
-        return Alarm.query.filter_by(device_serial=self.serial_number, user_id=self.user_id).all()
-    
+    def get_alarms(self) -> List["Alarm"]:
+        return Alarm.query.filter_by(
+            device_serial=self.serial_number, user_id=self.user_id
+        ).all()
+
     def get_alarms_by_day(self):
         """
         Returns a dictionary mapping day names to lists of alarms for this device, grouped by day_of_week (0=Monday, 6=Sunday).
         """
-        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        days = [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ]
         alarms_by_day = {day: [] for day in days}
         alarms = self.get_alarms()
         for alarm_obj in alarms:
-            day_idx = getattr(alarm_obj, 'day_of_week', 0)
+            day_idx = getattr(alarm_obj, "day_of_week", 0)
             try:
                 day_idx = int(day_idx)
                 if 0 <= day_idx <= 6:
@@ -170,21 +188,23 @@ class Device(db.Model):
 
 
 class Alarm(db.Model):
-    __tablename__ = 'alarms'
+    __tablename__ = "alarms"
     id = db.Column(db.String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
-    device_serial = db.Column(db.String(64), db.ForeignKey('devices.serial_number'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    device_serial = db.Column(
+        db.String(64), db.ForeignKey("devices.serial_number"), nullable=False
+    )
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
     time = db.Column(db.Time, nullable=False)
     day_of_week = db.Column(db.Integer, nullable=False, default=0)  # 0=Monday, 6=Sunday
     enabled = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime(timezone=True), default=utc_now)
-    puzzle_type = db.Column(db.String(16), nullable=False, default='random')
+    puzzle_type = db.Column(db.String(16), nullable=False, default="random")
     use_dynamic_alarm = db.Column(db.Boolean, nullable=False, default=False)
     dynamic_start_time = db.Column(db.Time, nullable=True)
     dynamic_end_time = db.Column(db.Time, nullable=True)
 
-    device = db.relationship('Device', backref=db.backref('alarms', lazy='select'))
-    user = db.relationship('User', backref=db.backref('alarms', lazy='select'))
+    device = db.relationship("Device", backref=db.backref("alarms", lazy="select"))
+    user = db.relationship("User", backref=db.backref("alarms", lazy="select"))
 
     @staticmethod
     def create(
@@ -213,19 +233,24 @@ class Alarm(db.Model):
         db.session.add(alarm)
         db.session.commit()
 
+
 class AlarmSession(db.Model):
-    __tablename__ = 'alarm_sessions'
+    __tablename__ = "alarm_sessions"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    device_serial = db.Column(db.String(64), db.ForeignKey('devices.serial_number'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    device_serial = db.Column(
+        db.String(64), db.ForeignKey("devices.serial_number"), nullable=False
+    )
     waking_difficulty = db.Column(db.Integer, nullable=True)
-    triggered_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+    triggered_at = db.Column(
+        db.DateTime(timezone=True), nullable=False, default=utc_now
+    )
 
     @staticmethod
     def create(
         user_id: int,
         device_serial: str,
-        triggered_at: datetime | None = None,
+        triggered_at: datetime,
         waking_difficulty: int = None,
         commit: bool = True,
     ):
@@ -254,12 +279,13 @@ class AlarmSession(db.Model):
             db.session.flush()
         return session
 
+
 class PuzzleSession(db.Model):
-    __tablename__ = 'puzzle_sessions'
+    __tablename__ = "puzzle_sessions"
     id = db.Column(db.Integer, primary_key=True)
     alarm_session_id = db.Column(
         db.Integer,
-        db.ForeignKey('alarm_sessions.id', ondelete='CASCADE'),
+        db.ForeignKey("alarm_sessions.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -271,8 +297,8 @@ class PuzzleSession(db.Model):
 
     # Let the DB perform cascade deletes; avoid ORM issuing separate DELETEs by using passive_deletes.
     alarm_session = db.relationship(
-        'AlarmSession',
-        backref=db.backref('puzzle_sessions', lazy='select'),
+        "AlarmSession",
+        backref=db.backref("puzzle_sessions", lazy="select"),
         passive_deletes=True,
         foreign_keys=[alarm_session_id],
     )
@@ -284,7 +310,7 @@ class PuzzleSession(db.Model):
         question: str,
         is_correct: bool,
         time_taken_seconds: int,
-        outcome_action: str | None = None,
+        outcome_action: str,
         commit: bool = True,
     ):
         """
@@ -304,7 +330,11 @@ class PuzzleSession(db.Model):
         session.is_correct = is_correct
         session.time_taken_seconds = time_taken_seconds
         normalized_outcome = (outcome_action or "").strip().lower()
-        session.outcome_action = normalized_outcome if normalized_outcome in SUPPORTED_PUZZLE_OUTCOMES else None
+        session.outcome_action = (
+            normalized_outcome
+            if normalized_outcome in SUPPORTED_PUZZLE_OUTCOMES
+            else None
+        )
         db.session.add(session)
         if commit:
             db.session.commit()
@@ -312,43 +342,49 @@ class PuzzleSession(db.Model):
             db.session.flush()
         return session
 
+
 class SleepSession(db.Model):
-    __tablename__ = 'sleep_sessions'
+    __tablename__ = "sleep_sessions"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     start_date = db.Column(db.DateTime(timezone=True), nullable=False)
     end_date = db.Column(db.DateTime(timezone=True), nullable=False)
     total_duration = db.Column(db.Integer, nullable=False)
 
     sleep_stages = db.relationship(
-        'SleepStage',
-        back_populates='sleep_session',
-        lazy='selectin',
-        order_by='SleepStage.start_date',
-        cascade='all, delete-orphan',
+        "SleepStage",
+        back_populates="sleep_session",
+        lazy="selectin",
+        order_by="SleepStage.start_date",
+        cascade="all, delete-orphan",
     )
 
+
 class SleepStage(db.Model):
-    __tablename__ = 'sleep_stages'
+    __tablename__ = "sleep_stages"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     stage = db.Column(db.String(64), nullable=False)
     creation_date = db.Column(db.DateTime(timezone=True))
     start_date = db.Column(db.DateTime(timezone=True))
     end_date = db.Column(db.DateTime(timezone=True))
     source_name = db.Column(db.String(64))
-    sleep_session_id = db.Column(db.Integer, db.ForeignKey('sleep_sessions.id'), nullable=False)
+    sleep_session_id = db.Column(
+        db.Integer, db.ForeignKey("sleep_sessions.id"), nullable=False
+    )
 
-    sleep_session = db.relationship('SleepSession', back_populates='sleep_stages')
+    sleep_session = db.relationship("SleepSession", back_populates="sleep_stages")
+
 
 class DifficultyModel(db.Model):
-    __tablename__ = 'difficulty_models'
+    __tablename__ = "difficulty_models"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     model_blob = db.Column(db.LargeBinary, nullable=False)
     last_trained = db.Column(db.DateTime(timezone=True), nullable=False)
 
-def resolve_effective_puzzle_type(alarm: Alarm, device: Device | None = None) -> str:
+
+def resolve_effective_puzzle_type(alarm: Alarm, device: Device = None) -> str:
     """
     Resolve the actual puzzle type that should be sent to the device.
 
@@ -367,26 +403,31 @@ def resolve_effective_puzzle_type(alarm: Alarm, device: Device | None = None) ->
         return stored_type
 
     scores = {puzzle_type: 0 for puzzle_type in SUPPORTED_PUZZLE_TYPES}
-    recent_alarm_sessions_query = (
-        AlarmSession.query
-        .filter(AlarmSession.user_id == alarm.user_id)
-        .options(selectinload(AlarmSession.puzzle_sessions))
-    )
+    recent_alarm_sessions_query = AlarmSession.query.filter(
+        AlarmSession.user_id == alarm.user_id
+    ).options(selectinload(AlarmSession.puzzle_sessions))
 
-    target_device_serial = getattr(device, "serial_number", None) or getattr(alarm, "device_serial", None)
+    target_device_serial = getattr(device, "serial_number", None) or getattr(
+        alarm, "device_serial", None
+    )
     if target_device_serial:
-        recent_alarm_sessions_query = recent_alarm_sessions_query.filter(AlarmSession.device_serial == target_device_serial)
+        recent_alarm_sessions_query = recent_alarm_sessions_query.filter(
+            AlarmSession.device_serial == target_device_serial
+        )
 
     recent_alarm_sessions = (
-        recent_alarm_sessions_query
-        .order_by(AlarmSession.triggered_at.desc(), AlarmSession.id.desc())
+        recent_alarm_sessions_query.order_by(
+            AlarmSession.triggered_at.desc(), AlarmSession.id.desc()
+        )
         .limit(6)
         .all()
     )
 
     flattened_recent_puzzles: list[PuzzleSession] = []
     for alarm_session in recent_alarm_sessions:
-        flattened_recent_puzzles.extend(sorted(alarm_session.puzzle_sessions, key=lambda s: s.id, reverse=True))
+        flattened_recent_puzzles.extend(
+            sorted(alarm_session.puzzle_sessions, key=lambda s: s.id, reverse=True)
+        )
 
     if flattened_recent_puzzles:
         last_type = (flattened_recent_puzzles[0].puzzle_type or "").strip().lower()
@@ -395,9 +436,12 @@ def resolve_effective_puzzle_type(alarm: Alarm, device: Device | None = None) ->
 
     for index, alarm_session in enumerate(recent_alarm_sessions):
         weight = max(1, 5 - index)
-        ordered_puzzle_sessions = sorted(alarm_session.puzzle_sessions, key=lambda s: s.id)
+        ordered_puzzle_sessions = sorted(
+            alarm_session.puzzle_sessions, key=lambda s: s.id
+        )
         snoozed_sessions = [
-            session for session in ordered_puzzle_sessions
+            session
+            for session in ordered_puzzle_sessions
             if (session.outcome_action or "").strip().lower() == "snoozed"
         ]
         snooze_count = len(snoozed_sessions)
@@ -446,4 +490,3 @@ def resolve_effective_puzzle_type(alarm: Alarm, device: Device | None = None) ->
         today_key,
     )
     return candidates[seed % len(candidates)]
-

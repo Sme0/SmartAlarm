@@ -81,7 +81,7 @@ class AlarmController:
 
         # Current alarm state
         self.state: AlarmState = AlarmState.WAITING
-        self.current_triggered_alarm: Alarm | None = None
+        self.current_triggered_alarm: Alarm
 
         # Session data
         self._pending_sessions: Dict[str, Dict[str, Any]] = {}
@@ -103,7 +103,7 @@ class AlarmController:
             return MemoryPuzzle(self.input_handler, self.output_handler)
         return MathsPuzzle(self.input_handler, self.output_handler)
 
-    def _decision_selection(self, options: List[str]) -> str | None:
+    def _decision_selection(self, options: List[str]) -> str:
         MAX_TIME = 30
         selected_idx = 0
         start_time = time.time()
