@@ -13,6 +13,7 @@ from alarm.io.input_handler import InputEventType
 from alarm.flask_api_client import FlaskAPIClient, PairingStatus
 from alarm.alarm_controller import AlarmController
 from alarm.alarm_state import AlarmState
+from alarm.thingsboard_client import ThingsBoardClient
 
 load_dotenv()
 SERIAL_NUMBER = os.getenv("SERIAL_NUMBER")
@@ -21,14 +22,15 @@ if not SERIAL_NUMBER:
     raise ValueError("SERIAL_NUMBER environment variable is not set. Please set it in the .env file.")
 
 flask_api_client = FlaskAPIClient(serial_number=SERIAL_NUMBER)
-
+thingsboard_client = ThingsBoardClient()
+thingsboard_client.connect()
 
 device_debug_mode = str(os.getenv("DEVICE_DEBUG_MODE")).lower() in ["true", "y", "yes", "debug"]
 if device_debug_mode:
-    input_handler = DebugInputHandler()
+    input_handler = DebugInputHandler(thingsboard_client=thingsboard_client)
     output_handler = DebugOutputHandler()
 else:
-    input_handler = RaspberryPiInputHandler()
+    input_handler = RaspberryPiInputHandler(thingsboard_client=thingsboard_client)
     output_handler = RaspberryPiOutputHandler()
 
 alarm_controller = AlarmController(input_handler, output_handler)

@@ -1,4 +1,5 @@
 import json
+import time
 
 from dotenv import load_dotenv
 import paho.mqtt.client as mqtt
@@ -29,8 +30,9 @@ class ThingsBoardClient:
 
     def _on_message(self, client, userdata, msg):
         print("Payload: " + str(msg.payload))
+        #TODO: Sort via msg.topic
         data = json.loads(msg.payload)
-        #TODO: Send data somewhere
+        #TODO: Send data somewhere (observer pattern?)
 
     def connect(self):
         self.client.username_pw_set(self.access_token)
@@ -59,7 +61,20 @@ class ThingsBoardClient:
             qos=1
         )
 
+if __name__ == "__main__":
+    load_dotenv()
+    import random
+    print(os.getenv("THINGSBOARD_ACCESS_TOKEN"))
+    print(os.getenv("THINGSBOARD_HOST"))
+    thingsboard_client = ThingsBoardClient()
+    thingsboard_client.connect()
 
+    while True:
+        thingsboard_client.post({
+            "temperature": random.randint(0, 100),
+            "humidity": random.randint(0, 100),
+        })
+        time.sleep(1)
 
 
 

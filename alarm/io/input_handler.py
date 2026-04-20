@@ -16,6 +16,7 @@ import sys
 from typing import List, Set
 
 from alarm.alarm_state import AlarmState
+from alarm.thingsboard_client import ThingsBoardClient
 
 try:
     import msvcrt # Windows-only, used for non-blocking console input in debug mode
@@ -71,13 +72,15 @@ class InputHandler(ABC):
     call `push_event(...)` whenever a meaningful input action occurs.
     """
 
-    def __init__(self, max_events: int = 128):
+    def __init__(self, thingsboard_client: ThingsBoardClient, max_events: int = 128):
         """
         Create a handler with a bounded queue.
 
+        :param thingsboard_client: ThingsBoard client to use
         :param max_events: Maximum number of queued events retained. If the queue
             fills, oldest events are dropped automatically by `deque(maxlen=...)`.
         """
+        self.thingsboard_client = thingsboard_client
         self._events = deque(maxlen=max_events)
 
     @abstractmethod
@@ -95,7 +98,12 @@ class InputHandler(ABC):
         Enqueue a normalized input event.
         """
         event = InputEvent(event_type=event_type, timestamp=time.time(), payload=payload)
+        print("Recognised: " + event.event_type.__str__())
         self._events.append(event)
+        self.thingsboard_client.post({
+            "input_event": event.event_type.__str__(),
+            "input_timestamp": event.timestamp,
+        })
 
     def pop_events(self) -> List[InputEvent]:
         """Return and clear all queued events (FIFO order)."""
@@ -139,9 +147,9 @@ class DebugInputHandler(InputHandler):
     Commands are read from stdin and translated into queued `InputEvent`s.
     """
 
-    def __init__(self):
+    def __init__(self, thingsboard_client: ThingsBoardClient):
         """Initialize command-to-event mapping for debug mode."""
-        super().__init__()
+        super().__init__(thingsboard_client)
         self._line_buffer = ""
 
         self._command_map = {
@@ -242,9 +250,9 @@ class RaspberryPiInputHandler(InputHandler):
     debounce, and emits normalized input events.
     """
 
-    def __init__(self):
+    def __init__(self, thingsboard_client: ThingsBoardClient):
         """Initialize GPIO pin mappings, hardware state cache, and debounce config."""
-        super().__init__()
+        super().__init__(thingsboard_client)
 
         if grovepi is None:
             raise RuntimeError("RaspberryPiInputHandler requires grovepi to be installed and importable.")
