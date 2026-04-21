@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import time
+from typing import Optional
 
 from alarm.io.input_handler import InputHandler, InputEventType
 from alarm.io.output_handler import OutputHandler
@@ -165,7 +166,7 @@ class Puzzle(ABC):
             class_name = class_name[:-len("Puzzle")]
         return class_name.lower()
 
-    def export_session(self, alarm_session_id: str, outcome_action: str | None = None):
+    def export_session(self, alarm_session_id: str, outcome_action: Optional[str] = None):
         time_taken_seconds = None
         if self.start_time is not None and self.end_time is not None:
             time_taken_seconds = self.end_time - self.start_time
