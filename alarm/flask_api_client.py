@@ -101,7 +101,7 @@ class FlaskAPIClient:
     def get_alarms(self):
         """
         Returns updated alarms from the server.
-        :return: (success: bool, alarms: list[Alarm])
+        :return: tuple of success flag and parsed alarms
         """
         path = "/api/device/get-alarms"
         payload = {"serial_number": self.serial_number}

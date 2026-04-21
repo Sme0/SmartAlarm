@@ -85,8 +85,8 @@ class User(UserMixin, db.Model):
 
     @staticmethod
     @lm.user_loader
-    def get(user_id: int) -> "User":
-        return User.query.get(int(user_id))
+    def get(user_id: int) -> 'User':
+        return db.session.get(User, int(user_id))
 
 
 class Device(db.Model):
@@ -232,6 +232,7 @@ class Alarm(db.Model):
 
         db.session.add(alarm)
         db.session.commit()
+        return alarm
 
 
 class AlarmSession(db.Model):
@@ -250,7 +251,7 @@ class AlarmSession(db.Model):
     def create(
         user_id: int,
         device_serial: str,
-        triggered_at: datetime,
+        triggered_at: datetime = None,
         waking_difficulty: int = None,
         commit: bool = True,
     ):
@@ -310,7 +311,7 @@ class PuzzleSession(db.Model):
         question: str,
         is_correct: bool,
         time_taken_seconds: int,
-        outcome_action: str,
+        outcome_action: str = None,
         commit: bool = True,
     ):
         """

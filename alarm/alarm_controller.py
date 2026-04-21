@@ -2,7 +2,7 @@ import os
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import List, Dict, Any, Optional
 
 import pytz
 
@@ -81,9 +81,9 @@ class AlarmController:
         self.snooze_alarms: List[Alarm] = []
 
         # Current alarm state
-        self.state: AlarmState = AlarmState.WAITING
+        self.state : AlarmState = AlarmState.WAITING
         self.current_triggered_alarm: Optional[Alarm] = None
-
+        
         # Session data
         self._pending_sessions: Dict[str, Dict[str, Any]] = {}
         self._complete_sessions: Dict[str, Dict[str, Any]] = {}
