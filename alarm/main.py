@@ -10,9 +10,11 @@ from dotenv import load_dotenv
 from alarm.io.input_handler import DebugInputHandler, RaspberryPiInputHandler
 from alarm.io.output_handler import DebugOutputHandler, RaspberryPiOutputHandler
 from alarm.io.input_handler import InputEventType
+from alarm.io.pi_bluetooth import BluetoothSetup
 from alarm.flask_api_client import FlaskAPIClient, PairingStatus
 from alarm.alarm_controller import AlarmController
 from alarm.alarm_state import AlarmState
+from alarm.thingsboard_client import ThingsBoardClient
 
 load_dotenv()
 SERIAL_NUMBER = os.getenv("SERIAL_NUMBER")
@@ -21,19 +23,20 @@ if not SERIAL_NUMBER:
     raise ValueError("SERIAL_NUMBER environment variable is not set. Please set it in the .env file.")
 
 flask_api_client = FlaskAPIClient(serial_number=SERIAL_NUMBER)
-
+thingsboard_client = ThingsBoardClient()
+thingsboard_client.connect()
 
 device_debug_mode = str(os.getenv("DEVICE_DEBUG_MODE")).lower() in ["true", "y", "yes", "debug"]
 if device_debug_mode:
-    input_handler = DebugInputHandler()
+    input_handler = DebugInputHandler(thingsboard_client=thingsboard_client)
     output_handler = DebugOutputHandler()
 else:
-    input_handler = RaspberryPiInputHandler()
+    input_handler = RaspberryPiInputHandler(thingsboard_client=thingsboard_client)
     output_handler = RaspberryPiOutputHandler()
 
-alarm_controller = AlarmController(input_handler, output_handler)
+alarm_controller = AlarmController(input_handler, output_handler, debug_mode=device_debug_mode)
 
-# Helperfunctions for debuugging and main loop
+# Helper functions for debugging and main loop
 def _print_debug_help():
     if str(os.getenv("DEVICE_DEBUG_MODE")).lower() != "true":
         return
@@ -153,5 +156,15 @@ def main_alarm_loop():
 
 if __name__ == "__main__":
     _print_debug_help()
+    
+    # Setup Bluetooth connection to Arduino (skip in debug mode)
+    if not device_debug_mode:
+        print("[SETUP] Initializing Bluetooth connection to Arduino...")
+        bluetooth_setup = BluetoothSetup(debug=device_debug_mode)
+        if not bluetooth_setup.connect():
+            print("[SETUP] Bluetooth connection failed. Continuing without Arduino pairing.")
+    else:
+        print("[SETUP] Skipping Bluetooth setup in debug mode")
+    
     pairing_loop()
     main_alarm_loop()

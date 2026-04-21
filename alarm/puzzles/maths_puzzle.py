@@ -74,6 +74,9 @@ class MathsPuzzle(Puzzle):
 
     def display_puzzle(self):
         self.solution = self._parse_solution_int(self.solution)
+        print(self.problem)
+        print(self.choices)
+        print(self.solution)
 
         if self.current_selection is None:
             self.current_selection = 0

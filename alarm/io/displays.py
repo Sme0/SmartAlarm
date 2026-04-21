@@ -5,8 +5,8 @@ from alarm.io.input_handler import JoystickDirection
 # To avoid errors when not running on a Raspberry Pi
 try:
     from grove_rgb_lcd import *
-    import smbus
 except ImportError as e:
+    smbus = None
     print("Unable to import the following modules. Only an issue if connecting to raspberry pi components")
 
 
@@ -14,8 +14,8 @@ class Display:
     """
     Class to control the Raspberry Pi LCD screen.
     """
-    def __init__ (self, rgb_values: List[int] = [255, 255, 255], text: str = "") -> None:
-        self.colour = rgb_values
+    def __init__ (self, rgb_values: List[int] = None, text: str = "") -> None:
+        self.colour = rgb_values or [255, 255, 255]
         self.text = text
         
         # initialise memory addresses
@@ -88,7 +88,7 @@ def format_memory_instruction(instruction: JoystickDirection) -> str:
     """
     Formats a joystick direction for the Raspberry Pi's LCD screen
     :param instruction: Joystick direction to be formatted
-    :return: Formatted value
+    :return:  value
     """
     if instruction == JoystickDirection.UP:
         return f"       {instruction.value}"

@@ -71,7 +71,7 @@ class ModelTests(unittest.TestCase):
 
         Alarm.create(device_serial=device.serial_number, user_id=user.id, time=time(7, 0), day_of_week=0, enabled=True, puzzle_type="maths")
         Alarm.create(device_serial=device.serial_number, user_id=user.id, time=time(8, 0), day_of_week=3, enabled=True, puzzle_type="memory")
-        bad_alarm = Alarm.create(device_serial=device.serial_number, user_id=user.id, time=time(9, 0), day_of_week=2, enabled=True, puzzle_type="random")
+        bad_alarm = Alarm.create(device_serial=device.serial_number, user_id=user.id, time=time(9, 0), day_of_week=2, enabled=True, puzzle_type="recommended")
         bad_alarm.day_of_week = "bad"
         db.session.commit()
 
@@ -129,8 +129,8 @@ class ModelTests(unittest.TestCase):
 
         self.assertEqual(resolve_effective_puzzle_type(alarm, device), "memory")
 
-    def test_random_alarm_favors_puzzle_that_led_to_dismissal(self):
-        """Random alarms should prefer puzzle types that led to dismissal."""
+    def test_recommended_alarm_favors_puzzle_that_led_to_dismissal(self):
+        """Recommended alarms should prefer puzzle types that led to dismissal."""
         user = User.register("randomizer2@example.com", "password123", "Randomizer")
         device = Device.register("TEST-RANDOM-2", "Clock", user)
 
@@ -168,7 +168,7 @@ class ModelTests(unittest.TestCase):
             time=time(8, 0),
             day_of_week=0,
             enabled=True,
-            puzzle_type="random",
+            puzzle_type="recommended",
         )
 
         self.assertEqual(resolve_effective_puzzle_type(alarm, device), "maths")

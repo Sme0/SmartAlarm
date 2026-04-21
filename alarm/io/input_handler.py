@@ -16,6 +16,8 @@ import sys
 from typing import List, Set
 
 from alarm.alarm_state import AlarmState
+from alarm.io.grovepi_lock import grovepi_lock
+from alarm.thingsboard_client import ThingsBoardClient
 
 try:
     import msvcrt # Windows-only, used for non-blocking console input in debug mode
@@ -45,7 +47,7 @@ class InputEventType(Enum):
     JOYSTICK_PRESS = "JOYSTICK_PRESS"
 
 class JoystickDirection(Enum):
-    """Normalized joystick direction states from analog stick coordinates."""
+    """Normalized joystick direction states from analogue stick coordinates."""
 
     NEUTRAL = "NEUTRAL"
     UP = "UP"
@@ -71,13 +73,15 @@ class InputHandler(ABC):
     call `push_event(...)` whenever a meaningful input action occurs.
     """
 
-    def __init__(self, max_events: int = 128):
+    def __init__(self, thingsboard_client: ThingsBoardClient = None, max_events: int = 128):
         """
         Create a handler with a bounded queue.
 
+        :param thingsboard_client: ThingsBoard client to use
         :param max_events: Maximum number of queued events retained. If the queue
             fills, oldest events are dropped automatically by `deque(maxlen=...)`.
         """
+        self.thingsboard_client = thingsboard_client or ThingsBoardClient()
         self._events = deque(maxlen=max_events)
 
     @abstractmethod
@@ -95,7 +99,12 @@ class InputHandler(ABC):
         Enqueue a normalized input event.
         """
         event = InputEvent(event_type=event_type, timestamp=time.time(), payload=payload)
+        print("Recognised: " + event.event_type.__str__())
         self._events.append(event)
+        self.thingsboard_client.post({
+            "input_event": event.event_type.__str__(),
+            "input_timestamp": event.timestamp,
+        })
 
     def pop_events(self) -> List[InputEvent]:
         """Return and clear all queued events (FIFO order)."""
@@ -139,9 +148,9 @@ class DebugInputHandler(InputHandler):
     Commands are read from stdin and translated into queued `InputEvent`s.
     """
 
-    def __init__(self):
-        """Initialize command-to-event mapping for debug mode."""
-        super().__init__()
+    def __init__(self, thingsboard_client: ThingsBoardClient):
+        """Initialise command-to-event mapping for debug mode."""
+        super().__init__(thingsboard_client)
         self._line_buffer = ""
 
         self._command_map = {
@@ -239,25 +248,26 @@ class RaspberryPiInputHandler(InputHandler):
     Hardware input handler for Raspberry Pi + Grove components.
 
     Captures button presses and joystick movement, applies edge detection and
-    debounce, and emits normalized input events.
+    debounce, and emits normalised input events.
     """
 
-    def __init__(self):
-        """Initialize GPIO pin mappings, hardware state cache, and debounce config."""
-        super().__init__()
+    def __init__(self, thingsboard_client: ThingsBoardClient):
+        """Initialise GPIO pin mappings, hardware state cache, and debounce config."""
+        super().__init__(thingsboard_client)
 
         if grovepi is None:
             raise RuntimeError("RaspberryPiInputHandler requires grovepi to be installed and importable.")
 
         # Initialise pins
-        self.dismiss_button = 5
+        self.dismiss_button = 4
         self.joystick_x = 0
         self.joystick_y = 1
 
         # Links pins to button
-        grovepi.pinMode(self.dismiss_button, "INPUT")
-        grovepi.pinMode(self.joystick_x, "INPUT")
-        grovepi.pinMode(self.joystick_y, "INPUT")
+        with grovepi_lock:
+            grovepi.pinMode(self.dismiss_button, "INPUT")
+            grovepi.pinMode(self.joystick_x, "INPUT")
+            grovepi.pinMode(self.joystick_y, "INPUT")
 
         self.last_dismiss_button_state = 1
         self.last_joystick_direction = JoystickDirection.NEUTRAL
@@ -287,7 +297,8 @@ class RaspberryPiInputHandler(InputHandler):
         - Debounce guards against repeated noise/bounce events.
         """
         try:
-            dismiss_button_state = grovepi.digitalRead(self.dismiss_button)
+            with grovepi_lock:
+                dismiss_button_state = grovepi.digitalRead(self.dismiss_button)
 
             # Trigger once when button transitions from not pressed -> pressed.
             if dismiss_button_state == 0 and self.last_dismiss_button_state != 0:
@@ -310,14 +321,15 @@ class RaspberryPiInputHandler(InputHandler):
         Collects the x and y coordinates of a joystick input and translates it into
         a JoystickDirection.
 
-        Threshold ranges are tuned around a neutral center and map quadrants to
+        Threshold ranges are tuned around a neutral centre and map quadrants to
         cardinal directions.
 
         :return: The JoystickDirection for the given x and y
         """
         try:
-            x = grovepi.analogRead(self.joystick_x)
-            y = grovepi.analogRead(self.joystick_y)
+            with grovepi_lock:
+                x = grovepi.analogRead(self.joystick_x)
+                y = grovepi.analogRead(self.joystick_y)
         except IOError:
             print("ERROR: Error reading from joystick")
             return JoystickDirection.NEUTRAL
@@ -326,7 +338,7 @@ class RaspberryPiInputHandler(InputHandler):
         if x > 1020:
             return JoystickDirection.PRESS
 
-        # up side values
+        # upside values
         if x < 385:
             if y < 385:
                 if x < y:
@@ -341,7 +353,7 @@ class RaspberryPiInputHandler(InputHandler):
             else:
                 return JoystickDirection.UP
 
-        # down side values
+        # downside values
         elif x > 645:
             if y < 385:
                 if (x - 645) < (y - 255):
