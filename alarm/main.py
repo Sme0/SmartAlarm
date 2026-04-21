@@ -160,7 +160,7 @@ if __name__ == "__main__":
     # Setup Bluetooth connection to Arduino (skip in debug mode)
     if not device_debug_mode:
         print("[SETUP] Initializing Bluetooth connection to Arduino...")
-        bluetooth_setup = BluetoothSetup(debug=device_debug_mode)
+        bluetooth_setup = BluetoothSetup(debug=True)
         if not bluetooth_setup.connect():
             print("[SETUP] Bluetooth connection failed. Continuing without Arduino pairing.")
     else:
