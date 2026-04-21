@@ -68,7 +68,7 @@ def stub_optional_device_dependencies():
         mathgenerator.mathgen = lambda *args, **kwargs: ("2 + 2", 4)
         sys.modules["mathgenerator"] = mathgenerator
 
-// Stub out serial and MQTT dependencies to avoid requiring hardware or network access for tests.
+# Stub out serial and MQTT dependencies to avoid requiring hardware or network access for tests.
     if "serial" not in sys.modules:
         serial = types.ModuleType("serial")
 
