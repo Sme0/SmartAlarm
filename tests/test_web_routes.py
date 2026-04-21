@@ -144,9 +144,9 @@ class WebRouteTests(unittest.TestCase):
         self.assertEqual(account.status_code, 200)
         self.assertEqual(dashboard.status_code, 200)
         self.assertEqual(alarms.status_code, 200)
-        self.assertIn(b"Pages", account.data)
-        self.assertIn(b"Bedroom", dashboard.data)
-        self.assertIn(b"Manage Your Alarms", alarms.data)
+        self.assertIn(b"/account/session-history", account.data)
+        self.assertIn(b"/alarms/add", dashboard.data)
+        self.assertIn(b'id="alarms-grid"', alarms.data)
 
     def test_session_history_sleep_data_pair_device_and_add_alarm_render(self):
         """Secondary logged-in pages should render with the expected data."""
@@ -194,9 +194,14 @@ class WebRouteTests(unittest.TestCase):
         self.assertEqual(pair_device.status_code, 200)
         self.assertEqual(add_alarm.status_code, 200)
         self.assertEqual(edit_alarm.status_code, 200)
-        self.assertIn(b"Bedroom", session_history.data)
-        self.assertIn(b"Bedroom", add_alarm.data)
-        self.assertIn(b"07:30", edit_alarm.data)
+        self.assertIn(
+            f'/account/session-history/alarm/{session.id}/waking-difficulty'.encode(),
+            session_history.data,
+        )
+        self.assertIn(b'name="pairing_code"', pair_device.data)
+        self.assertIn(f'value="{device.serial_number}"'.encode(), add_alarm.data)
+        self.assertIn(b'name="days_of_week"', add_alarm.data)
+        self.assertIn(b'value="07:30"', edit_alarm.data)
 
 
 if __name__ == "__main__":
