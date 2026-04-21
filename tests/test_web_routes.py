@@ -145,7 +145,8 @@ class WebRouteTests(unittest.TestCase):
         self.assertEqual(dashboard.status_code, 200)
         self.assertEqual(alarms.status_code, 200)
         self.assertIn(b"/account/session-history", account.data)
-        self.assertIn(b"/alarms/add", dashboard.data)
+        self.assertIn(b"Overview", dashboard.data)
+        self.assertIn(b"Next alarm", dashboard.data)        
         self.assertIn(b'id="alarms-grid"', alarms.data)
 
     def test_session_history_sleep_data_pair_device_and_add_alarm_render(self):
