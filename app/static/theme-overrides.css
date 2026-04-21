@@ -1,0 +1,440 @@
+:root {
+    --ui-bg: #eef1f4;
+    --ui-surface: #ffffff;
+    --ui-border: #d3dbe3;
+    --ui-text: #18232f;
+    --ui-muted: #4d5b69;
+    --ui-primary: #1f4f73;
+    --ui-primary-hover: #173d59;
+    --ui-primary-soft: #e3edf5;
+}
+
+body {
+    background: var(--ui-bg);
+    color: var(--ui-text);
+}
+
+nav {
+    background: var(--ui-surface) !important;
+    border-bottom-color: var(--ui-border) !important;
+}
+
+main {
+    padding-bottom: 1.5rem !important;
+}
+
+.bg-white {
+    background-color: var(--ui-surface) !important;
+}
+
+.border-gray-100,
+.border-gray-200,
+.border-gray-300 {
+    border-color: var(--ui-border) !important;
+}
+
+.text-gray-900 {
+    color: #0f1c29 !important;
+}
+
+.text-gray-800 {
+    color: #1f2e3d !important;
+}
+
+.text-gray-700,
+.text-gray-600,
+.text-gray-500 {
+    color: var(--ui-muted) !important;
+}
+
+.text-indigo-600,
+.text-indigo-700,
+.text-indigo-800,
+.text-indigo-900 {
+    color: var(--ui-primary) !important;
+}
+
+.bg-indigo-50,
+.bg-indigo-100 {
+    background-color: var(--ui-primary-soft) !important;
+}
+
+.bg-indigo-500,
+.bg-indigo-600 {
+    background-color: var(--ui-primary) !important;
+}
+
+.hover\:bg-indigo-400:hover,
+.hover\:bg-indigo-700:hover {
+    background-color: var(--ui-primary-hover) !important;
+}
+
+.hover\:text-indigo-700:hover,
+.hover\:text-indigo-800:hover {
+    color: var(--ui-primary-hover) !important;
+}
+
+.border-indigo-200,
+.border-indigo-300 {
+    border-color: #9fb5c8 !important;
+}
+
+.hover\:bg-indigo-50:hover {
+    background-color: #d9e7f2 !important;
+}
+
+.focus\:ring-indigo-500:focus,
+.focus\:border-indigo-500:focus {
+    --tw-ring-color: rgba(31, 79, 115, 0.35) !important;
+    border-color: var(--ui-primary) !important;
+}
+
+.bg-gradient-to-r {
+    background-image: none !important;
+}
+
+.from-indigo-600,
+.to-violet-600 {
+    --tw-gradient-from: var(--ui-primary) !important;
+    --tw-gradient-to: var(--ui-primary) !important;
+}
+
+.rounded-2xl {
+    border-radius: 0.85rem !important;
+}
+
+.shadow,
+.shadow-sm,
+.shadow-lg {
+    box-shadow: 0 2px 8px rgba(15, 28, 41, 0.08) !important;
+}
+
+.mt-8 {
+    margin-top: 1.25rem !important;
+}
+
+.mt-10,
+.pt-12 {
+    margin-top: 1.5rem !important;
+    padding-top: 1.5rem !important;
+}
+
+.gap-4 {
+    gap: 0.8rem !important;
+}
+
+.p-8,
+.md\:p-8 {
+    padding: 1.25rem !important;
+}
+
+.md\:p-12 {
+    padding: 1.5rem !important;
+}
+
+/* Ensure account settings active tab styling wins over utility text colors. */
+.nav-btn.active {
+    background-color: var(--ui-primary) !important;
+    border-color: var(--ui-primary) !important;
+    color: #ffffff !important;
+}
+
+.nav-btn.active:hover {
+    background-color: var(--ui-primary-hover) !important;
+    border-color: var(--ui-primary-hover) !important;
+    color: #ffffff !important;
+}
+
+/* Give plain bordered action buttons a stronger visual treatment. */
+a.bg-white.border.border-gray-300.text-gray-700,
+button.bg-white.border.border-gray-300.text-gray-700 {
+    background-color: #edf3f8 !important;
+    border-color: #b6c7d5 !important;
+    color: var(--ui-primary) !important;
+    font-weight: 600;
+}
+
+a.bg-white.border.border-gray-300.text-gray-700:hover,
+button.bg-white.border.border-gray-300.text-gray-700:hover {
+    background-color: #e0ebf4 !important;
+    border-color: #9fb5c8 !important;
+    color: var(--ui-primary-hover) !important;
+}
+
+/* Keep dashboard hero prominent without overpowering the page theme. */
+.dashboard-hero {
+    background: #eaf2f8 !important;
+    border-color: #c2d4e3 !important;
+    color: #132231 !important;
+}
+
+.dashboard-hero-kicker {
+    color: #46617a !important;
+}
+
+.dashboard-hero-subtitle {
+    color: #2f4a62 !important;
+}
+
+/* Dark mode palette */
+.dark-mode body {
+    background: #0e1621;
+    color: #e6eef7;
+}
+
+.dark-mode nav {
+    background: #0f1b2a !important;
+    border-bottom-color: #273649 !important;
+}
+
+.dark-mode .bg-white {
+    background-color: #162334 !important;
+}
+
+.dark-mode .bg-gray-50 {
+    background-color: #101d2c !important;
+}
+
+.dark-mode .dashboard-hero {
+    background: #1a2a3d !important;
+    border-color: #2f4762 !important;
+    color: #edf5ff !important;
+}
+
+.dark-mode .dashboard-hero-kicker {
+    color: #98b6d4 !important;
+}
+
+.dark-mode .dashboard-hero-subtitle {
+    color: #c6d8eb !important;
+}
+
+.dark-mode .border-gray-100,
+.dark-mode .border-gray-200,
+.dark-mode .border-gray-300 {
+    border-color: #2b3c52 !important;
+}
+
+.dark-mode .text-gray-900 {
+    color: #f0f6ff !important;
+}
+
+.dark-mode .text-gray-800 {
+    color: #dbe7f5 !important;
+}
+
+.dark-mode .text-gray-700,
+.dark-mode .text-gray-600,
+.dark-mode .text-gray-500 {
+    color: #b4c4d7 !important;
+}
+
+.dark-mode .ui-select {
+    background-color: #162334 !important;
+    color: #e6eef7 !important;
+    border-color: #2b3c52 !important;
+}
+
+.dark-mode .ui-select:hover {
+    border-color: #3a5473 !important;
+}
+
+.dark-mode .ui-select:focus {
+    border-color: #6ea4d8 !important;
+    box-shadow: 0 0 0 3px rgba(110, 164, 216, 0.25) !important;
+}
+
+/* Keep text-like form controls readable in dark mode. */
+.dark-mode input:not([type]),
+.dark-mode input[type="text"],
+.dark-mode input[type="email"],
+.dark-mode input[type="password"],
+.dark-mode input[type="number"],
+.dark-mode input[type="time"],
+.dark-mode input[type="search"],
+.dark-mode input[type="tel"],
+.dark-mode input[type="url"],
+.dark-mode input[type="date"],
+.dark-mode input[type="datetime-local"],
+.dark-mode input[type="month"],
+.dark-mode input[type="week"],
+.dark-mode textarea {
+    background-color: #162334 !important;
+    color: #e6eef7 !important;
+    border-color: #2b3c52 !important;
+    color-scheme: dark;
+}
+
+.dark-mode input:not([type]):hover,
+.dark-mode input[type="text"]:hover,
+.dark-mode input[type="email"]:hover,
+.dark-mode input[type="password"]:hover,
+.dark-mode input[type="number"]:hover,
+.dark-mode input[type="time"]:hover,
+.dark-mode input[type="search"]:hover,
+.dark-mode input[type="tel"]:hover,
+.dark-mode input[type="url"]:hover,
+.dark-mode input[type="date"]:hover,
+.dark-mode input[type="datetime-local"]:hover,
+.dark-mode input[type="month"]:hover,
+.dark-mode input[type="week"]:hover,
+.dark-mode textarea:hover {
+    border-color: #3a5473 !important;
+}
+
+.dark-mode input:not([type]):focus,
+.dark-mode input[type="text"]:focus,
+.dark-mode input[type="email"]:focus,
+.dark-mode input[type="password"]:focus,
+.dark-mode input[type="number"]:focus,
+.dark-mode input[type="time"]:focus,
+.dark-mode input[type="search"]:focus,
+.dark-mode input[type="tel"]:focus,
+.dark-mode input[type="url"]:focus,
+.dark-mode input[type="date"]:focus,
+.dark-mode input[type="datetime-local"]:focus,
+.dark-mode input[type="month"]:focus,
+.dark-mode input[type="week"]:focus,
+.dark-mode textarea:focus {
+    border-color: #6ea4d8 !important;
+    box-shadow: 0 0 0 3px rgba(110, 164, 216, 0.25) !important;
+}
+
+.dark-mode input:not([type])::placeholder,
+.dark-mode input[type="text"]::placeholder,
+.dark-mode input[type="email"]::placeholder,
+.dark-mode input[type="password"]::placeholder,
+.dark-mode input[type="number"]::placeholder,
+.dark-mode input[type="time"]::placeholder,
+.dark-mode input[type="search"]::placeholder,
+.dark-mode input[type="tel"]::placeholder,
+.dark-mode input[type="url"]::placeholder,
+.dark-mode input[type="date"]::placeholder,
+.dark-mode input[type="datetime-local"]::placeholder,
+.dark-mode input[type="month"]::placeholder,
+.dark-mode input[type="week"]::placeholder,
+.dark-mode textarea::placeholder {
+    color: #8ea3ba !important;
+}
+
+.dark-mode input:disabled,
+.dark-mode textarea:disabled {
+    background-color: #101d2c !important;
+    color: #8ea3ba !important;
+    border-color: #2b3c52 !important;
+}
+
+.dark-mode a.bg-white.border.border-gray-300.text-gray-700,
+.dark-mode button.bg-white.border.border-gray-300.text-gray-700 {
+    background-color: #20344c !important;
+    border-color: #3b5878 !important;
+    color: #e4eef9 !important;
+}
+
+.dark-mode a.bg-white.border.border-gray-300.text-gray-700:hover,
+.dark-mode button.bg-white.border.border-gray-300.text-gray-700:hover {
+    background-color: #294564 !important;
+    border-color: #4a6a8e !important;
+    color: #ffffff !important;
+}
+
+.dark-mode .hover\:bg-gray-50:hover {
+    background-color: #203148 !important;
+}
+
+.dark-mode .hover\:text-gray-900:hover {
+    color: #ffffff !important;
+}
+
+.dark-mode .shadow,
+.dark-mode .shadow-sm,
+.dark-mode .shadow-lg {
+    box-shadow: 0 6px 20px rgba(3, 8, 15, 0.45) !important;
+}
+
+.dark-mode .text-indigo-600,
+.dark-mode .text-indigo-700,
+.dark-mode .text-indigo-800,
+.dark-mode .text-indigo-900 {
+    color: #9ecfff !important;
+}
+
+.dark-mode .hover\:text-indigo-700:hover,
+.dark-mode .hover\:text-indigo-800:hover {
+    color: #c6e3ff !important;
+}
+
+.dark-mode .bg-indigo-50,
+.dark-mode .bg-indigo-100 {
+    background-color: #20344c !important;
+}
+
+.dark-mode .bg-indigo-500,
+.dark-mode .bg-indigo-600 {
+    background-color: #3e6a92 !important;
+    color: #f4f9ff !important;
+}
+
+.dark-mode .hover\:bg-indigo-400:hover,
+.dark-mode .hover\:bg-indigo-700:hover,
+.dark-mode .hover\:bg-indigo-100:hover {
+    background-color: #4b7da9 !important;
+}
+
+.dark-mode .border-indigo-200,
+.dark-mode .border-indigo-300 {
+    border-color: #4b6c8e !important;
+}
+
+.dark-mode .text-red-600,
+.dark-mode .text-red-700 {
+    color: #ffacb4 !important;
+}
+
+.dark-mode .hover\:text-red-700:hover,
+.dark-mode .hover\:text-red-800:hover {
+    color: #ffd2d7 !important;
+}
+
+.dark-mode .bg-red-50 {
+    background-color: #3a1f26 !important;
+}
+
+.dark-mode .border-red-200,
+.dark-mode .border-red-300 {
+    border-color: #7a4350 !important;
+}
+
+.dark-mode .bg-red-600 {
+    background-color: #b95869 !important;
+}
+
+.dark-mode .hover\:bg-red-700:hover {
+    background-color: #cf6a7c !important;
+}
+
+.dark-mode .text-green-600 {
+    color: #86e1ac !important;
+}
+
+.dark-mode .nav-btn:not(.active) {
+    color: #b4c4d7 !important;
+}
+
+.dark-mode .nav-btn:not(.active):hover {
+    background-color: #203148 !important;
+    color: #e6eef7 !important;
+}
+
+.dark-mode .nav-btn.hover\:bg-red-50:hover {
+    background-color: #3a1f26 !important;
+}
+
+.dark-mode .nav-btn.hover\:bg-red-50.hover\:text-red-600:hover,
+.dark-mode .nav-btn.hover\:text-red-600:hover {
+    color: #ffd2d7 !important;
+}
+
+.dark-mode .hover\:bg-red-50:hover {
+    background-color: #3a1f26 !important;
+}

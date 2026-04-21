@@ -1,6 +1,7 @@
 import threading
 from abc import ABC, abstractmethod
 from time import sleep
+from alarm.io.grovepi_lock import grovepi_lock
 
 try:
     import grovepi
@@ -71,16 +72,19 @@ class RaspberryPiBuzzer(Buzzer):
         super().__init__(volume)
         self.pin = 5
 
-        grovepi.pinMode(self.pin, "OUTPUT")
-        grovepi.analogWrite(self.pin, 0)
+        with grovepi_lock:
+            grovepi.pinMode(self.pin, "OUTPUT")
+            grovepi.analogWrite(self.pin, 0)
 
     def play_single_sound(self, duration: float = 0.5) -> None:
         """
         Play a constant sound for a given duration.
         """
-        grovepi.analogWrite(self.pin, 5 * self.volume)
+        with grovepi_lock:
+            grovepi.analogWrite(self.pin, 5 * self.volume)
         sleep(duration)
-        grovepi.analogWrite(self.pin, 0)
+        with grovepi_lock:
+            grovepi.analogWrite(self.pin, 0)
 
     def _alarm_sound(self) -> None:
         """
@@ -88,19 +92,24 @@ class RaspberryPiBuzzer(Buzzer):
         """
         while self.active:
             for _ in range(4):
-                grovepi.analogWrite(self.pin, 10 * self.volume)
+                with grovepi_lock:
+                    grovepi.analogWrite(self.pin, 10 * self.volume)
                 sleep(0.05)
-                grovepi.analogWrite(self.pin, 1 * self.volume)
+                with grovepi_lock:
+                    grovepi.analogWrite(self.pin, 1 * self.volume)
                 sleep(0.1)
 
                 if not self.active:
-                    grovepi.analogWrite(self.pin, 0)
+                    with grovepi_lock:
+                        grovepi.analogWrite(self.pin, 0)
                     return
 
-            grovepi.analogWrite(self.pin, 0)
+            with grovepi_lock:
+                grovepi.analogWrite(self.pin, 0)
             sleep(0.4)
 
-        grovepi.analogWrite(self.pin, 0)
+        with grovepi_lock:
+            grovepi.analogWrite(self.pin, 0)
 
     def play_alarm_sound(self) -> None:
         """
@@ -115,9 +124,11 @@ class RaspberryPiBuzzer(Buzzer):
         Stops the alarm if it's playing
         """
         self.active = False
-        grovepi.analogWrite(self.pin, 5 * self.volume)
+        with grovepi_lock:
+            grovepi.analogWrite(self.pin, 5 * self.volume)
         sleep(0.08)
-        grovepi.analogWrite(self.pin, 0)
+        with grovepi_lock:
+            grovepi.analogWrite(self.pin, 0)
 
     def set_alarm_volume(self, volume: int) -> None:
         """

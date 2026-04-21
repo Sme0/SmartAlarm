@@ -137,7 +137,7 @@ class DeviceRouteTests(unittest.TestCase):
             time=time(7, 0),
             day_of_week=1,
             enabled=True,
-            puzzle_type="random",
+            puzzle_type="recommended",
         )
         Alarm.create(
             device_serial=other_device.serial_number,

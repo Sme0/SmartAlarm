@@ -14,7 +14,7 @@
                 <div class="flex items-center space-x-3">
                     {% if current_user.devices %}
                     <div id="view-selector" class="flex items-center space-x-2">
-                        <label for="view_device_select" class="text-sm text-gray-600">View:</label>
+                        <label for="view_device_select" class="text-sm text-gray-900">View:</label>
                         <select id="view_device_select" name="view_device" class="ui-select min-w-56 md:min-w-64">
                             <option value="all" {% if request.args.get('view_device', 'all') == 'all' %}selected{% endif %}>All Devices</option>
                             {% for d in current_user.devices %}
@@ -47,7 +47,7 @@
                 const col = document.createElement('div');
                 col.className = 'border border-gray-200 rounded-lg p-4';
                 const h = document.createElement('h3');
-                h.className = 'text-lg font-medium text-gray-700';
+                h.className = 'text-lg font-medium text-gray-900';
                 h.textContent = day;
                 col.appendChild(h);
 
@@ -57,7 +57,7 @@
                 const alarms = alarmsByDay[day] || [];
                 if (alarms.length === 0) {
                     const li = document.createElement('li');
-                    li.className = 'text-gray-400';
+                    li.className = 'text-gray-900';
                     li.textContent = 'No alarms set for this day.';
                     ul.appendChild(li);
                 } else {
@@ -70,7 +70,8 @@
                         topLine.className = 'flex flex-wrap items-center gap-2';
 
                         const timeAndPuzzle = document.createElement('span');
-                        timeAndPuzzle.innerHTML = `${alarm.time} — <span class="italic text-indigo-600">${alarm.puzzle_type.charAt(0).toUpperCase() + alarm.puzzle_type.slice(1)}</span>`;
+                        timeAndPuzzle.className = 'text-gray-900';
+                        timeAndPuzzle.innerHTML = `<span class="font-medium text-gray-900">${alarm.time}</span> — ${alarm.puzzle_type.charAt(0).toUpperCase() + alarm.puzzle_type.slice(1)}`;
                         topLine.appendChild(timeAndPuzzle);
 
                         if (alarm.use_dynamic_alarm) {
@@ -91,7 +92,7 @@
 
                         if (currentView === 'all') {
                             const dev = document.createElement('div');
-                            dev.className = 'text-xs text-gray-500';
+                            dev.className = 'text-xs text-gray-900';
                             dev.textContent = 'on ' + (alarm.device_name || alarm.device_serial);
                             left.appendChild(dev);
                         }

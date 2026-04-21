@@ -1,13 +1,15 @@
 import os
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
-import time
+
 import pytz
 
-from alarm.io.output_handler import OutputHandler, DebugOutputHandler
-from alarm.io.input_handler import InputHandler, InputEventType
 from alarm.alarm_state import AlarmState
+from alarm.io.input_handler import InputEventType, InputHandler
+from alarm.io.output_handler import DebugOutputHandler, OutputHandler
+from alarm.io.pi_bluetooth import BluetoothConfirmation
 from alarm.puzzles.maths_puzzle import MathsPuzzle
 from alarm.puzzles.memory_puzzle import MemoryPuzzle
 from alarm.puzzles.puzzle import Puzzle
@@ -29,7 +31,9 @@ def _resolve_clock_timezone():
         try:
             return pytz.timezone(configured_tz)
         except pytz.UnknownTimeZoneError:
-            print(f"Invalid DEVICE_TIMEZONE '{configured_tz}', falling back to device timezone")
+            print(
+                f"Invalid DEVICE_TIMEZONE '{configured_tz}', falling back to device timezone"
+            )
 
     local_tz = datetime.now().astimezone().tzinfo
     return local_tz or timezone.utc
@@ -48,6 +52,7 @@ def _get_current_day_of_week_number():
     """
     return _clock_now().weekday()
 
+
 @dataclass
 class Alarm:
     id: str
@@ -61,11 +66,11 @@ class Alarm:
 
 
 class AlarmController:
-
-    def __init__(self, input_handler: InputHandler, output_handler: OutputHandler):
+    def __init__(self, input_handler: InputHandler, output_handler: OutputHandler, debug_mode: bool = False):
 
         self.input_handler = input_handler
         self.output_handler = output_handler
+        self.debug_mode = debug_mode
 
         # Current time in 24-hour format
         self.current_time = 0
@@ -83,12 +88,18 @@ class AlarmController:
         self._pending_sessions: Dict[str, Dict[str, Any]] = {}
         self._complete_sessions: Dict[str, Dict[str, Any]] = {}
 
+        self.bluetooth_connection = BluetoothConfirmation(20, True)
+
     def _build_puzzle_for_current_alarm(self) -> Puzzle:
         """
         Create the puzzle instance for the active alarm.
         Defaults to maths if the alarm is missing or has an unknown type.
         """
-        puzzle_type = (getattr(self.current_triggered_alarm, "puzzle_type", "") or "").strip().lower()
+        puzzle_type = (
+            (getattr(self.current_triggered_alarm, "puzzle_type", "") or "")
+            .strip()
+            .lower()
+        )
         if puzzle_type == "memory":
             return MemoryPuzzle(self.input_handler, self.output_handler)
         return MathsPuzzle(self.input_handler, self.output_handler)
@@ -101,30 +112,34 @@ class AlarmController:
         update_display = True
 
         while True:
-
             if time.time() - start_time > MAX_TIME:
                 return "trigger"
 
             if update_display:
                 rendered_options = options.copy()
-                rendered_options[selected_idx] = f">{options[selected_idx]}""<"
-                self.output_handler.display_text('   '.join(rendered_options))
+                rendered_options[selected_idx] = f">{options[selected_idx]}<"
+                self.output_handler.display_text("   ".join(rendered_options))
                 update_display = False
 
             self.input_handler.check_inputs()
-            events = self.input_handler.pop_events_by_type({
-                InputEventType.JOYSTICK_LEFT,
-                InputEventType.JOYSTICK_RIGHT,
-                InputEventType.JOYSTICK_PRESS,
-                InputEventType.ALARM_DISMISS
-            })
+            events = self.input_handler.pop_events_by_type(
+                {
+                    InputEventType.JOYSTICK_LEFT,
+                    InputEventType.JOYSTICK_RIGHT,
+                    InputEventType.JOYSTICK_PRESS,
+                    InputEventType.ALARM_DISMISS,
+                }
+            )
 
             if not events:
                 time.sleep(0.05)
                 continue
 
             for event in events:
-                if event.event_type in [InputEventType.JOYSTICK_PRESS, InputEventType.ALARM_DISMISS]:
+                if event.event_type in [
+                    InputEventType.JOYSTICK_PRESS,
+                    InputEventType.ALARM_DISMISS,
+                ]:
                     return options[selected_idx]
 
                 if len(options) == 1:
@@ -149,42 +164,49 @@ class AlarmController:
                 return None
 
             if update_display:
-                output = f"How difficult was it to wake up today? (10 = hard)\n>{selected_value}<"
+                output = f"Waking difficulty: \n>{selected_value}<"
                 self.output_handler.display_text(output)
                 update_display = False
 
             self.input_handler.check_inputs()
-            events = self.input_handler.pop_events_by_type({
-                InputEventType.JOYSTICK_LEFT,
-                InputEventType.JOYSTICK_RIGHT,
-                InputEventType.JOYSTICK_UP,
-                InputEventType.JOYSTICK_DOWN,
-                InputEventType.JOYSTICK_PRESS,
-                InputEventType.ALARM_DISMISS
-            })
+            events = self.input_handler.pop_events_by_type(
+                {
+                    InputEventType.JOYSTICK_LEFT,
+                    InputEventType.JOYSTICK_RIGHT,
+                    InputEventType.JOYSTICK_UP,
+                    InputEventType.JOYSTICK_DOWN,
+                    InputEventType.JOYSTICK_PRESS,
+                    InputEventType.ALARM_DISMISS,
+                }
+            )
 
             if not events:
                 time.sleep(0.05)
                 continue
 
             for event in events:
-                if event.event_type in [InputEventType.JOYSTICK_PRESS, InputEventType.ALARM_DISMISS]:
+                if event.event_type in [
+                    InputEventType.JOYSTICK_PRESS,
+                    InputEventType.ALARM_DISMISS,
+                ]:
                     return selected_value
 
-                if event.event_type in [InputEventType.JOYSTICK_LEFT, InputEventType.JOYSTICK_DOWN]:
+                if event.event_type in [
+                    InputEventType.JOYSTICK_LEFT,
+                    InputEventType.JOYSTICK_DOWN,
+                ]:
                     selected_value = max(1, selected_value - 1)
                     update_display = True
-                elif event.event_type in [InputEventType.JOYSTICK_RIGHT, InputEventType.JOYSTICK_UP]:
+                elif event.event_type in [
+                    InputEventType.JOYSTICK_RIGHT,
+                    InputEventType.JOYSTICK_UP,
+                ]:
                     selected_value = min(10, selected_value + 1)
                     update_display = True
-
-
-
 
     def update(self):
         # Update current time
         self.current_time = _clock_now().strftime("%H:%M:%S")
-
 
     def check_alarms(self) -> bool:
         """
@@ -197,19 +219,23 @@ class AlarmController:
         # Check each alarm and trigger if needed
         alarms_to_check = (self.alarms or []) + (self.snooze_alarms or [])
         for alarm in alarms_to_check:
-            if self.state == AlarmState.WAITING and day_of_week == alarm.day_of_week and self.current_time == (alarm.time + ":00"):
+            if (
+                self.state == AlarmState.WAITING
+                and day_of_week == alarm.day_of_week
+                and self.current_time == (alarm.time + ":00")
+            ):
                 self.trigger_alarm(alarm)
                 return True
 
         # If there are no alarms triggered
-        if self.state == AlarmState.WAITING and current_minute != self.last_displayed_minute:
+        if (
+            self.state == AlarmState.WAITING
+            and current_minute != self.last_displayed_minute
+        ):
             self.last_displayed_minute = current_minute
-            self.output_handler.display_text(_clock_now().strftime('%H:%M'))
+            self.output_handler.display_text(_clock_now().strftime("%H:%M"))
 
         return False
-
-
-
 
     def trigger_alarm(self, current_alarm):
         """
@@ -221,16 +247,20 @@ class AlarmController:
         self.current_triggered_alarm = current_alarm
 
         source_alarm_id = str(current_alarm.source_alarm_id or current_alarm.id)
-        self._pending_sessions.setdefault(source_alarm_id, {
-            "triggered_at": _utc_now().isoformat(),
-            "puzzle_sessions": [],
-        })
+        self._pending_sessions.setdefault(
+            source_alarm_id,
+            {
+                "triggered_at": _utc_now().isoformat(),
+                "puzzle_sessions": [],
+            },
+        )
 
-        self.output_handler.display_text(f"Alarm Triggered: {_clock_now().strftime('%H:%M')}")
+        self.output_handler.display_text(
+            f"Alarm Triggered: {_clock_now().strftime('%H:%M')}"
+        )
         self.output_handler.buzzer.play_alarm_sound()
         if isinstance(self.output_handler, DebugOutputHandler):
             print("[DEBUG] Type 'dismiss' to solve puzzle.")
-
 
     def run_alarm_interaction(self):
 
@@ -242,13 +272,27 @@ class AlarmController:
         self.output_handler.buzzer.stop_alarm_sound()
         puzzle = self._build_puzzle_for_current_alarm()
         solved = puzzle.run_puzzle()
-        source_alarm_id = str(self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id)
+        source_alarm_id = str(
+            self.current_triggered_alarm.source_alarm_id
+            or self.current_triggered_alarm.id
+        )
         session = self._pending_sessions[source_alarm_id]
         session["puzzle_sessions"].append(puzzle.export_session(source_alarm_id))
 
         if not solved:
             self.trigger_alarm(self.current_triggered_alarm)
             return
+
+        # Skip Bluetooth confirmation in debug mode
+        if not self.debug_mode:
+            self.output_handler.display_text("Get up and press\nthe button")
+            self.bluetooth_connection.send_confirmation_request()
+            self.bluetooth_connection.await_confirmation()
+            confirmed = self.bluetooth_connection.check_confirmation()
+
+            if not confirmed:
+                self.trigger_alarm(self.current_triggered_alarm)
+                return
 
         options = ["Dismiss"]
 
@@ -262,21 +306,25 @@ class AlarmController:
             choice = choice.lower()
 
         if choice == "snooze":
-
             # TODO: Make snooze time editable through web
             session["puzzle_sessions"][-1]["outcome_action"] = "snoozed"
             snooze_time = (_clock_now() + timedelta(minutes=5)).strftime("%H:%M")
-            source_alarm_id = self.current_triggered_alarm.source_alarm_id or self.current_triggered_alarm.id
-            self.snooze_alarms.append(Alarm(
-                id=f"{source_alarm_id}-Snooze-{current_snooze_count + 1}",
-                time=snooze_time,
-                enabled=True,
-                day_of_week=_get_current_day_of_week_number(),
-                puzzle_type=self.current_triggered_alarm.puzzle_type,
-                max_snoozes=max_snoozes,
-                snooze_count=current_snooze_count + 1,
-                source_alarm_id=source_alarm_id,
-            ))
+            source_alarm_id = (
+                self.current_triggered_alarm.source_alarm_id
+                or self.current_triggered_alarm.id
+            )
+            self.snooze_alarms.append(
+                Alarm(
+                    id=f"{source_alarm_id}-Snooze-{current_snooze_count + 1}",
+                    time=snooze_time,
+                    enabled=True,
+                    day_of_week=_get_current_day_of_week_number(),
+                    puzzle_type=self.current_triggered_alarm.puzzle_type,
+                    max_snoozes=max_snoozes,
+                    snooze_count=current_snooze_count + 1,
+                    source_alarm_id=source_alarm_id,
+                )
+            )
             self.stop_alarm()
 
         elif choice == "dismiss":
@@ -290,10 +338,8 @@ class AlarmController:
         elif choice == "trigger":
             self.trigger_alarm(self.current_triggered_alarm)
         else:
-            # Unhandled choice (shouldn't happen), ensure cleanup
+            # Unhandled choice (shouldn't happen), ensure clean-up
             self.stop_alarm()
-
-
 
     def stop_alarm(self):
         """
@@ -321,4 +367,3 @@ class AlarmController:
     def drop_complete_sessions(self, session_ids):
         for session_id in session_ids:
             self._complete_sessions.pop(session_id, None)
-

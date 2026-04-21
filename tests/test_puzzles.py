@@ -14,9 +14,14 @@ from alarm.puzzles.memory_puzzle import MemoryPuzzle
 from alarm.puzzles.puzzle import Puzzle
 
 
+class _Tb:
+    def post(self, data):
+        return None
+
+
 class _Input(InputHandler):
     def __init__(self):
-        super().__init__()
+        super().__init__(_Tb())
 
     def check_inputs(self, state=None):
         return None

@@ -67,3 +67,58 @@ def stub_optional_device_dependencies():
         mathgenerator = types.ModuleType("mathgenerator")
         mathgenerator.mathgen = lambda *args, **kwargs: ("2 + 2", 4)
         sys.modules["mathgenerator"] = mathgenerator
+
+// Stub out serial and MQTT dependencies to avoid requiring hardware or network access for tests.
+    if "serial" not in sys.modules:
+        serial = types.ModuleType("serial")
+
+        class _SerialException(Exception):
+            pass
+
+        class _Serial:
+            def __init__(self, *args, **kwargs):
+                self.buffer = []
+
+            def write(self, data):
+                self.buffer.append(data)
+
+            def read(self, *args, **kwargs):
+                return b""
+
+        serial.SerialException = _SerialException
+        serial.Serial = _Serial
+        sys.modules["serial"] = serial
+
+    if "paho" not in sys.modules:
+        sys.modules["paho"] = types.ModuleType("paho")
+
+    if "paho.mqtt" not in sys.modules:
+        sys.modules["paho.mqtt"] = types.ModuleType("paho.mqtt")
+
+    if "paho.mqtt.client" not in sys.modules:
+        mqtt_client = types.ModuleType("paho.mqtt.client")
+
+        class _MqttClient:
+            def username_pw_set(self, *args, **kwargs):
+                return None
+
+            def subscribe(self, *args, **kwargs):
+                return None
+
+            def connect(self, *args, **kwargs):
+                return 0
+
+            def loop_start(self):
+                return None
+
+            def loop_stop(self):
+                return None
+
+            def disconnect(self):
+                return None
+
+            def publish(self, *args, **kwargs):
+                return None
+
+        mqtt_client.Client = _MqttClient
+        sys.modules["paho.mqtt.client"] = mqtt_client

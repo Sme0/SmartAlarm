@@ -5,8 +5,8 @@
 {% block content %}
     <div class="max-w-5xl mx-auto mt-8 flex gap-8 px-6">
         
-        <aside class="w-64 flex flex-col gap-1 bg-white border border-gray-200 rounded-lg overflow-hidden h-fit shadow-sm">
-            <button data-target="change-details" class="nav-btn block w-full text-left px-5 py-3 text-sm font-medium border-b border-gray-100 transition-colors">Change account details</button>
+        <aside class="w-64 flex flex-col gap-0 bg-white border border-gray-200 rounded-lg overflow-hidden h-fit shadow-sm">
+            <button data-target="change-details" class="nav-btn block w-full text-left px-5 py-3 text-sm font-medium border-b border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors">Change account details</button>
             <button data-target="paired-devices" class="nav-btn block w-full text-left px-5 py-3 text-sm font-medium border-b border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors">Paired devices</button>
             <a href="{{ url_for('session_history') }}" class="block w-full text-left px-5 py-3 text-sm font-medium border-b border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors">Session history</a>
             <button data-target="data-permissions" class="nav-btn block w-full text-left px-5 py-3 text-sm font-medium border-b border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors">Data permissions</button>
@@ -30,6 +30,15 @@
                 <div class="space-x-3">
                     <a href="#" class="inline-block bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md">Edit details</a>
                     <a href="#" class="inline-block bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md">Change password</a>
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-gray-200 max-w-md">
+                    <h3 class="text-sm font-semibold text-gray-800 mb-3">Appearance</h3>
+                    <label for="dark-mode-toggle" class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 cursor-pointer">
+                        <span class="text-sm font-medium text-gray-700">Dark mode</span>
+                        <input id="dark-mode-toggle" type="checkbox" class="h-4 w-4 accent-indigo-600 cursor-pointer">
+                    </label>
+                    <p class="mt-2 text-xs text-gray-500">Use a darker color theme across the app.</p>
                 </div>
             </section>
 
@@ -80,6 +89,10 @@
 
                 <h2 class="text-lg font-bold mb-6 text-gray-900">Data Portability</h2>
                 <div class="space-y-4">
+                    <a href="{{ url_for('sleep_data') }}" class="flex items-center justify-between max-w-md p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                        <span class="text-sm font-medium text-gray-700">Import sleep data</span>
+                        <button class="bg-white border border-gray-300 text-gray-700 font-medium rounded-md px-4 py-1.5 text-sm hover:bg-gray-50 transition-colors shadow-sm">Open</button>
+                    </a>
                     <div class="flex items-center justify-between max-w-md p-4 border border-gray-200 rounded-lg">
                         <span class="text-sm font-medium text-gray-700">Request a copy of your data</span>
                         <button class="bg-white border border-gray-300 text-gray-700 font-medium rounded-md px-4 py-1.5 text-sm hover:bg-gray-50 transition-colors shadow-sm">Send Request</button>
@@ -111,4 +124,17 @@
 
 {% block scripts %}
 <script src="/static/js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const darkModeToggle = document.getElementById('dark-mode-toggle');
+    if (!darkModeToggle) return;
+
+    darkModeToggle.checked = document.documentElement.classList.contains('dark-mode');
+    darkModeToggle.addEventListener('change', function () {
+        if (typeof window.setThemeMode === 'function') {
+            window.setThemeMode(this.checked ? 'dark' : 'light');
+        }
+    });
+});
+</script>
 {% endblock %}

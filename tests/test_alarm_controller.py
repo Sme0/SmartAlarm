@@ -12,7 +12,15 @@ from alarm.io.input_handler import InputHandler
 from alarm.io.output_handler import DebugOutputHandler
 
 
+class _Tb:
+    def post(self, data):
+        return None
+
+
 class _NoopInput(InputHandler):
+    def __init__(self):
+        super().__init__(_Tb())
+
     def check_inputs(self, state=None):
         return None
 
@@ -80,7 +88,7 @@ class AlarmControllerTests(unittest.TestCase):
 
     def test_dismiss_moves_session_to_completed_queue(self):
         """Dismissing an alarm should move the session to the completed queue."""
-        controller = AlarmController(_NoopInput(), _Output())
+        controller = AlarmController(_NoopInput(), _Output(), debug_mode=True)
         alarm = Alarm(
             id="alarm-1",
             time="07:30",
@@ -110,7 +118,7 @@ class AlarmControllerTests(unittest.TestCase):
 
     def test_snooze_keeps_session_pending_creates_snooze_alarm(self):
         """Snoozing an alarm should keep the session pending and create a new snooze alarm."""
-        controller = AlarmController(_NoopInput(), _Output())
+        controller = AlarmController(_NoopInput(), _Output(), debug_mode=True)
         alarm = Alarm(
             id="alarm-2",
             time="07:30",
