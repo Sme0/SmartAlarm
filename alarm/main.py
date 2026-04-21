@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from alarm.io.input_handler import DebugInputHandler, RaspberryPiInputHandler
 from alarm.io.output_handler import DebugOutputHandler, RaspberryPiOutputHandler
 from alarm.io.input_handler import InputEventType
+from alarm.io.pi_bluetooth import BluetoothSetup
 from alarm.flask_api_client import FlaskAPIClient, PairingStatus
 from alarm.alarm_controller import AlarmController
 from alarm.alarm_state import AlarmState
@@ -33,7 +34,7 @@ else:
     input_handler = RaspberryPiInputHandler(thingsboard_client=thingsboard_client)
     output_handler = RaspberryPiOutputHandler()
 
-alarm_controller = AlarmController(input_handler, output_handler)
+alarm_controller = AlarmController(input_handler, output_handler, debug_mode=device_debug_mode)
 
 # Helper functions for debugging and main loop
 def _print_debug_help():
@@ -155,5 +156,15 @@ def main_alarm_loop():
 
 if __name__ == "__main__":
     _print_debug_help()
+    
+    # Setup Bluetooth connection to Arduino (skip in debug mode)
+    if not device_debug_mode:
+        print("[SETUP] Initializing Bluetooth connection to Arduino...")
+        bluetooth_setup = BluetoothSetup(debug=device_debug_mode)
+        if not bluetooth_setup.connect():
+            print("[SETUP] Bluetooth connection failed. Continuing without Arduino pairing.")
+    else:
+        print("[SETUP] Skipping Bluetooth setup in debug mode")
+    
     pairing_loop()
     main_alarm_loop()

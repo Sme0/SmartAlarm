@@ -66,10 +66,11 @@ class Alarm:
 
 
 class AlarmController:
-    def __init__(self, input_handler: InputHandler, output_handler: OutputHandler):
+    def __init__(self, input_handler: InputHandler, output_handler: OutputHandler, debug_mode: bool = False):
 
         self.input_handler = input_handler
         self.output_handler = output_handler
+        self.debug_mode = debug_mode
 
         # Current time in 24-hour format
         self.current_time = 0
@@ -163,7 +164,7 @@ class AlarmController:
                 return None
 
             if update_display:
-                output = f"How difficult was it to wake up today? (10 = hard)\n>{selected_value}<"
+                output = f"Waking difficulty: \n>{selected_value}<"
                 self.output_handler.display_text(output)
                 update_display = False
 
@@ -282,14 +283,16 @@ class AlarmController:
             self.trigger_alarm(self.current_triggered_alarm)
             return
 
-        self.output_handler.display_text("Get up and press\nthe button")
-        self.bluetooth_connection.send_confirmation_request()
-        self.bluetooth_connection.await_confirmation()
-        confirmed = self.bluetooth_connection.check_confirmation()
+        # Skip Bluetooth confirmation in debug mode
+        if not self.debug_mode:
+            self.output_handler.display_text("Get up and press\nthe button")
+            self.bluetooth_connection.send_confirmation_request()
+            self.bluetooth_connection.await_confirmation()
+            confirmed = self.bluetooth_connection.check_confirmation()
 
-        if not confirmed:
-            self.trigger_alarm(self.current_triggered_alarm)
-            return
+            if not confirmed:
+                self.trigger_alarm(self.current_triggered_alarm)
+                return
 
         options = ["Dismiss"]
 

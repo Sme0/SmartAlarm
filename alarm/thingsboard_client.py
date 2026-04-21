@@ -9,9 +9,18 @@ load_dotenv()
 
 class ThingsBoardClient:
     def __init__(self, host=None, token=None):
-        self.client = mqtt.Client()
+        # Check if ThingsBoard is enabled
+        self.enabled = str(os.getenv("THINGSBOARD_ENABLED", "False")).lower() in ["true", "y", "yes"]
+
+        self.client = None
         self.host = host or os.getenv("THINGSBOARD_HOST")
         self.access_token = token or os.getenv("THINGSBOARD_ACCESS_TOKEN")
+
+        # Only initialize MQTT client if enabled
+        if self.enabled:
+            self.client = mqtt.Client()
+        else:
+            print("[ThingsBoard] Disabled via THINGSBOARD_ENABLED=False")
 
     def _on_connect(self, client, userdata, flags, rc, *extra_params):
         """
@@ -35,6 +44,10 @@ class ThingsBoardClient:
         #TODO: Send data somewhere (observer pattern?)
 
     def connect(self):
+        # Skip if ThingsBoard is disabled
+        if not self.enabled:
+            return
+
         self.client.username_pw_set(self.access_token)
         self.client.on_connect = self._on_connect
         self.client.on_publish = self._on_publish
@@ -47,13 +60,25 @@ class ThingsBoardClient:
         self.client.loop_start()
 
     def disconnect(self):
+        # Skip if ThingsBoard is disabled
+        if not self.enabled or not self.client:
+            return
+
         self.client.loop_stop()
         self.client.disconnect()
 
     def post(self, data: dict):
+        # Skip if ThingsBoard is disabled
+        if not self.enabled or not self.client:
+            return
+
         self.client.publish('v1/devices/me/telemetry', json.dumps(data), qos=1)
 
     def request_shared_attributes(self, keys: list):
+        # Skip if ThingsBoard is disabled
+        if not self.enabled or not self.client:
+            return
+
         payload = {"sharedKeys": ",".join(keys)}
         self.client.publish(
             'v1/devices/me/attributes/request/1',
