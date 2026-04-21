@@ -78,7 +78,7 @@ def _run_dynamic_alarm_optimization(
                 dynamic_end_time=dynamic_end_time,
             )
 
-            alarm = Alarm.query.get(alarm_id)
+            alarm = db.session.get(Alarm, alarm_id)
             if not alarm or not getattr(alarm, 'use_dynamic_alarm', False):
                 return
 
@@ -285,7 +285,7 @@ def session_history():
 @app.route('/account/session-history/alarm/<int:alarm_session_id>/waking-difficulty', methods=['POST'])
 @login_required
 def update_alarm_session_waking_difficulty(alarm_session_id):
-    alarm_session = AlarmSession.query.get(alarm_session_id)
+    alarm_session = db.session.get(AlarmSession, alarm_session_id)
     day = request.form.get('day')
     tz_name = request.form.get('tz')
 
@@ -347,7 +347,7 @@ def delete_alarm_session(alarm_session_id):
 @app.route('/account/session-history/puzzle/<int:puzzle_session_id>/delete', methods=['POST'])
 @login_required
 def delete_puzzle_session(puzzle_session_id):
-    puzzle_session = PuzzleSession.query.get(puzzle_session_id)
+    puzzle_session = db.session.get(PuzzleSession, puzzle_session_id)
     day = request.form.get('day')
     tz_name = request.form.get('tz')
 
@@ -408,12 +408,14 @@ def delete_all_sleep_data():
             'success',
         )
 
+        user_id = current_user.id
+
         # Train model in background without blocking
         def train_model():
             with app.app_context():
                 try:
                     from app.analysis import train_user_model
-                    train_user_model(current_user.id)
+                    train_user_model(user_id)
                 except Exception:
                     pass
                 finally:
@@ -546,12 +548,14 @@ def update_sleep_data():
         .first()
     )
 
+    user_id = current_user.id
+
     # Train model in background without blocking
     def train_model():
         with app.app_context():
             try:
                 from app.analysis import train_user_model
-                train_user_model(current_user.id)
+                train_user_model(user_id)
             except Exception:
                 pass
             finally:
@@ -868,7 +872,7 @@ def add_alarm():
 @app.route('/alarms/<string:alarm_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_alarm(alarm_id):
-    alarm = Alarm.query.get(alarm_id)
+    alarm = db.session.get(Alarm, alarm_id)
     if alarm is None:
         flash('Alarm not found.', 'danger')
         return redirect(url_for('alarms'))
@@ -995,7 +999,7 @@ def delete_alarm():
         return redirect(url_for('alarms', view_device=view_device) if view_device and view_device != 'all' else url_for('alarms'))
 
     try:
-        alarm = Alarm.query.get(alarm_id)
+        alarm = db.session.get(Alarm, alarm_id)
     except Exception:
         alarm = None
 
@@ -1162,7 +1166,7 @@ def api_delete_alarm():
     except Exception:
         return jsonify({'response': 'failed', 'message': 'invalid alarm_id'}), 400
 
-    alarm = Alarm.query.get(alarm_id)
+    alarm = db.session.get(Alarm, alarm_id)
     if alarm is None:
         return jsonify({'response': 'failed', 'message': 'not found'}), 404
 
@@ -1204,7 +1208,7 @@ def request_pairing_code():
             "message": "missing serial number"
         }), 400
 
-    device = Device.query.get(serial_number)
+    device = db.session.get(Device, serial_number)
 
     if device is None:
         device = Device.register(serial_number, None, None)
@@ -1243,7 +1247,7 @@ def pairing_status():
             "message": "missing serial number"
         }), 400
 
-    device = Device.query.get(serial_number)
+    device = db.session.get(Device, serial_number)
 
     if device is None:
         return jsonify({
@@ -1290,7 +1294,7 @@ def get_alarms():
             "message": "missing serial number"
         }), 400
 
-    device: Device = Device.query.get(serial_number)
+    device: Device = db.session.get(Device, serial_number)
     if device is None or device.user_id is None:
         return jsonify({
             "response": "failed",
@@ -1361,7 +1365,7 @@ def submit_complete_sessions():
     if not isinstance(complete_sessions, dict):
         return jsonify({"response": "failed", "message": "complete_sessions must be an dictionary"}), 400
 
-    device: Device = Device.query.get(serial_number)
+    device: Device = db.session.get(Device, serial_number)
     if device is None or device.user_id is None:
         return jsonify({"response": "failed", "message": "device not paired"}), 400
 
@@ -1383,6 +1387,10 @@ def submit_complete_sessions():
                 when = utc_now()
 
             waking_difficulty = session_data.get("waking_difficulty")
+            puzzle_sessions = session_data.get("puzzle_sessions", [])
+            if not isinstance(puzzle_sessions, list):
+                db.session.rollback()
+                return jsonify({"response": "failed", "message": "puzzle_sessions must be a list"}), 400
 
             alarm_session = AlarmSession.create(
                 user_id=device.user_id,
@@ -1391,10 +1399,6 @@ def submit_complete_sessions():
                 waking_difficulty=waking_difficulty,
                 commit=False,
             )
-
-            puzzle_sessions = session_data.get("puzzle_sessions", [])
-            if not isinstance(puzzle_sessions, list):
-                return jsonify({"response": "failed", "message": "puzzle_sessions must be a list"}), 400
 
             for puzzle_data in puzzle_sessions:
                 if not isinstance(puzzle_data, dict):

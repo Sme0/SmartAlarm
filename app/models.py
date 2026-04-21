@@ -80,7 +80,7 @@ class User(UserMixin, db.Model):
     @staticmethod
     @lm.user_loader
     def get(user_id: int) -> 'User':
-        return User.query.get(int(user_id))
+        return db.session.get(User, int(user_id))
 
 
 class Device(db.Model):
@@ -212,6 +212,7 @@ class Alarm(db.Model):
 
         db.session.add(alarm)
         db.session.commit()
+        return alarm
 
 class AlarmSession(db.Model):
     __tablename__ = 'alarm_sessions'
