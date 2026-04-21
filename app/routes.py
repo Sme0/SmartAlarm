@@ -138,7 +138,7 @@ def _schedule_dynamic_alarm_optimization(
     expected_dynamic_start_time,
     expected_dynamic_end_time,
 ):
-    """Start a detached thread to optimize one dynamic alarm without blocking the request."""
+    """Start a detached thread to optimise one dynamic alarm without blocking the request."""
     Thread(
         target=_run_dynamic_alarm_optimization,
         args=(

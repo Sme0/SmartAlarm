@@ -1,5 +1,6 @@
+from typing import Optional
+
 import serial
-from time import sleep
 
 
 '''
@@ -23,7 +24,7 @@ class Bluetooth:
     def send_message(self, message) -> None:
         self.connection.write(message.encode())
         
-    def listen(self, timeout: int) -> str:
+    def listen(self, timeout: int) -> Optional[str]:
         message = []
             
         for _ in range(timeout // 2):
@@ -33,24 +34,24 @@ class Bluetooth:
             message.append(incoming)
         
         self.send_message("2")
-            
-            
-    def message_to_string(self, message) -> str:
+        return None
+
+    def message_to_string(self, message) -> Optional[str]:
         string = ""
-        if message != None:
+        if message is not None:
             for i in message:
                 string += i
             return string.strip()
-                
-                
-                
+        return None
+
+
 class BluetoothConfirmation:
     def __init__(self, timeout: int, debug: bool = False) -> None:
         self.awaiting_confirmation = False
         self.received_confirmation = False
         self.received_message = ""
         
-        self.bluetoothio = Bluetooth()
+        self.bluetooth_io = Bluetooth()
         self.reply_window = timeout
         
         self.debug = debug
@@ -60,7 +61,7 @@ class BluetoothConfirmation:
         if self.debug:
             print("Awaiting confirmation...")
         
-        self.received_message = self.bluetoothio.listen(self.reply_window)
+        self.received_message = self.bluetooth_io.listen(self.reply_window)
         
         if self.received_message and "1" in self.received_message:
             self.received_confirmation = True
@@ -71,7 +72,7 @@ class BluetoothConfirmation:
         
     def send_confirmation_request(self) -> None:
         self.received_confirmation = False
-        self.bluetoothio.send_message("0")
+        self.bluetooth_io.send_message("0")
         if self.debug:
             print("Sending confirmation request...")
         

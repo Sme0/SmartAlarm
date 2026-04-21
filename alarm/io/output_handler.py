@@ -31,7 +31,7 @@ class OutputHandler(ABC):
 
         :param question: Puzzle prompt/question text.
         :param options: Candidate numeric answers shown to the user.
-        :param selected_index: Currently highlighted option index.
+        :param selected_index: Current highlighted option index.
         """
         raise NotImplementedError
 

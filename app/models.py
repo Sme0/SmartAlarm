@@ -24,7 +24,7 @@ SUPPORTED_PUZZLE_OUTCOMES = ("dismissed", "snoozed")
 
 def _stable_choice_seed(*parts) -> int:
     """
-    Build a deterministic numeric seed without relying on Python's randomized hash().
+    Build a deterministic numeric seed without relying on Python's randomised hash().
     """
     joined = "|".join("" if part is None else str(part) for part in parts)
     return sum(ord(char) for char in joined)
@@ -60,7 +60,7 @@ class User(UserMixin, db.Model):
         :return: The newly created (and stored) User object
         """
 
-        # Normalize inputs
+        # Normalise inputs
         email_address = (email_address or "").strip().lower()
         if not preferred_name:
             preferred_name = (
@@ -258,7 +258,7 @@ class AlarmSession(db.Model):
         Create and persist an AlarmSession entry recording when an alarm fired.
 
         :param user_id: id of the user owning the device
-        :param device_serial: device serial which triggered
+        :param device_serial:  serial of device which triggered
         :param triggered_at: optional timezone-aware datetime; if omitted, now (UTC) is used
         :param commit: whether to commit immediately; use False when batching work in one transaction
         :return: the created AlarmSession instance
@@ -395,7 +395,7 @@ def resolve_effective_puzzle_type(alarm: Alarm, device: Device = None) -> str:
     The automatic choice uses recent puzzle history for the same user/device:
     - avoids repeating the most recent puzzle type
     - rewards puzzle types solved correctly and quickly
-    - penalizes puzzle types answered incorrectly or very slowly
+    - penalises puzzle types answered incorrectly or very slowly
     - uses a deterministic tie-breaker so "no history" does not always mean maths
     """
     stored_type = (getattr(alarm, "puzzle_type", "") or "").strip().lower()

@@ -2,7 +2,7 @@ import os
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import pytz
 
@@ -81,7 +81,7 @@ class AlarmController:
 
         # Current alarm state
         self.state: AlarmState = AlarmState.WAITING
-        self.current_triggered_alarm: Alarm
+        self.current_triggered_alarm: Optional[Alarm] = None
 
         # Session data
         self._pending_sessions: Dict[str, Dict[str, Any]] = {}
@@ -103,7 +103,7 @@ class AlarmController:
             return MemoryPuzzle(self.input_handler, self.output_handler)
         return MathsPuzzle(self.input_handler, self.output_handler)
 
-    def _decision_selection(self, options: List[str]) -> str:
+    def _decision_selection(self, options: List[str]) -> Optional[str]:
         MAX_TIME = 30
         selected_idx = 0
         start_time = time.time()
@@ -335,7 +335,7 @@ class AlarmController:
         elif choice == "trigger":
             self.trigger_alarm(self.current_triggered_alarm)
         else:
-            # Unhandled choice (shouldn't happen), ensure cleanup
+            # Unhandled choice (shouldn't happen), ensure clean-up
             self.stop_alarm()
 
     def stop_alarm(self):

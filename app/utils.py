@@ -56,8 +56,8 @@ def parse_apple_dt(value: str):
     return datetime.fromisoformat(normalized)
 
 
-def as_utc(value: datetime) -> datetime:
-    """Normalize naive/aware datetimes to timezone-aware UTC for safe comparisons."""
+def as_utc(value: datetime) -> datetime | None:
+    """Normalise naive/aware datetimes to timezone-aware UTC for safe comparisons."""
     if value is None:
         return None
     if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:

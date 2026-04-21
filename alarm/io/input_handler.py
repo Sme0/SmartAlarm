@@ -47,7 +47,7 @@ class InputEventType(Enum):
     JOYSTICK_PRESS = "JOYSTICK_PRESS"
 
 class JoystickDirection(Enum):
-    """Normalized joystick direction states from analog stick coordinates."""
+    """Normalized joystick direction states from analogue stick coordinates."""
 
     NEUTRAL = "NEUTRAL"
     UP = "UP"
@@ -149,7 +149,7 @@ class DebugInputHandler(InputHandler):
     """
 
     def __init__(self, thingsboard_client: ThingsBoardClient):
-        """Initialize command-to-event mapping for debug mode."""
+        """Initialise command-to-event mapping for debug mode."""
         super().__init__(thingsboard_client)
         self._line_buffer = ""
 
@@ -248,11 +248,11 @@ class RaspberryPiInputHandler(InputHandler):
     Hardware input handler for Raspberry Pi + Grove components.
 
     Captures button presses and joystick movement, applies edge detection and
-    debounce, and emits normalized input events.
+    debounce, and emits normalised input events.
     """
 
     def __init__(self, thingsboard_client: ThingsBoardClient):
-        """Initialize GPIO pin mappings, hardware state cache, and debounce config."""
+        """Initialise GPIO pin mappings, hardware state cache, and debounce config."""
         super().__init__(thingsboard_client)
 
         if grovepi is None:
@@ -321,7 +321,7 @@ class RaspberryPiInputHandler(InputHandler):
         Collects the x and y coordinates of a joystick input and translates it into
         a JoystickDirection.
 
-        Threshold ranges are tuned around a neutral center and map quadrants to
+        Threshold ranges are tuned around a neutral centre and map quadrants to
         cardinal directions.
 
         :return: The JoystickDirection for the given x and y
@@ -338,7 +338,7 @@ class RaspberryPiInputHandler(InputHandler):
         if x > 1020:
             return JoystickDirection.PRESS
 
-        # up side values
+        # upside values
         if x < 385:
             if y < 385:
                 if x < y:
@@ -353,7 +353,7 @@ class RaspberryPiInputHandler(InputHandler):
             else:
                 return JoystickDirection.UP
 
-        # down side values
+        # downside values
         elif x > 645:
             if y < 385:
                 if (x - 645) < (y - 255):

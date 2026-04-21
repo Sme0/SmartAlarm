@@ -272,7 +272,7 @@ def _save_model(user_id, model):
     db.session.commit()
 
 
-def _load_model(user_id) -> Pipeline:
+def _load_model(user_id) -> Pipeline | None:
     """
     Deserializes and retrieves a previously trained model for the given user from the database.
 
@@ -309,7 +309,7 @@ def should_retrain_model(
     return model_age > timedelta(days=max_age_days)
 
 
-def _extract_features(user_id) -> list[dict]:
+def _extract_features(user_id) -> list[dict] | None:
     """
     Extracts training features from alarm sessions, puzzle sessions, and sleep data for a given user.
 
@@ -426,7 +426,7 @@ def _extract_features(user_id) -> list[dict]:
     return extracted_data
 
 
-def train_user_model(user_id) -> Pipeline:
+def train_user_model(user_id) -> Pipeline | None:
     """
     Trains a RandomForest regression model to predict puzzle solve time for a given user.
 

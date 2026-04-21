@@ -35,7 +35,7 @@ else:
 
 alarm_controller = AlarmController(input_handler, output_handler)
 
-# Helperfunctions for debuugging and main loop
+# Helper functions for debugging and main loop
 def _print_debug_help():
     if str(os.getenv("DEVICE_DEBUG_MODE")).lower() != "true":
         return

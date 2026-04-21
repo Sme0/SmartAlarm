@@ -118,7 +118,7 @@ class ResetEmailAddressForm(FlaskForm):
 
 class PairDeviceForm(FlaskForm):
     """
-    Form for pairing device to user via 6 digit code
+    Form for pairing device to user via 6-digit code
     """
     pairing_code = StringField('Pairing code', validators=[
         DataRequired(),
