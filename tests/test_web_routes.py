@@ -312,6 +312,82 @@ class WebRouteTests(unittest.TestCase):
         self.assertIsNotNone(refreshed_device)
         self.assertIsNone(refreshed_device.user_id)
 
+    def test_account_edit_details_updates_email(self):
+        user = User.register("old-email@example.com", "password123", "EditDetails")
+        self._log_in(user)
+
+        response = self.client.post(
+            "/account/edit-details",
+            data={
+                "email-new_email_address": "new-email@example.com",
+                "email-password": "password123",
+                "email-submit": "Edit details",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/account#change-details", response.headers["Location"])
+        updated = db.session.get(User, user.id)
+        self.assertEqual(updated.email_address, "new-email@example.com")
+
+    def test_account_change_preferred_name_updates_name(self):
+        user = User.register("name-update@example.com", "password123", "Old Name")
+        self._log_in(user)
+
+        response = self.client.post(
+            "/account/change-preferred-name",
+            data={
+                "name-preferred_name": "New Name",
+                "name-password": "password123",
+                "name-submit": "Change preferred name",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/account#change-details", response.headers["Location"])
+        updated = db.session.get(User, user.id)
+        self.assertEqual(updated.preferred_name, "New Name")
+
+    def test_account_change_password_updates_hash(self):
+        user = User.register("change-password@example.com", "password123", "ChangePassword")
+        self._log_in(user)
+
+        response = self.client.post(
+            "/account/change-password",
+            data={
+                "password-old_password": "password123",
+                "password-new_password": "newpassword123",
+                "password-submit": "Change password",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/account#change-details", response.headers["Location"])
+        updated = db.session.get(User, user.id)
+        self.assertTrue(updated.verify_password("newpassword123"))
+
+    def test_account_change_password_rejects_wrong_current_password(self):
+        user = User.register("change-password-fail@example.com", "password123", "ChangePassword")
+        self._log_in(user)
+
+        response = self.client.post(
+            "/account/change-password",
+            data={
+                "password-old_password": "wrongpassword",
+                "password-new_password": "newpassword123",
+                "password-submit": "Change password",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/account#change-details", response.headers["Location"])
+        unchanged = db.session.get(User, user.id)
+        self.assertTrue(unchanged.verify_password("password123"))
+
 
 if __name__ == "__main__":
     unittest.main()

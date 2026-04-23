@@ -23,6 +23,9 @@ from app.forms import (
     LoginForm,
     PairDeviceForm,
     RegistrationForm,
+    ResetEmailAddressForm,
+    ResetPreferredNameForm,
+    ResetPasswordForm,
 )
 from app.models import (
     Alarm,
@@ -255,13 +258,104 @@ def account():
     If a user is not logged in, Flask-Login will redirect them to the login page.
     """
     try:
+        reset_preferred_name_form = ResetPreferredNameForm(prefix="name")
+        reset_email_form = ResetEmailAddressForm(prefix="email")
+        reset_password_form = ResetPasswordForm(prefix="password")
         delete_account_form = DeleteAccountForm()
         return render_template(
-            "account.html", user=current_user, delete_account_form=delete_account_form
+            "account.html",
+            user=current_user,
+            reset_preferred_name_form=reset_preferred_name_form,
+            reset_email_form=reset_email_form,
+            reset_password_form=reset_password_form,
+            delete_account_form=delete_account_form,
         )
     except Exception:
         # Raise a 500 server error if something unexpected occurs
         raise InternalServerError("An error occurred while loading the account page.")
+
+
+@app.route("/account/edit-details", methods=["POST"])
+@login_required
+def account_edit_details():
+    reset_email_form = ResetEmailAddressForm(prefix="email")
+
+    if not reset_email_form.validate_on_submit():
+        flash("Please enter a valid email and password.", "danger")
+        return redirect(url_for("account") + "#change-details")
+
+    if not current_user.verify_password(reset_email_form.password.data or ""):
+        flash("Incorrect password.", "danger")
+        return redirect(url_for("account") + "#change-details")
+
+    new_email = (reset_email_form.new_email_address.data or "").strip().lower()
+    existing_user = User.query.filter(
+        User.email_address == new_email, User.id != current_user.id
+    ).first()
+    if existing_user:
+        flash("That email address is already in use.", "danger")
+        return redirect(url_for("account") + "#change-details")
+
+    try:
+        current_user.email_address = new_email
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        flash("Could not update account details right now.", "danger")
+        return redirect(url_for("account") + "#change-details")
+
+    flash("Account details updated.", "success")
+    return redirect(url_for("account") + "#change-details")
+
+
+@app.route("/account/change-preferred-name", methods=["POST"])
+@login_required
+def account_change_preferred_name():
+    reset_preferred_name_form = ResetPreferredNameForm(prefix="name")
+
+    if not reset_preferred_name_form.validate_on_submit():
+        flash("Please enter a valid preferred name and password.", "danger")
+        return redirect(url_for("account") + "#change-details")
+
+    if not current_user.verify_password(reset_preferred_name_form.password.data or ""):
+        flash("Incorrect password.", "danger")
+        return redirect(url_for("account") + "#change-details")
+
+    try:
+        current_user.preferred_name = reset_preferred_name_form.preferred_name.data.strip()
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        flash("Could not update your preferred name right now.", "danger")
+        return redirect(url_for("account") + "#change-details")
+
+    flash("Preferred name updated.", "success")
+    return redirect(url_for("account") + "#change-details")
+
+
+@app.route("/account/change-password", methods=["POST"])
+@login_required
+def account_change_password():
+    reset_password_form = ResetPasswordForm(prefix="password")
+
+    if not reset_password_form.validate_on_submit():
+        flash("Please provide both your current and new password.", "danger")
+        return redirect(url_for("account") + "#change-details")
+
+    if not current_user.verify_password(reset_password_form.old_password.data or ""):
+        flash("Current password is incorrect.", "danger")
+        return redirect(url_for("account") + "#change-details")
+
+    try:
+        current_user.set_password(reset_password_form.new_password.data)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        flash("Could not change your password right now.", "danger")
+        return redirect(url_for("account") + "#change-details")
+
+    flash("Password updated successfully.", "success")
+    return redirect(url_for("account") + "#change-details")
 
 
 @app.route("/account/delete", methods=["POST"])

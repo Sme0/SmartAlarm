@@ -101,6 +101,21 @@ class ResetEmailAddressForm(FlaskForm):
     ])
     submit = SubmitField('Change Email Address')
 
+
+class ResetPreferredNameForm(FlaskForm):
+    """
+    Form for resetting the user's preferred name.
+    """
+    preferred_name = StringField('Preferred name', validators=[
+        DataRequired(),
+        Length(min=1, max=32)
+    ])
+    password = PasswordField('Password', validators=[
+        DataRequired(),
+        Length(min=8)
+    ])
+    submit = SubmitField('Change Preferred Name')
+
 class PairDeviceForm(FlaskForm):
     """
     Form for pairing device to user via 6-digit code

@@ -27,9 +27,48 @@
                     <div class="text-gray-800 font-medium">{{ current_user.email_address }}</div>
                 </div>
 
-                <div class="space-x-3">
-                    <a href="#" class="inline-block bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md">Edit details</a>
-                    <a href="#" class="inline-block bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md">Change password</a>
+                <div class="space-y-4 max-w-xl">
+                    <form method="POST" action="{{ url_for('account_change_preferred_name') }}" class="border border-gray-200 rounded-md p-4 space-y-3">
+                        {{ reset_preferred_name_form.hidden_tag() }}
+                        <h3 class="text-sm font-semibold text-gray-800">Change preferred name</h3>
+                        <div>
+                            <label for="name-preferred-name" class="block text-sm text-gray-700 mb-1">New preferred name</label>
+                            {{ reset_preferred_name_form.preferred_name(id="name-preferred-name", class_="w-full rounded-md border border-gray-300 px-3 py-2 text-sm") }}
+                        </div>
+                        <div>
+                            <label for="name-password" class="block text-sm text-gray-700 mb-1">Confirm with password</label>
+                            {{ reset_preferred_name_form.password(id="name-password", class_="w-full rounded-md border border-gray-300 px-3 py-2 text-sm") }}
+                        </div>
+                        {{ reset_preferred_name_form.submit(value="Change preferred name", class_="inline-block bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md") }}
+                    </form>
+
+                    <form method="POST" action="{{ url_for('account_edit_details') }}" class="border border-gray-200 rounded-md p-4 space-y-3">
+                        {{ reset_email_form.hidden_tag() }}
+                        <h3 class="text-sm font-semibold text-gray-800">Change email address</h3>
+                        <div>
+                            <label for="email-new-email" class="block text-sm text-gray-700 mb-1">New email address</label>
+                            {{ reset_email_form.new_email_address(id="email-new-email", class_="w-full rounded-md border border-gray-300 px-3 py-2 text-sm") }}
+                        </div>
+                        <div>
+                            <label for="email-password" class="block text-sm text-gray-700 mb-1">Confirm with password</label>
+                            {{ reset_email_form.password(id="email-password", class_="w-full rounded-md border border-gray-300 px-3 py-2 text-sm") }}
+                        </div>
+                        {{ reset_email_form.submit(value="Change email", class_="inline-block bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md") }}
+                    </form>
+
+                    <form method="POST" action="{{ url_for('account_change_password') }}" class="border border-gray-200 rounded-md p-4 space-y-3">
+                        {{ reset_password_form.hidden_tag() }}
+                        <h3 class="text-sm font-semibold text-gray-800">Change password</h3>
+                        <div>
+                            <label for="password-old" class="block text-sm text-gray-700 mb-1">Current password</label>
+                            {{ reset_password_form.old_password(id="password-old", class_="w-full rounded-md border border-gray-300 px-3 py-2 text-sm") }}
+                        </div>
+                        <div>
+                            <label for="password-new" class="block text-sm text-gray-700 mb-1">New password</label>
+                            {{ reset_password_form.new_password(id="password-new", class_="w-full rounded-md border border-gray-300 px-3 py-2 text-sm") }}
+                        </div>
+                        {{ reset_password_form.submit(value="Change password", class_="inline-block bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md") }}
+                    </form>
                 </div>
 
                 <div class="mt-8 pt-6 border-t border-gray-200 max-w-md">
