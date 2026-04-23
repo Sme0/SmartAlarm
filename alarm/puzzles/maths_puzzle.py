@@ -1,9 +1,12 @@
 import mathgenerator as mg
 import random
+import logging
 
 from alarm.io.input_handler import InputHandler
 from alarm.io.output_handler import OutputHandler
 from alarm.puzzles.puzzle import Puzzle
+
+logger = logging.getLogger(__name__)
 
 
 class MathsPuzzle(Puzzle):
@@ -74,9 +77,9 @@ class MathsPuzzle(Puzzle):
 
     def display_puzzle(self):
         self.solution = self._parse_solution_int(self.solution)
-        print(self.problem)
-        print(self.choices)
-        print(self.solution)
+        logger.debug(self.problem)
+        logger.debug(self.choices)
+        logger.debug(self.solution)
 
         if self.current_selection is None:
             self.current_selection = 0

@@ -1,5 +1,6 @@
 import os
 import time
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
@@ -14,6 +15,7 @@ from alarm.puzzles.maths_puzzle import MathsPuzzle
 from alarm.puzzles.memory_puzzle import MemoryPuzzle
 from alarm.puzzles.puzzle import Puzzle
 
+logger = logging.getLogger(__name__)
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -31,7 +33,7 @@ def _resolve_clock_timezone():
         try:
             return pytz.timezone(configured_tz)
         except pytz.UnknownTimeZoneError:
-            print(
+            logger.warning(
                 f"Invalid DEVICE_TIMEZONE '{configured_tz}', falling back to device timezone"
             )
 
@@ -40,7 +42,6 @@ def _resolve_clock_timezone():
 
 
 CLOCK_TIMEZONE = _resolve_clock_timezone()
-
 
 def _clock_now() -> datetime:
     return datetime.now(CLOCK_TIMEZONE)
@@ -260,7 +261,7 @@ class AlarmController:
         )
         self.output_handler.buzzer.play_alarm_sound()
         if isinstance(self.output_handler, DebugOutputHandler):
-            print("[DEBUG] Type 'dismiss' to solve puzzle.")
+            print("Type 'dismiss' to solve puzzle.")
 
     def run_alarm_interaction(self):
 
@@ -347,8 +348,8 @@ class AlarmController:
         :return:
         """
         if self.state in [AlarmState.TRIGGERED, AlarmState.PUZZLE]:
-            print("Alarm Stopped")
-            print(f"Active alarms: {self.alarms}, {self.snooze_alarms}")
+            logger.debug("Alarm Stopped")
+            logger.debug(f"Active alarms: {self.alarms}, {self.snooze_alarms}")
 
             if self.current_triggered_alarm in self.snooze_alarms:
                 self.snooze_alarms.remove(self.current_triggered_alarm)

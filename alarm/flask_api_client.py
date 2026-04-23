@@ -1,5 +1,6 @@
 from enum import Enum
 import os
+import logging
 import requests
 from dotenv import load_dotenv
 from requests.exceptions import SSLError, RequestException
@@ -9,6 +10,7 @@ from alarm.alarm_controller import Alarm
 load_dotenv()
 
 TIMEOUT = 5
+logger = logging.getLogger(__name__)
 
 class PairingStatus(Enum):
     PAIRED = 0
@@ -65,7 +67,7 @@ class FlaskAPIClient:
                 source_alarm_id=raw_alarm.get("source_alarm_id", alarm_id),
             )
         except Exception as e:
-            print(f"Skipping malformed alarm entry: {e}")
+            logger.debug(f"Skipping malformed alarm entry: {e}")
             return None
 
     def _post(self, path: str, payload: dict):
@@ -78,10 +80,10 @@ class FlaskAPIClient:
                 resp = requests.post(url, json=payload, timeout=TIMEOUT, verify=verify_path if verify_path else True)
             return resp
         except SSLError as e:
-            print("[DEBUG] SSL verification failed when contacting server.")
+            logger.debug("SSL verification failed when contacting server.")
             raise
         except RequestException as e:
-            print("[DEBUG] HTTP request failed.")
+            logger.debug("HTTP request failed")
             raise
 
     def get_pairing_status(self) -> PairingStatus:
@@ -98,7 +100,7 @@ class FlaskAPIClient:
             if response.headers.get("Content-Type", "").lower().startswith("application/json"):
                 data = response.json()
             else:
-                print("Failed to receive pairing status: " + response.text)
+                logger.debug("Failed to receive pairing status: " + response.text)
                 return PairingStatus.INVALID
 
             raw_pairing_status = data.get("response")
@@ -130,11 +132,11 @@ class FlaskAPIClient:
             if response.headers.get("Content-Type", "").lower().startswith("application/json"):
                 data = response.json()
             else:
-                print("Failed to request pairing code: " + response.text)
+                logger.debug("Failed to request pairing code: " + response.text)
                 return None
 
             if response.status_code != 200:
-                print("Failed to request pairing code: ", data.get('message', 'unknown reason'))
+                logger.debug("Failed to request pairing code: ", data.get('message', 'unknown reason'))
                 return None
 
             return data.get("pairing_code")
@@ -154,13 +156,13 @@ class FlaskAPIClient:
             response = self._post(path, payload)
 
             if not response.headers.get("Content-Type", "").lower().startswith("application/json"):
-                print("Failed to get alarms: " + response.text)
+                logger.debug("Failed to get alarms: " + response.text)
                 return False, []
 
             data = response.json()
 
             if response.status_code != 200:
-                print("Failed to get alarms:", data.get("reason", "unknown reason"))
+                logger.debug("Failed to get alarms:", data.get("reason", "unknown reason"))
                 return False, []
 
             alarms = []
@@ -172,7 +174,7 @@ class FlaskAPIClient:
             return True, alarms
 
         except Exception as e:
-            print(f"Failed to get alarms: {e}")
+            logger.debug(f"Failed to get alarms: {e}")
             return False, []
 
     def send_complete_sessions(self, complete_sessions: dict) -> bool:
@@ -213,11 +215,11 @@ class FlaskAPIClient:
             if response.headers.get("Content-Type", "").lower().startswith("application/json"):
                 data = response.json()
             else:
-                print("Failed to submit complete sessions: " + response.text)
+                logger.debug("Failed to submit complete sessions: " + response.text)
                 return False
 
             if response.status_code != 200:
-                print("Failed to submit complete sessions: ", data.get("message", data.get("reason", "unknown reason")))
+                logger.debug("Failed to submit complete sessions: ", data.get("message", data.get("reason", "unknown reason")))
                 return False
 
             return True

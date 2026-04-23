@@ -4,8 +4,20 @@ and delegating tasks to other modules.
 """
 import os
 import time
-
+import logging
 from dotenv import load_dotenv
+
+load_dotenv()
+logger = logging.getLogger(__name__)
+is_logging_enabled = os.getenv("ENABLE_LOGGING", "").lower() in ["true", "1", "yes"]
+
+if is_logging_enabled:
+    logging.basicConfig(level=logging.WARNING, format="[%(levelname)s] %(module)s: %(message)s")
+    logging.getLogger("alarm").setLevel(logging.DEBUG)
+    logging.getLogger("__main__").setLevel(logging.DEBUG)
+else:
+    # Disable logs warning level or below
+    logging.disable(logging.WARNING)
 
 from alarm.io.input_handler import DebugInputHandler, RaspberryPiInputHandler
 from alarm.io.output_handler import DebugOutputHandler, RaspberryPiOutputHandler
@@ -22,7 +34,6 @@ from alarm.alarm_controller import AlarmController
 from alarm.alarm_state import AlarmState
 from alarm.thingsboard_client import ThingsBoardClient
 
-load_dotenv()
 SERIAL_NUMBER = os.getenv("SERIAL_NUMBER")
 
 if not SERIAL_NUMBER:
@@ -33,6 +44,7 @@ thingsboard_client = ThingsBoardClient()
 thingsboard_client.connect()
 
 device_debug_mode = str(os.getenv("DEVICE_DEBUG_MODE")).lower() in ["true", "y", "yes", "debug"]
+
 if device_debug_mode:
     input_handler = DebugInputHandler(thingsboard_client=thingsboard_client)
     output_handler = DebugOutputHandler()
@@ -47,11 +59,11 @@ def _print_debug_help():
     if str(os.getenv("DEVICE_DEBUG_MODE")).lower() != "true":
         return
 
-    print("[DEBUG] SmartAlarm terminal controls")
-    print("[DEBUG] When alarm is ringing: type 'dismiss' and press Enter.")
-    print("[DEBUG] Maths puzzle / disarm-snooze selection controls: 'left', 'right', 'joy_press'.")
-    print("[DEBUG] Memory puzzle controls: 'up', 'down', 'left', 'right'.")
-    print("[DEBUG] Commands are read from this terminal while the program is running.\n")
+    logger.debug("SmartAlarm terminal controls")
+    logger.debug("When alarm is ringing: type 'dismiss' and press Enter.")
+    logger.debug("Maths puzzle / disarm-snooze selection controls: 'left', 'right', 'joy_press'.")
+    logger.debug("Memory puzzle controls: 'up', 'down', 'left', 'right'.")
+    logger.debug("Commands are read from this terminal while the program is running.")
 
 
 def _flush_inputs_on_state_change(previous_state, current_state):
@@ -86,10 +98,10 @@ def pairing_loop():
 
     if pairing_status == PairingStatus.INVALID:
         if cached_paired:
-            print("[SETUP] Pairing status unavailable, using cached paired state.")
+            logger.info("[SETUP] Pairing status unavailable, using cached paired state.")
             return
-        print("[SETUP] Could not verify pairing and no cached paired state was found.")
-        print("[SETUP] Device will continue in offline/unpaired mode.")
+        logger.warning("[SETUP] Could not verify pairing and no cached paired state was found.")
+        logger.warning("[SETUP] Device will continue in offline/unpaired mode.")
         return
 
     pairing_code = flask_api_client.request_pairing_code()
@@ -103,15 +115,15 @@ def pairing_loop():
 
         if status == PairingStatus.PAIRED:
             save_cached_server_paired(True)
-            print("Successfully paired")
+            logger.info("Successfully paired")
             break
 
         if status == PairingStatus.INVALID:
             if cached_paired:
-                print("[SETUP] Network lost, using cached paired state.")
+                logger.info("[SETUP] Network lost, using cached paired state.")
                 break
             output_handler.display_text("Unable to retrieve pairing status/code.")
-            print("[SETUP] Pairing status unavailable. Continuing without pairing.")
+            logger.warning("[SETUP] Pairing status unavailable. Continuing without pairing.")
             break
 
         if status == PairingStatus.FAILED:
@@ -119,7 +131,7 @@ def pairing_loop():
             output_handler.display_text(pairing_code)
 
         if status == PairingStatus.PAIRING:
-            print("Displaying up to date code. No issues")
+            logger.info("Displaying up to date code. No issues")
         time.sleep(5)
 
 
@@ -142,7 +154,7 @@ def main_alarm_loop():
 
         if restored_alarms:
             alarm_controller.alarms = restored_alarms
-            print(f"[SETUP] Loaded {len(restored_alarms)} alarms from local cache.")
+            logger.info("[SETUP] Loaded %s alarms from local cache.", len(restored_alarms))
 
     while True:
 
@@ -186,15 +198,15 @@ def main_alarm_loop():
 
                 if fallback_alarms:
                     alarm_controller.alarms = fallback_alarms
-                    print(f"[DEBUG] Loaded {len(fallback_alarms)} cached alarms due to sync failure")
+                    logger.debug("Loaded %s cached alarms due to sync failure", len(fallback_alarms))
             alarm_snapshot = (
                 [(alarm.id, alarm.time, alarm.day_of_week, alarm.puzzle_type) for alarm in alarm_controller.alarms],
                 [(alarm.id, alarm.time, alarm.day_of_week, alarm.puzzle_type) for alarm in alarm_controller.snooze_alarms],
             )
             if not success:
-                print("[DEBUG] Failed to refresh alarms, keeping existing ones")
+                logger.debug("Failed to refresh alarms, keeping existing ones")
             if alarm_snapshot != previous_alarm_snapshot:
-                print(f"[DEBUG] Active alarms updated: {alarm_controller.alarms}, {alarm_controller.snooze_alarms}")
+                logger.debug("Active alarms updated: %s, %s", alarm_controller.alarms, alarm_controller.snooze_alarms)
                 previous_alarm_snapshot = alarm_snapshot
 
             complete_sessions = alarm_controller.peek_complete_sessions()
@@ -203,7 +215,7 @@ def main_alarm_loop():
                 if uploaded:
                     alarm_controller.drop_complete_sessions(complete_sessions.keys())
                 else:
-                    print("[DEBUG] Failed to upload completed sessions, will retry on next sync")
+                    logger.debug("Failed to upload completed sessions, will retry on next sync")
 
             last_update_time = current_time
 
@@ -211,15 +223,15 @@ def main_alarm_loop():
 
 if __name__ == "__main__":
     _print_debug_help()
-    
+
     # Setup Bluetooth connection to Arduino (skip in debug mode)
     if not device_debug_mode:
-        print("[SETUP] Initializing Bluetooth connection to Arduino...")
+        logger.info("[SETUP] Initializing Bluetooth connection to Arduino...")
         bluetooth_setup = BluetoothSetup(debug=True)
         if not bluetooth_setup.connect():
-            print("[SETUP] Bluetooth connection failed. Continuing without Arduino pairing.")
+            logger.warning("[SETUP] Bluetooth connection failed. Continuing without Arduino pairing.")
     else:
-        print("[SETUP] Skipping Bluetooth setup in debug mode")
-    
+        logger.info("[SETUP] Skipping Bluetooth setup in debug mode")
+
     pairing_loop()
     main_alarm_loop()

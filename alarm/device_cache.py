@@ -3,8 +3,10 @@
 import json
 import os
 import tempfile
+import logging
 from typing import Any, Dict, Optional
 
+logger = logging.getLogger(__name__)
 
 CACHE_FILE_ENV = "DEVICE_CACHE_PATH"
 DEFAULT_CACHE_FILE = os.path.join(os.path.dirname(__file__), "device_cache.json")
@@ -25,7 +27,7 @@ def _load_cache() -> Dict[str, Any]:
         # Missing cache is expected on first boot.
         return {}
     except Exception as exc:
-        print(f"[CACHE] Failed to load cache file {path}: {exc}")
+        logger.error(f"Failed to load cache file {path}: {exc}")
         return {}
 
 
@@ -44,7 +46,7 @@ def _save_cache(data: Dict[str, Any]) -> bool:
         os.replace(temp_path, path)
         return True
     except Exception as exc:
-        print(f"[CACHE] Failed to save cache file {path}: {exc}")
+        logger.error(f"Failed to save cache file {path}: {exc}")
         return False
 
 
