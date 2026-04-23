@@ -5,8 +5,8 @@ from typing import List
 from alarm.io.input_handler import InputEventType, JoystickDirection
 from alarm.puzzles.puzzle import Puzzle
 
-class MemoryPuzzle(Puzzle):
 
+class MemoryPuzzle(Puzzle):
     def __init__(self, input_handler, output_handler, puzzle_length: int = 5):
         super().__init__(input_handler, output_handler)
         self.puzzle_length = puzzle_length
@@ -33,7 +33,7 @@ class MemoryPuzzle(Puzzle):
         return self.instructions
 
     def display_puzzle(self):
-        self.output_handler.display_text("Memory game: Copy the\norder with the joystick.")
+        self.output_handler.display_text("  Memory Game")
         self.output_handler.play_memory_sequence(self.instructions)
 
     def _event_to_direction(self, event_type: InputEventType):
@@ -53,13 +53,15 @@ class MemoryPuzzle(Puzzle):
         self.display_puzzle()
 
         # Clear stale movement events from before puzzle start.
-        self.input_handler.pop_events_by_type({
-            InputEventType.JOYSTICK_LEFT,
-            InputEventType.JOYSTICK_RIGHT,
-            InputEventType.JOYSTICK_UP,
-            InputEventType.JOYSTICK_DOWN,
-            InputEventType.JOYSTICK_PRESS
-        })
+        self.input_handler.pop_events_by_type(
+            {
+                InputEventType.JOYSTICK_LEFT,
+                InputEventType.JOYSTICK_RIGHT,
+                InputEventType.JOYSTICK_UP,
+                InputEventType.JOYSTICK_DOWN,
+                InputEventType.JOYSTICK_PRESS,
+            }
+        )
 
         self.start_time = time.time()
         while True:
@@ -69,12 +71,14 @@ class MemoryPuzzle(Puzzle):
                 return False
 
             self.input_handler.check_inputs()
-            events = self.input_handler.pop_events_by_type({
-                InputEventType.JOYSTICK_LEFT,
-                InputEventType.JOYSTICK_RIGHT,
-                InputEventType.JOYSTICK_UP,
-                InputEventType.JOYSTICK_DOWN,
-            })
+            events = self.input_handler.pop_events_by_type(
+                {
+                    InputEventType.JOYSTICK_LEFT,
+                    InputEventType.JOYSTICK_RIGHT,
+                    InputEventType.JOYSTICK_UP,
+                    InputEventType.JOYSTICK_DOWN,
+                }
+            )
 
             if not events:
                 time.sleep(0.05)
@@ -88,7 +92,10 @@ class MemoryPuzzle(Puzzle):
                 self.direction_values.append(direction)
 
                 # Original flow: compare after collecting the full sequence.
-                if len(self.direction_values) >= len(self.instructions) or event.event_type == InputEventType.JOYSTICK_PRESS:
+                if (
+                    len(self.direction_values) >= len(self.instructions)
+                    or event.event_type == InputEventType.JOYSTICK_PRESS
+                ):
                     self.end_time = time.time()
                     if self.check_answer():
                         self.output_handler.display_text("Correct")
