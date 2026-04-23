@@ -2019,7 +2019,7 @@ def alarm_success():
     success = 0
 
     for s in sessions:
-        if any(p.is_correct for p in s.puzzle_sessions):
+        if all(p.is_correct for p in s.puzzle_sessions):
             success += 1
 
     return {
