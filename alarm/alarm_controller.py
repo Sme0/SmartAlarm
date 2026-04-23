@@ -245,7 +245,7 @@ class AlarmController:
             temp, humidity = self.sensor.get_temp_and_humidity()
 
             self.output_handler.display_text(
-                f"{_clock_now().strftime('%H:%M')}\n{temp}°C   {humidity}%"
+                f"     {_clock_now().strftime('%H:%M')}\n{temp}c {humidity}%"
             )
 
         return False
