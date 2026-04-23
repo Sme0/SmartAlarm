@@ -172,7 +172,7 @@ class AlarmController:
                 return None
 
             if update_display:
-                output = f"Waking difficulty: \n>{selected_value}<"
+                output = f"Waking\ndifficulty: >{selected_value}<"
                 self.output_handler.display_text(output)
                 update_display = False
 
