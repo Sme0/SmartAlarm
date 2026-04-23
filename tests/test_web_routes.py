@@ -1,6 +1,7 @@
 """Web route tests: auth flows, settings, and authenticated GET page rendering."""
 
 import unittest
+import json
 from datetime import time, timedelta
 
 from tests.bootstrap import configure_test_environment, stub_optional_ml_dependencies
@@ -154,6 +155,8 @@ class WebRouteTests(unittest.TestCase):
         self.assertEqual(dashboard.status_code, 200)
         self.assertEqual(alarms.status_code, 200)
         self.assertIn(b"/account/session-history", account.data)
+        self.assertIn(b"/account/export-data", account.data)
+        self.assertNotIn(b"Request data deletion", account.data)
         self.assertIn(b"Overview", dashboard.data)
         self.assertIn(b"Next alarm", dashboard.data)        
         self.assertIn(b'id="alarms-grid"', alarms.data)
@@ -387,6 +390,52 @@ class WebRouteTests(unittest.TestCase):
         self.assertIn("/account#change-details", response.headers["Location"])
         unchanged = db.session.get(User, user.id)
         self.assertTrue(unchanged.verify_password("password123"))
+
+    def test_account_export_data_returns_downloadable_json(self):
+        user = User.register("export@example.com", "password123", "Export User")
+        self._log_in(user)
+
+        device = Device.register("EXPORT-DEVICE-1", "Bedroom", user)
+        Alarm.create(
+            device_serial=device.serial_number,
+            user_id=user.id,
+            time=time(6, 45),
+            day_of_week=2,
+            enabled=True,
+            puzzle_type="maths",
+        )
+
+        alarm_session = AlarmSession.create(
+            user_id=user.id,
+            device_serial=device.serial_number,
+            triggered_at=utc_now(),
+            waking_difficulty=5,
+        )
+        PuzzleSession.create(
+            alarm_session_id=alarm_session.id,
+            puzzle_type="maths",
+            question="1+1",
+            is_correct=True,
+            time_taken_seconds=10,
+            outcome_action="dismissed",
+        )
+
+        response = self.client.get("/account/export-data")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/json", response.headers.get("Content-Type", ""))
+        self.assertIn(
+            "attachment; filename=\"smartalarm-user-",
+            response.headers.get("Content-Disposition", ""),
+        )
+
+        payload = json.loads(response.data.decode("utf-8"))
+        self.assertEqual(payload["user"]["email_address"], "export@example.com")
+        self.assertEqual(payload["user"]["preferred_name"], "Export User")
+        self.assertEqual(len(payload["devices"]), 1)
+        self.assertEqual(len(payload["alarms"]), 1)
+        self.assertEqual(len(payload["alarm_sessions"]), 1)
+        self.assertEqual(len(payload["alarm_sessions"][0]["puzzle_sessions"]), 1)
 
 
 if __name__ == "__main__":

@@ -2,11 +2,13 @@
 This module implements all the routes for the Flask application.
 """
 
+import base64
+import json
 from datetime import datetime, timedelta
 from threading import Thread
 from typing import List
 
-from flask import flash, jsonify, redirect, render_template, request, url_for
+from flask import flash, jsonify, make_response, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
@@ -165,6 +167,14 @@ def _dynamic_alarm_ui_state(user_id: int) -> tuple[int, bool]:
     """Return alarm-session count and whether dynamic UI should be enabled (>10 sessions)."""
     alarm_session_count = AlarmSession.query.filter_by(user_id=user_id).count()
     return alarm_session_count, alarm_session_count > 10
+
+
+def _serialize_datetime(value):
+    return value.isoformat() if value is not None else None
+
+
+def _serialize_time(value):
+    return value.strftime("%H:%M:%S") if value is not None else None
 
 
 # Return JSON 401 for API/AJAX requests, otherwise redirect to the login page.
@@ -356,6 +366,145 @@ def account_change_password():
 
     flash("Password updated successfully.", "success")
     return redirect(url_for("account") + "#change-details")
+
+
+@app.route("/account/export-data", methods=["GET"])
+@login_required
+def account_export_data():
+    user_id = current_user.id
+    user = db.session.get(User, user_id)
+    paired_devices = Device.query.filter_by(user_id=user_id).all()
+    paired_serials = [device.serial_number for device in paired_devices]
+
+    alarms = Alarm.query.filter_by(user_id=user_id).all()
+    alarm_sessions = (
+        AlarmSession.query.filter_by(user_id=user_id)
+        .options(selectinload(AlarmSession.puzzle_sessions))
+        .all()
+    )
+    sleep_sessions = (
+        SleepSession.query.filter_by(user_id=user_id)
+        .options(selectinload(SleepSession.sleep_stages))
+        .all()
+    )
+    sleep_stages = SleepStage.query.filter_by(user_id=user_id).all()
+    difficulty_models = DifficultyModel.query.filter_by(user_id=user_id).all()
+
+    export_payload = {
+        "exported_at": _serialize_datetime(utc_now()),
+        "user": {
+            "id": user.id,
+            "email_address": user.email_address,
+            "preferred_name": user.preferred_name,
+            "password_hash": user.password_hash,
+        },
+        "devices": [
+            {
+                "serial_number": device.serial_number,
+                "name": device.name,
+                "max_snoozes": device.max_snoozes,
+                "user_id": device.user_id,
+                "pairing_code": device.pairing_code,
+                "pairing_expiry": _serialize_datetime(device.pairing_expiry),
+                "last_seen": _serialize_datetime(device.last_seen),
+            }
+            for device in paired_devices
+        ],
+        "alarms": [
+            {
+                "id": alarm.id,
+                "device_serial": alarm.device_serial,
+                "user_id": alarm.user_id,
+                "time": _serialize_time(alarm.time),
+                "day_of_week": alarm.day_of_week,
+                "enabled": alarm.enabled,
+                "created_at": _serialize_datetime(alarm.created_at),
+                "puzzle_type": alarm.puzzle_type,
+                "use_dynamic_alarm": alarm.use_dynamic_alarm,
+                "dynamic_start_time": _serialize_time(alarm.dynamic_start_time),
+                "dynamic_end_time": _serialize_time(alarm.dynamic_end_time),
+            }
+            for alarm in alarms
+        ],
+        "alarm_sessions": [
+            {
+                "id": session.id,
+                "user_id": session.user_id,
+                "device_serial": session.device_serial,
+                "waking_difficulty": session.waking_difficulty,
+                "triggered_at": _serialize_datetime(session.triggered_at),
+                "puzzle_sessions": [
+                    {
+                        "id": puzzle.id,
+                        "alarm_session_id": puzzle.alarm_session_id,
+                        "puzzle_type": puzzle.puzzle_type,
+                        "question": puzzle.question,
+                        "is_correct": puzzle.is_correct,
+                        "time_taken_seconds": puzzle.time_taken_seconds,
+                        "outcome_action": puzzle.outcome_action,
+                    }
+                    for puzzle in sorted(session.puzzle_sessions, key=lambda s: s.id)
+                ],
+            }
+            for session in alarm_sessions
+        ],
+        "sleep_sessions": [
+            {
+                "id": sleep_session.id,
+                "user_id": sleep_session.user_id,
+                "start_date": _serialize_datetime(sleep_session.start_date),
+                "end_date": _serialize_datetime(sleep_session.end_date),
+                "total_duration": sleep_session.total_duration,
+                "sleep_stages": [
+                    {
+                        "id": stage.id,
+                        "user_id": stage.user_id,
+                        "stage": stage.stage,
+                        "creation_date": _serialize_datetime(stage.creation_date),
+                        "start_date": _serialize_datetime(stage.start_date),
+                        "end_date": _serialize_datetime(stage.end_date),
+                        "source_name": stage.source_name,
+                        "sleep_session_id": stage.sleep_session_id,
+                    }
+                    for stage in sleep_session.sleep_stages
+                ],
+            }
+            for sleep_session in sleep_sessions
+        ],
+        "sleep_stages": [
+            {
+                "id": stage.id,
+                "user_id": stage.user_id,
+                "stage": stage.stage,
+                "creation_date": _serialize_datetime(stage.creation_date),
+                "start_date": _serialize_datetime(stage.start_date),
+                "end_date": _serialize_datetime(stage.end_date),
+                "source_name": stage.source_name,
+                "sleep_session_id": stage.sleep_session_id,
+            }
+            for stage in sleep_stages
+        ],
+        "difficulty_models": [
+            {
+                "id": model.id,
+                "user_id": model.user_id,
+                "last_trained": _serialize_datetime(model.last_trained),
+                "model_blob_size_bytes": len(model.model_blob) if model.model_blob else 0,
+                "model_blob_base64": base64.b64encode(model.model_blob).decode("ascii")
+                if model.model_blob
+                else None,
+            }
+            for model in difficulty_models
+        ],
+    }
+
+    payload_text = json.dumps(export_payload, indent=2)
+    response = make_response(payload_text)
+    response.headers["Content-Type"] = "application/json"
+    response.headers["Content-Disposition"] = (
+        f'attachment; filename="smartalarm-user-{user_id}-export.json"'
+    )
+    return response
 
 
 @app.route("/account/delete", methods=["POST"])

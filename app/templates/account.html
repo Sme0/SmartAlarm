@@ -39,7 +39,7 @@
                             <label for="name-password" class="block text-sm text-gray-700 mb-1">Confirm with password</label>
                             {{ reset_preferred_name_form.password(id="name-password", class_="w-full rounded-md border border-gray-300 px-3 py-2 text-sm") }}
                         </div>
-                        {{ reset_preferred_name_form.submit(value="Change preferred name", class_="inline-block bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md") }}
+                        {{ reset_preferred_name_form.submit(value="Change preferred name", class_="inline-block bg-indigo-600 text-white font-medium rounded-md px-4 py-2 text-sm hover:bg-indigo-700 transition-colors shadow-sm") }}
                     </form>
 
                     <form method="POST" action="{{ url_for('account_edit_details') }}" class="border border-gray-200 rounded-md p-4 space-y-3">
@@ -53,7 +53,7 @@
                             <label for="email-password" class="block text-sm text-gray-700 mb-1">Confirm with password</label>
                             {{ reset_email_form.password(id="email-password", class_="w-full rounded-md border border-gray-300 px-3 py-2 text-sm") }}
                         </div>
-                        {{ reset_email_form.submit(value="Change email", class_="inline-block bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md") }}
+                        {{ reset_email_form.submit(value="Change email", class_="inline-block bg-indigo-600 text-white font-medium rounded-md px-4 py-2 text-sm hover:bg-indigo-700 transition-colors shadow-sm") }}
                     </form>
 
                     <form method="POST" action="{{ url_for('account_change_password') }}" class="border border-gray-200 rounded-md p-4 space-y-3">
@@ -67,7 +67,7 @@
                             <label for="password-new" class="block text-sm text-gray-700 mb-1">New password</label>
                             {{ reset_password_form.new_password(id="password-new", class_="w-full rounded-md border border-gray-300 px-3 py-2 text-sm") }}
                         </div>
-                        {{ reset_password_form.submit(value="Change password", class_="inline-block bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md") }}
+                        {{ reset_password_form.submit(value="Change password", class_="inline-block bg-indigo-600 text-white font-medium rounded-md px-4 py-2 text-sm hover:bg-indigo-700 transition-colors shadow-sm") }}
                     </form>
                 </div>
 
@@ -102,7 +102,7 @@
                         {% endfor %}
                     </div>
                     <div class="mb-6">
-                        <a href="{{ url_for('pair_device') }}" class="inline-block bg-indigo-600 text-white px-4 py-2 rounded-md">Pair a new device</a>
+                        <a href="{{ url_for('pair_device') }}" class="inline-block bg-indigo-600 text-white font-medium rounded-md px-4 py-2 text-sm hover:bg-indigo-700 transition-colors shadow-sm">Pair a new device</a>
                     </div>
                 {% endif %}
             </section>
@@ -130,16 +130,12 @@
                 <div class="space-y-4">
                     <a href="{{ url_for('sleep_data') }}" class="flex items-center justify-between max-w-md p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                         <span class="text-sm font-medium text-gray-700">Import sleep data</span>
-                        <button class="bg-white border border-gray-300 text-gray-700 font-medium rounded-md px-4 py-1.5 text-sm hover:bg-gray-50 transition-colors shadow-sm">Open</button>
+                        <span class="bg-indigo-600 text-white font-medium rounded-md px-4 py-1.5 text-sm hover:bg-indigo-700 transition-colors shadow-sm">Import</span>
                     </a>
-                    <div class="flex items-center justify-between max-w-md p-4 border border-gray-200 rounded-lg">
+                    <a href="{{ url_for('account_export_data') }}" class="flex items-center justify-between max-w-md p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                         <span class="text-sm font-medium text-gray-700">Request a copy of your data</span>
-                        <button class="bg-white border border-gray-300 text-gray-700 font-medium rounded-md px-4 py-1.5 text-sm hover:bg-gray-50 transition-colors shadow-sm">Send Request</button>
-                    </div>
-                    <div class="flex items-center justify-between max-w-md p-4 border border-gray-200 rounded-lg">
-                        <span class="text-sm font-medium text-gray-700">Request data deletion</span>
-                        <button class="bg-white border border-gray-300 text-gray-700 font-medium rounded-md px-4 py-1.5 text-sm hover:bg-gray-50 transition-colors shadow-sm">Send Request</button>
-                    </div>
+                        <span class="bg-indigo-600 text-white font-medium rounded-md px-4 py-1.5 text-sm hover:bg-indigo-700 transition-colors shadow-sm">Download JSON</span>
+                    </a>
                 </div>
             </section>
 
