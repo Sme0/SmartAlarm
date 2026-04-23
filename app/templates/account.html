@@ -106,15 +106,29 @@
 
             <section id="delete-account" class="view-section">
                 <div class="bg-red-50 border border-red-200 rounded-lg p-6 max-w-2xl">
-                    <h2 class="text-lg font-bold text-red-700 mb-2">Deactivate account</h2>
-                    <p class="text-sm text-red-600 mb-4">Deactivated accounts will be deleted automatically if not reactivated within 30 days.</p>
-                    <button class="bg-white border border-red-300 text-red-700 font-medium rounded-md px-5 py-2 text-sm hover:bg-red-50 transition-colors shadow-sm mb-8">Deactivate</button>
-                    
-                    <hr class="border-red-200 mb-8">
-                    
                     <h2 class="text-lg font-bold text-red-700 mb-2">Delete account permanently</h2>
-                    <p class="text-sm text-red-600 mb-4">This action cannot be undone. All your alarm logic, puzzles, and historical data will be wiped.</p>
-                    <button class="bg-red-600 text-white font-medium rounded-md px-5 py-2 text-sm hover:bg-red-700 transition-colors shadow-sm">Delete Account</button>
+                    <p class="text-sm text-red-600 mb-4">This action cannot be undone. All your alarm data, puzzle history, and sleep analytics will be deleted, and all your devices will be unpaired.</p>
+
+                    <form method="POST" action="{{ url_for('delete_account') }}" class="space-y-4">
+                        {{ delete_account_form.hidden_tag() }}
+
+                        <div>
+                            <label for="delete-email" class="block text-sm font-medium text-red-700 mb-1">Confirm your email address</label>
+                            {{ delete_account_form.email_address(id="delete-email", class_="w-full rounded-md border border-red-300 px-3 py-2 text-sm") }}
+                        </div>
+
+                        <div>
+                            <label for="delete-password" class="block text-sm font-medium text-red-700 mb-1">Confirm your password</label>
+                            {{ delete_account_form.password(id="delete-password", class_="w-full rounded-md border border-red-300 px-3 py-2 text-sm") }}
+                        </div>
+
+                        <label class="flex items-center gap-2 text-sm text-red-700">
+                            {{ delete_account_form.confirmation(class_="accent-red-600") }}
+                            <span>I understand this action is permanent</span>
+                        </label>
+
+                        {{ delete_account_form.submit(class_="bg-red-600 text-white font-medium rounded-md px-5 py-2 text-sm hover:bg-red-700 transition-colors shadow-sm") }}
+                    </form>
                 </div>
             </section>
 

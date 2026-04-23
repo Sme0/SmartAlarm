@@ -54,23 +54,6 @@ class RegistrationForm(FlaskForm):
         if User.query.filter_by(email_address=(field.data or '').strip().lower()).first():
             raise ValidationError('Email already registered.')
 
-class DeactivateAccountForm(FlaskForm):
-    """
-    Form for deactivating accounts.
-    Requires both email and password to ensure the chosen account is the correct
-    one to be deactivated, and that the user is the account's owner.
-    """
-    email_address = EmailField('Email address', validators=[
-        DataRequired(),
-        Email()
-    ])
-    password = PasswordField('Password', validators=[
-        DataRequired(),
-        Length(min=8)
-    ])
-    confirmation = BooleanField('Are you sure?')
-    submit = SubmitField('Deactivate Account')
-
 class DeleteAccountForm(FlaskForm):
     """
     Form for deleting accounts.
@@ -85,7 +68,9 @@ class DeleteAccountForm(FlaskForm):
         DataRequired(),
         Length(min=8)
     ])
-    confirmation = BooleanField('Are you sure?')
+    confirmation = BooleanField('I understand this action is permanent', validators=[
+        DataRequired(message='You must confirm account deletion.')
+    ])
     submit = SubmitField('Delete Account')
 
 class ResetPasswordForm(FlaskForm):

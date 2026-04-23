@@ -10,7 +10,16 @@ configure_test_environment()
 stub_optional_ml_dependencies()
 
 from app import app, database as db
-from app.models import Alarm, AlarmSession, Device, PuzzleSession, SleepSession, User
+from app.models import (
+    Alarm,
+    AlarmSession,
+    Device,
+    DifficultyModel,
+    PuzzleSession,
+    SleepSession,
+    SleepStage,
+    User,
+)
 from app.utils import utc_now
 
 
@@ -203,6 +212,105 @@ class WebRouteTests(unittest.TestCase):
         self.assertIn(f'value="{device.serial_number}"'.encode(), add_alarm.data)
         self.assertIn(b'name="days_of_week"', add_alarm.data)
         self.assertIn(b'value="07:30"', edit_alarm.data)
+
+    def test_delete_account_rejects_wrong_password(self):
+        user = User.register("delete-fail@example.com", "password123", "DeleteFail")
+        self._log_in(user)
+
+        response = self.client.post(
+            "/account/delete",
+            data={
+                "email_address": "delete-fail@example.com",
+                "password": "wrong-password",
+                "confirmation": "y",
+                "submit": "Delete Account",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/account#delete-account", response.headers["Location"])
+        self.assertIsNotNone(db.session.get(User, user.id))
+
+    def test_delete_account_deletes_user_data_and_unpairs_devices(self):
+        user = User.register("delete-ok@example.com", "password123", "DeleteOK")
+        self._log_in(user)
+
+        device = Device.register("DELETE-DEVICE-1", "Bedroom", user)
+        alarm = Alarm.create(
+            device_serial=device.serial_number,
+            user_id=user.id,
+            time=time(7, 30),
+            day_of_week=1,
+            enabled=True,
+            puzzle_type="memory",
+        )
+        self.assertIsNotNone(alarm)
+
+        alarm_session = AlarmSession.create(
+            user_id=user.id,
+            device_serial=device.serial_number,
+            triggered_at=utc_now(),
+            waking_difficulty=4,
+        )
+        PuzzleSession.create(
+            alarm_session_id=alarm_session.id,
+            puzzle_type="memory",
+            question="Pattern",
+            is_correct=True,
+            time_taken_seconds=12,
+            outcome_action="dismissed",
+        )
+
+        sleep_session = SleepSession(
+            user_id=user.id,
+            start_date=utc_now() - timedelta(hours=8),
+            end_date=utc_now(),
+            total_duration=7 * 3600,
+        )
+        db.session.add(sleep_session)
+        db.session.flush()
+        db.session.add(
+            SleepStage(
+                user_id=user.id,
+                stage="Asleep",
+                start_date=utc_now() - timedelta(hours=8),
+                end_date=utc_now() - timedelta(hours=7),
+                sleep_session_id=sleep_session.id,
+            )
+        )
+        db.session.add(
+            DifficultyModel(
+                user_id=user.id,
+                model_blob=b"model",
+                last_trained=utc_now(),
+            )
+        )
+        db.session.commit()
+
+        response = self.client.post(
+            "/account/delete",
+            data={
+                "email_address": "delete-ok@example.com",
+                "password": "password123",
+                "confirmation": "y",
+                "submit": "Delete Account",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/", response.headers["Location"])
+        self.assertIsNone(db.session.get(User, user.id))
+        self.assertIsNone(Alarm.query.filter_by(user_id=user.id).first())
+        self.assertIsNone(AlarmSession.query.filter_by(user_id=user.id).first())
+        self.assertIsNone(SleepSession.query.filter_by(user_id=user.id).first())
+        self.assertIsNone(SleepStage.query.filter_by(user_id=user.id).first())
+        self.assertIsNone(DifficultyModel.query.filter_by(user_id=user.id).first())
+
+        refreshed_device = db.session.get(Device, device.serial_number)
+        self.assertIsNotNone(refreshed_device)
+        self.assertIsNone(refreshed_device.user_id)
 
 
 if __name__ == "__main__":

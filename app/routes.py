@@ -17,6 +17,7 @@ from app import database as db
 from app.analysis import find_suitable_alarm, should_retrain_model
 from app.forms import (
     AlarmForm,
+    DeleteAccountForm,
     DeviceSettingsForm,
     EditAlarmForm,
     LoginForm,
@@ -26,6 +27,7 @@ from app.forms import (
 from app.models import (
     Alarm,
     AlarmSession,
+    DifficultyModel,
     Device,
     PuzzleSession,
     SleepSession,
@@ -253,10 +255,78 @@ def account():
     If a user is not logged in, Flask-Login will redirect them to the login page.
     """
     try:
-        return render_template("account.html", user=current_user)
+        delete_account_form = DeleteAccountForm()
+        return render_template(
+            "account.html", user=current_user, delete_account_form=delete_account_form
+        )
     except Exception:
         # Raise a 500 server error if something unexpected occurs
         raise InternalServerError("An error occurred while loading the account page.")
+
+
+@app.route("/account/delete", methods=["POST"])
+@login_required
+def delete_account():
+    delete_account_form = DeleteAccountForm()
+
+    if not delete_account_form.validate_on_submit():
+        flash("Please complete the delete-account confirmation fields.", "danger")
+        return redirect(url_for("account") + "#delete-account")
+
+    entered_email = (delete_account_form.email_address.data or "").strip().lower()
+    current_email = (current_user.email_address or "").strip().lower()
+
+    if entered_email != current_email:
+        flash("Email does not match your account.", "danger")
+        return redirect(url_for("account") + "#delete-account")
+
+    if not current_user.verify_password(delete_account_form.password.data or ""):
+        flash("Incorrect password.", "danger")
+        return redirect(url_for("account") + "#delete-account")
+
+    user_id = current_user.id
+    owned_serials = [
+        row[0] for row in db.session.query(Device.serial_number).filter_by(user_id=user_id).all()
+    ]
+
+    try:
+        if owned_serials:
+            Alarm.query.filter(Alarm.device_serial.in_(owned_serials)).delete(
+                synchronize_session=False
+            )
+            Device.query.filter(Device.serial_number.in_(owned_serials)).update(
+                {"user_id": None, "pairing_code": None, "pairing_expiry": None},
+                synchronize_session=False,
+            )
+
+        Alarm.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+
+        alarm_session_ids = [
+            row[0] for row in db.session.query(AlarmSession.id).filter_by(user_id=user_id).all()
+        ]
+        if alarm_session_ids:
+            PuzzleSession.query.filter(
+                PuzzleSession.alarm_session_id.in_(alarm_session_ids)
+            ).delete(synchronize_session=False)
+
+        AlarmSession.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+        SleepStage.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+        SleepSession.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+        DifficultyModel.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+
+        user = db.session.get(User, user_id)
+        if user is not None:
+            db.session.delete(user)
+
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        flash("Could not delete account right now. Please try again.", "danger")
+        return redirect(url_for("account") + "#delete-account")
+
+    logout_user()
+    flash("Your account and all associated data have been deleted.", "success")
+    return redirect(url_for("index"))
 
 
 @app.route("/account/session-history", methods=["GET"])
