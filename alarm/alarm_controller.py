@@ -2,7 +2,7 @@ import os
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 import pytz
 
@@ -10,6 +10,7 @@ from alarm.alarm_state import AlarmState
 from alarm.io.input_handler import InputEventType, InputHandler
 from alarm.io.output_handler import DebugOutputHandler, OutputHandler
 from alarm.io.pi_bluetooth import BluetoothConfirmation
+from alarm.io.temp_sensor import TempSensor
 from alarm.puzzles.maths_puzzle import MathsPuzzle
 from alarm.puzzles.memory_puzzle import MemoryPuzzle
 from alarm.puzzles.puzzle import Puzzle
@@ -66,7 +67,12 @@ class Alarm:
 
 
 class AlarmController:
-    def __init__(self, input_handler: InputHandler, output_handler: OutputHandler, debug_mode: bool = False):
+    def __init__(
+        self,
+        input_handler: InputHandler,
+        output_handler: OutputHandler,
+        debug_mode: bool = False,
+    ):
 
         self.input_handler = input_handler
         self.output_handler = output_handler
@@ -81,14 +87,16 @@ class AlarmController:
         self.snooze_alarms: List[Alarm] = []
 
         # Current alarm state
-        self.state : AlarmState = AlarmState.WAITING
+        self.state: AlarmState = AlarmState.WAITING
         self.current_triggered_alarm: Optional[Alarm] = None
-        
+
         # Session data
         self._pending_sessions: Dict[str, Dict[str, Any]] = {}
         self._complete_sessions: Dict[str, Dict[str, Any]] = {}
 
         self.bluetooth_connection = BluetoothConfirmation(20, True)
+
+        self.sensor = TempSensor()
 
     def _build_puzzle_for_current_alarm(self) -> Puzzle:
         """
@@ -233,7 +241,12 @@ class AlarmController:
             and current_minute != self.last_displayed_minute
         ):
             self.last_displayed_minute = current_minute
-            self.output_handler.display_text(_clock_now().strftime("%H:%M"))
+
+            temp, humidity = self.sensor.get_temp_and_humidity()
+
+            self.output_handler.display_text(
+                f"{_clock_now().strftime('%H:%M')}\n{temp}°C   {humidity}%"
+            )
 
         return False
 
