@@ -12,6 +12,12 @@ from alarm.io.output_handler import DebugOutputHandler, RaspberryPiOutputHandler
 from alarm.io.input_handler import InputEventType
 from alarm.io.pi_bluetooth import BluetoothSetup
 from alarm.flask_api_client import FlaskAPIClient, PairingStatus
+from alarm.device_cache import (
+    get_cached_alarms,
+    get_cached_server_paired,
+    save_cached_alarms,
+    save_cached_server_paired,
+)
 from alarm.alarm_controller import AlarmController
 from alarm.alarm_state import AlarmState
 from alarm.thingsboard_client import ThingsBoardClient
@@ -69,7 +75,21 @@ def _handle_alarm_events():
             break
 
 def pairing_loop():
-    if flask_api_client.get_pairing_status() == PairingStatus.PAIRED:
+    # Last known pairing state lets the device boot in offline mode without blocking.
+    cached_paired = get_cached_server_paired()
+    pairing_status = flask_api_client.get_pairing_status()
+
+    if pairing_status == PairingStatus.PAIRED:
+        # Persist successful server pairing so future offline boots can continue.
+        save_cached_server_paired(True)
+        return
+
+    if pairing_status == PairingStatus.INVALID:
+        if cached_paired:
+            print("[SETUP] Pairing status unavailable, using cached paired state.")
+            return
+        print("[SETUP] Could not verify pairing and no cached paired state was found.")
+        print("[SETUP] Device will continue in offline/unpaired mode.")
         return
 
     pairing_code = flask_api_client.request_pairing_code()
@@ -82,12 +102,17 @@ def pairing_loop():
         status = flask_api_client.get_pairing_status()
 
         if status == PairingStatus.PAIRED:
+            save_cached_server_paired(True)
             print("Successfully paired")
             break
 
         if status == PairingStatus.INVALID:
+            if cached_paired:
+                print("[SETUP] Network lost, using cached paired state.")
+                break
             output_handler.display_text("Unable to retrieve pairing status/code.")
-            continue
+            print("[SETUP] Pairing status unavailable. Continuing without pairing.")
+            break
 
         if status == PairingStatus.FAILED:
             pairing_code = flask_api_client.request_pairing_code()
@@ -105,6 +130,20 @@ def main_alarm_loop():
     last_update_time = time.time()
     previous_state = alarm_controller.state
     previous_alarm_snapshot = None
+
+    # Preload cached alarms so alarms can still run before the first successful sync.
+    cached_alarm_rows = get_cached_alarms()
+    if cached_alarm_rows:
+        restored_alarms = []
+        for row in cached_alarm_rows:
+            parsed_alarm = flask_api_client.alarm_from_dict(row)
+            if parsed_alarm is not None:
+                restored_alarms.append(parsed_alarm)
+
+        if restored_alarms:
+            alarm_controller.alarms = restored_alarms
+            print(f"[SETUP] Loaded {len(restored_alarms)} alarms from local cache.")
+
     while True:
 
         # Prepare for state change by clearing old inputs
@@ -132,6 +171,22 @@ def main_alarm_loop():
             success,latest_alarms = flask_api_client.get_alarms()
             if success:
                     alarm_controller.alarms = latest_alarms
+                    # Refresh local cache with the latest server-confirmed alarm list.
+                    save_cached_alarms([
+                        flask_api_client.alarm_to_dict(alarm)
+                        for alarm in latest_alarms
+                    ])
+            elif not alarm_controller.alarms:
+                # If sync fails and runtime has no alarms, restore from local cache.
+                fallback_alarms = []
+                for row in get_cached_alarms():
+                    parsed_alarm = flask_api_client.alarm_from_dict(row)
+                    if parsed_alarm is not None:
+                        fallback_alarms.append(parsed_alarm)
+
+                if fallback_alarms:
+                    alarm_controller.alarms = fallback_alarms
+                    print(f"[DEBUG] Loaded {len(fallback_alarms)} cached alarms due to sync failure")
             alarm_snapshot = (
                 [(alarm.id, alarm.time, alarm.day_of_week, alarm.puzzle_type) for alarm in alarm_controller.alarms],
                 [(alarm.id, alarm.time, alarm.day_of_week, alarm.puzzle_type) for alarm in alarm_controller.snooze_alarms],

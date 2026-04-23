@@ -24,6 +24,50 @@ class FlaskAPIClient:
         self.base_url = os.getenv("BASE_URL")
         self.serial_number = serial_number
 
+    @staticmethod
+    def alarm_to_dict(alarm: Alarm) -> dict:
+        # Keep Alarm dataclass fields JSON-safe for persistence in the local cache.
+        return {
+            "id": alarm.id,
+            "time": alarm.time,
+            "enabled": alarm.enabled,
+            "day_of_week": alarm.day_of_week,
+            "puzzle_type": alarm.puzzle_type,
+            "max_snoozes": alarm.max_snoozes,
+            "snooze_count": alarm.snooze_count,
+            "source_alarm_id": alarm.source_alarm_id,
+        }
+
+    @staticmethod
+    def alarm_from_dict(raw_alarm: dict):
+        # Shared parser for both server payloads and locally cached alarm rows.
+        if not isinstance(raw_alarm, dict):
+            return None
+
+        try:
+            if not raw_alarm.get("enabled"):
+                # Disabled alarms are intentionally ignored by the device runtime.
+                return None
+
+            day_of_week = raw_alarm.get("day_of_week")
+            if day_of_week is None:
+                return None
+
+            alarm_id = raw_alarm.get("id")
+            return Alarm(
+                id=alarm_id,
+                time=raw_alarm.get("time"),
+                enabled=raw_alarm.get("enabled"),
+                day_of_week=day_of_week,
+                puzzle_type=raw_alarm.get("puzzle_type"),
+                max_snoozes=raw_alarm.get("max_snoozes"),
+                snooze_count=raw_alarm.get("snooze_count", 0),
+                source_alarm_id=raw_alarm.get("source_alarm_id", alarm_id),
+            )
+        except Exception as e:
+            print(f"Skipping malformed alarm entry: {e}")
+            return None
+
     def _post(self, path: str, payload: dict):
         url = f"{self.base_url}{path}"
         try:
@@ -34,10 +78,10 @@ class FlaskAPIClient:
                 resp = requests.post(url, json=payload, timeout=TIMEOUT, verify=verify_path if verify_path else True)
             return resp
         except SSLError as e:
-            print("SSL verification failed when contacting server:", e)
+            print("[DEBUG] SSL verification failed when contacting server.")
             raise
         except RequestException as e:
-            print("HTTP request failed:", e)
+            print("[DEBUG] HTTP request failed.")
             raise
 
     def get_pairing_status(self) -> PairingStatus:
@@ -121,21 +165,9 @@ class FlaskAPIClient:
 
             alarms = []
             for alarm in data.get("alarms", []):
-                try:
-                    if alarm.get("enabled") and alarm.get("day_of_week") is not None:
-                        alarms.append(Alarm(
-                            id=alarm.get("id"),
-                            time=alarm.get("time"),
-                            enabled=alarm.get("enabled"),
-                            day_of_week=alarm.get("day_of_week"),
-                            puzzle_type=alarm.get("puzzle_type"),
-                            max_snoozes=alarm.get("max_snoozes"),
-                            snooze_count=0,
-                            source_alarm_id=alarm.get("id")
-                        ))
-                except Exception as e:
-                    print(f"Skipping malformed alarm entry: {e}")
-                    continue
+                parsed_alarm = self.alarm_from_dict(alarm)
+                if parsed_alarm is not None:
+                    alarms.append(parsed_alarm)
 
             return True, alarms
 

@@ -107,6 +107,44 @@ class FlaskApiClientTests(unittest.TestCase):
         client._post = Mock(return_value=_Resp(status_code=500, payload={"message": "nope"}))
         self.assertFalse(client.send_complete_sessions({"session": {"puzzle_sessions": []}}))
 
+    def test_alarm_dict_round_trip_for_cache(self):
+        """Alarm cache helpers should preserve values through dict conversion."""
+        client = FlaskAPIClient("SERIAL-5")
+        # Mirrors the shape persisted in local JSON cache.
+        raw_alarm = {
+            "id": "a-cache-1",
+            "time": "06:45",
+            "enabled": True,
+            "day_of_week": 4,
+            "puzzle_type": "memory",
+            "max_snoozes": 1,
+            "snooze_count": 0,
+            "source_alarm_id": "a-cache-1",
+        }
+
+        parsed = client.alarm_from_dict(raw_alarm)
+        self.assertIsNotNone(parsed)
+        # Round-trip back to dict to verify serializer compatibility.
+        serialized = client.alarm_to_dict(parsed)
+
+        self.assertEqual(serialized["id"], "a-cache-1")
+        self.assertEqual(serialized["day_of_week"], 4)
+        self.assertEqual(serialized["puzzle_type"], "memory")
+
+    def test_alarm_from_dict_rejects_disabled_rows(self):
+        """Disabled alarms should not be restored from cache."""
+        client = FlaskAPIClient("SERIAL-6")
+        parsed = client.alarm_from_dict({
+            "id": "a-disabled",
+            "time": "06:45",
+            "enabled": False,
+            "day_of_week": 4,
+            "puzzle_type": "maths",
+            "max_snoozes": 1,
+        })
+
+        self.assertIsNone(parsed)
+
 
 if __name__ == "__main__":
     unittest.main()
