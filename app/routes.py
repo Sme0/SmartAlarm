@@ -1910,13 +1910,22 @@ def analytics():
 @login_required
 def recommendation():
 
-    # trains the model on the user's data to give accurate predictions
-    from datetime import datetime
-
-    from app.analysis import train_user_model
-
+    # Retrain in the background so this API stays responsive.
     if should_retrain_model(current_user.id):
-        train_user_model(current_user.id)
+        user_id = current_user.id
+
+        def train_model():
+            with app.app_context():
+                try:
+                    from app.analysis import train_user_model
+
+                    train_user_model(user_id)
+                except Exception:
+                    app.logger.exception("Failed background model retrain for user %s", user_id)
+                finally:
+                    db.session.remove()
+
+        Thread(target=train_model, daemon=True).start()
 
     now = datetime.now()
 
