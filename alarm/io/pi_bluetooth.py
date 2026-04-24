@@ -264,7 +264,7 @@ class BluetoothSetup:
             self._log(f"Failed to start rfcomm process: {e}")
             return False
 
-        for _ in range(10):
+        for _ in range(20):
             if self._rfcomm_exists():
                 self._log("rfcomm connection established")
                 self.is_connected = True
