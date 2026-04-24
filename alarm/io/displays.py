@@ -1,13 +1,16 @@
+import logging
 from typing import List
 from time import sleep
 from alarm.io.input_handler import JoystickDirection
+
+logger = logging.getLogger(__name__)
 
 # To avoid errors when not running on a Raspberry Pi
 try:
     from grove_rgb_lcd import *
 except ImportError as e:
     smbus = None
-    print("Unable to import the following modules. Only an issue if connecting to raspberry pi components")
+    logger.warning("Unable to import the following modules. Only an issue if connecting to raspberry pi components")
 
 
 class Display:

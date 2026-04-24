@@ -1,6 +1,7 @@
 """Web route tests: auth flows, settings, and authenticated GET page rendering."""
 
 import unittest
+import json
 from datetime import time, timedelta
 
 from tests.bootstrap import configure_test_environment, stub_optional_ml_dependencies
@@ -10,7 +11,16 @@ configure_test_environment()
 stub_optional_ml_dependencies()
 
 from app import app, database as db
-from app.models import Alarm, AlarmSession, Device, PuzzleSession, SleepSession, User
+from app.models import (
+    Alarm,
+    AlarmSession,
+    Device,
+    DifficultyModel,
+    PuzzleSession,
+    SleepSession,
+    SleepStage,
+    User,
+)
 from app.utils import utc_now
 
 
@@ -145,6 +155,8 @@ class WebRouteTests(unittest.TestCase):
         self.assertEqual(dashboard.status_code, 200)
         self.assertEqual(alarms.status_code, 200)
         self.assertIn(b"/account/session-history", account.data)
+        self.assertIn(b"/account/export-data", account.data)
+        self.assertNotIn(b"Request data deletion", account.data)
         self.assertIn(b"Overview", dashboard.data)
         self.assertIn(b"Next alarm", dashboard.data)        
         self.assertIn(b'id="alarms-grid"', alarms.data)
@@ -203,6 +215,227 @@ class WebRouteTests(unittest.TestCase):
         self.assertIn(f'value="{device.serial_number}"'.encode(), add_alarm.data)
         self.assertIn(b'name="days_of_week"', add_alarm.data)
         self.assertIn(b'value="07:30"', edit_alarm.data)
+
+    def test_delete_account_rejects_wrong_password(self):
+        user = User.register("delete-fail@example.com", "password123", "DeleteFail")
+        self._log_in(user)
+
+        response = self.client.post(
+            "/account/delete",
+            data={
+                "email_address": "delete-fail@example.com",
+                "password": "wrong-password",
+                "confirmation": "y",
+                "submit": "Delete Account",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/account#delete-account", response.headers["Location"])
+        self.assertIsNotNone(db.session.get(User, user.id))
+
+    def test_delete_account_deletes_user_data_and_unpairs_devices(self):
+        user = User.register("delete-ok@example.com", "password123", "DeleteOK")
+        self._log_in(user)
+
+        device = Device.register("DELETE-DEVICE-1", "Bedroom", user)
+        alarm = Alarm.create(
+            device_serial=device.serial_number,
+            user_id=user.id,
+            time=time(7, 30),
+            day_of_week=1,
+            enabled=True,
+            puzzle_type="memory",
+        )
+        self.assertIsNotNone(alarm)
+
+        alarm_session = AlarmSession.create(
+            user_id=user.id,
+            device_serial=device.serial_number,
+            triggered_at=utc_now(),
+            waking_difficulty=4,
+        )
+        PuzzleSession.create(
+            alarm_session_id=alarm_session.id,
+            puzzle_type="memory",
+            question="Pattern",
+            is_correct=True,
+            time_taken_seconds=12,
+            outcome_action="dismissed",
+        )
+
+        sleep_session = SleepSession(
+            user_id=user.id,
+            start_date=utc_now() - timedelta(hours=8),
+            end_date=utc_now(),
+            total_duration=7 * 3600,
+        )
+        db.session.add(sleep_session)
+        db.session.flush()
+        db.session.add(
+            SleepStage(
+                user_id=user.id,
+                stage="Asleep",
+                start_date=utc_now() - timedelta(hours=8),
+                end_date=utc_now() - timedelta(hours=7),
+                sleep_session_id=sleep_session.id,
+            )
+        )
+        db.session.add(
+            DifficultyModel(
+                user_id=user.id,
+                model_blob=b"model",
+                last_trained=utc_now(),
+            )
+        )
+        db.session.commit()
+
+        response = self.client.post(
+            "/account/delete",
+            data={
+                "email_address": "delete-ok@example.com",
+                "password": "password123",
+                "confirmation": "y",
+                "submit": "Delete Account",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/", response.headers["Location"])
+        self.assertIsNone(db.session.get(User, user.id))
+        self.assertIsNone(Alarm.query.filter_by(user_id=user.id).first())
+        self.assertIsNone(AlarmSession.query.filter_by(user_id=user.id).first())
+        self.assertIsNone(SleepSession.query.filter_by(user_id=user.id).first())
+        self.assertIsNone(SleepStage.query.filter_by(user_id=user.id).first())
+        self.assertIsNone(DifficultyModel.query.filter_by(user_id=user.id).first())
+
+        refreshed_device = db.session.get(Device, device.serial_number)
+        self.assertIsNotNone(refreshed_device)
+        self.assertIsNone(refreshed_device.user_id)
+
+    def test_account_edit_details_updates_email(self):
+        user = User.register("old-email@example.com", "password123", "EditDetails")
+        self._log_in(user)
+
+        response = self.client.post(
+            "/account/edit-details",
+            data={
+                "email-new_email_address": "new-email@example.com",
+                "email-password": "password123",
+                "email-submit": "Edit details",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/account#change-details", response.headers["Location"])
+        updated = db.session.get(User, user.id)
+        self.assertEqual(updated.email_address, "new-email@example.com")
+
+    def test_account_change_preferred_name_updates_name(self):
+        user = User.register("name-update@example.com", "password123", "Old Name")
+        self._log_in(user)
+
+        response = self.client.post(
+            "/account/change-preferred-name",
+            data={
+                "name-preferred_name": "New Name",
+                "name-password": "password123",
+                "name-submit": "Change preferred name",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/account#change-details", response.headers["Location"])
+        updated = db.session.get(User, user.id)
+        self.assertEqual(updated.preferred_name, "New Name")
+
+    def test_account_change_password_updates_hash(self):
+        user = User.register("change-password@example.com", "password123", "ChangePassword")
+        self._log_in(user)
+
+        response = self.client.post(
+            "/account/change-password",
+            data={
+                "password-old_password": "password123",
+                "password-new_password": "newpassword123",
+                "password-submit": "Change password",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/account#change-details", response.headers["Location"])
+        updated = db.session.get(User, user.id)
+        self.assertTrue(updated.verify_password("newpassword123"))
+
+    def test_account_change_password_rejects_wrong_current_password(self):
+        user = User.register("change-password-fail@example.com", "password123", "ChangePassword")
+        self._log_in(user)
+
+        response = self.client.post(
+            "/account/change-password",
+            data={
+                "password-old_password": "wrongpassword",
+                "password-new_password": "newpassword123",
+                "password-submit": "Change password",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/account#change-details", response.headers["Location"])
+        unchanged = db.session.get(User, user.id)
+        self.assertTrue(unchanged.verify_password("password123"))
+
+    def test_account_export_data_returns_downloadable_json(self):
+        user = User.register("export@example.com", "password123", "Export User")
+        self._log_in(user)
+
+        device = Device.register("EXPORT-DEVICE-1", "Bedroom", user)
+        Alarm.create(
+            device_serial=device.serial_number,
+            user_id=user.id,
+            time=time(6, 45),
+            day_of_week=2,
+            enabled=True,
+            puzzle_type="maths",
+        )
+
+        alarm_session = AlarmSession.create(
+            user_id=user.id,
+            device_serial=device.serial_number,
+            triggered_at=utc_now(),
+            waking_difficulty=5,
+        )
+        PuzzleSession.create(
+            alarm_session_id=alarm_session.id,
+            puzzle_type="maths",
+            question="1+1",
+            is_correct=True,
+            time_taken_seconds=10,
+            outcome_action="dismissed",
+        )
+
+        response = self.client.get("/account/export-data")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/json", response.headers.get("Content-Type", ""))
+        self.assertIn(
+            "attachment; filename=\"smartalarm-user-",
+            response.headers.get("Content-Disposition", ""),
+        )
+
+        payload = json.loads(response.data.decode("utf-8"))
+        self.assertEqual(payload["user"]["email_address"], "export@example.com")
+        self.assertEqual(payload["user"]["preferred_name"], "Export User")
+        self.assertEqual(len(payload["devices"]), 1)
+        self.assertEqual(len(payload["alarms"]), 1)
+        self.assertEqual(len(payload["alarm_sessions"]), 1)
+        self.assertEqual(len(payload["alarm_sessions"][0]["puzzle_sessions"]), 1)
 
 
 if __name__ == "__main__":

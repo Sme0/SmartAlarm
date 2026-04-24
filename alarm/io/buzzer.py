@@ -1,12 +1,16 @@
 import threading
+import logging
 from abc import ABC, abstractmethod
 from time import sleep
 from alarm.io.grovepi_lock import grovepi_lock
 
+logger = logging.getLogger(__name__)
+
+
 try:
     import grovepi
 except ImportError:
-    print("Unable to import Pi libraries. Only an issue if connecting to raspberry pi components.")
+    logger.warning("Unable to import Pi libraries. Only an issue if connecting to raspberry pi components.")
 
 class Buzzer(ABC):
     def __init__(self, volume: int = 3) -> None:

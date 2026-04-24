@@ -1,5 +1,6 @@
 from enum import Enum
 import os
+import logging
 import requests
 from dotenv import load_dotenv
 from requests.exceptions import SSLError, RequestException
@@ -9,6 +10,7 @@ from alarm.alarm_controller import Alarm
 load_dotenv()
 
 TIMEOUT = 5
+logger = logging.getLogger(__name__)
 
 class PairingStatus(Enum):
     PAIRED = 0
@@ -24,6 +26,50 @@ class FlaskAPIClient:
         self.base_url = os.getenv("BASE_URL")
         self.serial_number = serial_number
 
+    @staticmethod
+    def alarm_to_dict(alarm: Alarm) -> dict:
+        # Keep Alarm dataclass fields JSON-safe for persistence in the local cache.
+        return {
+            "id": alarm.id,
+            "time": alarm.time,
+            "enabled": alarm.enabled,
+            "day_of_week": alarm.day_of_week,
+            "puzzle_type": alarm.puzzle_type,
+            "max_snoozes": alarm.max_snoozes,
+            "snooze_count": alarm.snooze_count,
+            "source_alarm_id": alarm.source_alarm_id,
+        }
+
+    @staticmethod
+    def alarm_from_dict(raw_alarm: dict):
+        # Shared parser for both server payloads and locally cached alarm rows.
+        if not isinstance(raw_alarm, dict):
+            return None
+
+        try:
+            if not raw_alarm.get("enabled"):
+                # Disabled alarms are intentionally ignored by the device runtime.
+                return None
+
+            day_of_week = raw_alarm.get("day_of_week")
+            if day_of_week is None:
+                return None
+
+            alarm_id = raw_alarm.get("id")
+            return Alarm(
+                id=alarm_id,
+                time=raw_alarm.get("time"),
+                enabled=raw_alarm.get("enabled"),
+                day_of_week=day_of_week,
+                puzzle_type=raw_alarm.get("puzzle_type"),
+                max_snoozes=raw_alarm.get("max_snoozes"),
+                snooze_count=raw_alarm.get("snooze_count", 0),
+                source_alarm_id=raw_alarm.get("source_alarm_id", alarm_id),
+            )
+        except Exception as e:
+            logger.debug(f"Skipping malformed alarm entry: {e}")
+            return None
+
     def _post(self, path: str, payload: dict):
         url = f"{self.base_url}{path}"
         try:
@@ -34,10 +80,10 @@ class FlaskAPIClient:
                 resp = requests.post(url, json=payload, timeout=TIMEOUT, verify=verify_path if verify_path else True)
             return resp
         except SSLError as e:
-            print("SSL verification failed when contacting server:", e)
+            logger.debug("SSL verification failed when contacting server.")
             raise
         except RequestException as e:
-            print("HTTP request failed:", e)
+            logger.debug("HTTP request failed")
             raise
 
     def get_pairing_status(self) -> PairingStatus:
@@ -54,7 +100,7 @@ class FlaskAPIClient:
             if response.headers.get("Content-Type", "").lower().startswith("application/json"):
                 data = response.json()
             else:
-                print("Failed to receive pairing status: " + response.text)
+                logger.debug("Failed to receive pairing status: " + response.text)
                 return PairingStatus.INVALID
 
             raw_pairing_status = data.get("response")
@@ -86,11 +132,11 @@ class FlaskAPIClient:
             if response.headers.get("Content-Type", "").lower().startswith("application/json"):
                 data = response.json()
             else:
-                print("Failed to request pairing code: " + response.text)
+                logger.debug("Failed to request pairing code: " + response.text)
                 return None
 
             if response.status_code != 200:
-                print("Failed to request pairing code: ", data.get('message', 'unknown reason'))
+                logger.debug("Failed to request pairing code: ", data.get('message', 'unknown reason'))
                 return None
 
             return data.get("pairing_code")
@@ -110,37 +156,25 @@ class FlaskAPIClient:
             response = self._post(path, payload)
 
             if not response.headers.get("Content-Type", "").lower().startswith("application/json"):
-                print("Failed to get alarms: " + response.text)
+                logger.debug("Failed to get alarms: " + response.text)
                 return False, []
 
             data = response.json()
 
             if response.status_code != 200:
-                print("Failed to get alarms:", data.get("reason", "unknown reason"))
+                logger.debug("Failed to get alarms:", data.get("reason", "unknown reason"))
                 return False, []
 
             alarms = []
             for alarm in data.get("alarms", []):
-                try:
-                    if alarm.get("enabled") and alarm.get("day_of_week") is not None:
-                        alarms.append(Alarm(
-                            id=alarm.get("id"),
-                            time=alarm.get("time"),
-                            enabled=alarm.get("enabled"),
-                            day_of_week=alarm.get("day_of_week"),
-                            puzzle_type=alarm.get("puzzle_type"),
-                            max_snoozes=alarm.get("max_snoozes"),
-                            snooze_count=0,
-                            source_alarm_id=alarm.get("id")
-                        ))
-                except Exception as e:
-                    print(f"Skipping malformed alarm entry: {e}")
-                    continue
+                parsed_alarm = self.alarm_from_dict(alarm)
+                if parsed_alarm is not None:
+                    alarms.append(parsed_alarm)
 
             return True, alarms
 
         except Exception as e:
-            print(f"Failed to get alarms: {e}")
+            logger.debug(f"Failed to get alarms: {e}")
             return False, []
 
     def send_complete_sessions(self, complete_sessions: dict) -> bool:
@@ -181,11 +215,11 @@ class FlaskAPIClient:
             if response.headers.get("Content-Type", "").lower().startswith("application/json"):
                 data = response.json()
             else:
-                print("Failed to submit complete sessions: " + response.text)
+                logger.debug("Failed to submit complete sessions: " + response.text)
                 return False
 
             if response.status_code != 200:
-                print("Failed to submit complete sessions: ", data.get("message", data.get("reason", "unknown reason")))
+                logger.debug("Failed to submit complete sessions: ", data.get("message", data.get("reason", "unknown reason")))
                 return False
 
             return True

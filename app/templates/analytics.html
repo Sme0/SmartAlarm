@@ -134,6 +134,19 @@ fetch("/api/analytics/alarm-success")
             datasets: [{
                 data: data.values
             }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.label + ": " + Math.round(context.parsed) + "%";
+                        }
+                    }
+                }
+            }
         }
     });
 });
@@ -144,8 +157,8 @@ fetch("/api/analytics/puzzle-types")
 .then(data => {
 
     const puzzleNameMap = {
-        "logic" : "Memory",
-        "math" : "Maths"
+        "memory" : "Memory",
+        "maths" : "Maths"
     }
 
     new Chart(document.getElementById("puzzleChart"), {

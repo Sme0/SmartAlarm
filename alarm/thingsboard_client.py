@@ -1,10 +1,12 @@
 import json
 import time
+import logging
 
 from dotenv import load_dotenv
 import os
 import paho.mqtt.client as mqtt
 
+logger = logging.getLogger(__name__)
 load_dotenv()
 
 class ThingsBoardClient:
@@ -20,14 +22,14 @@ class ThingsBoardClient:
         if self.enabled:
             self.client = mqtt.Client()
         else:
-            print("[ThingsBoard] Disabled via THINGSBOARD_ENABLED=False")
+            logger.info("Disabled via THINGSBOARD_ENABLED=False")
 
     def _on_connect(self, client, userdata, flags, rc, *extra_params):
         """
         Called after the client attempts to connect to the MQTT broker.
         rc (result code) = 0 means a successful connection.
         """
-        print('Connected with result code ' + str(rc))
+        logger.debug('Connected with result code ' + str(rc))
 
     def _on_publish(self, client, userdata, result):
         """
@@ -35,10 +37,10 @@ class ThingsBoardClient:
         Prints to confirm the publish event, helping verify
         that data actually reached the server.
         """
-        print("Published to MQTT broker")
+        logger.debug("Published to MQTT broker")
 
     def _on_message(self, client, userdata, msg):
-        print("Payload: " + str(msg.payload))
+        logger.debug("Payload: " + str(msg.payload))
         #TODO: Sort via msg.topic
         data = json.loads(msg.payload)
         #TODO: Send data somewhere (observer pattern?)
@@ -89,8 +91,6 @@ class ThingsBoardClient:
 if __name__ == "__main__":
     load_dotenv()
     import random
-    print(os.getenv("THINGSBOARD_ACCESS_TOKEN"))
-    print(os.getenv("THINGSBOARD_HOST"))
     thingsboard_client = ThingsBoardClient()
     thingsboard_client.connect()
 

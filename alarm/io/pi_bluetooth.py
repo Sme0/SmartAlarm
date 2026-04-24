@@ -1,6 +1,7 @@
 import os
 import subprocess
 import time
+import logging
 from typing import Optional, Tuple
 
 import serial
@@ -18,6 +19,7 @@ See end of file for sample code.
 ARDUINO_MAC_ADDRESS = '00:0E:EA:CF:6D:A5'
 SERIAL = "/dev/rfcomm0"
 HCI_DEVICE = "hci0"
+logger = logging.getLogger(__name__)
 
 class Bluetooth:
     def __init__(self):
@@ -25,8 +27,8 @@ class Bluetooth:
         try:
             self.connection = serial.Serial("/dev/rfcomm0", 9600, timeout=2)
         except serial.SerialException as e:
-            print(f"[Bluetooth] Warning: Could not open /dev/rfcomm0: {e}")
-            print("[Bluetooth] A connection will be attempted when needed.")
+            logger.warning(f"Could not open /dev/rfcomm0: {e}")
+            logger.warning("A connection will be attempted when needed.")
 
     def process_incoming_message(self, message: str) -> str:
         return str(message).strip('b').strip(r"'").strip()
@@ -73,8 +75,8 @@ class BluetoothConfirmation:
         
     def await_confirmation(self) -> None:
         if self.debug:
-            print("Awaiting confirmation...")
-        
+            logger.debug("Awaiting confirmation...")
+
         self.received_message = self.bluetooth_io.listen(self.reply_window)
         
         if self.received_message and "1" in self.received_message:
@@ -88,15 +90,15 @@ class BluetoothConfirmation:
         self.received_confirmation = False
         self.bluetooth_io.send_message("0")
         if self.debug:
-            print("Sending confirmation request...")
-        
+            logger.debug("Sending confirmation request...")
+
     def check_confirmation(self) -> bool:
         if self.debug:
             if self.received_confirmation:
-                print("\nThird-party confirmation received.")       
+                logger.debug("Third-party confirmation received.")
             else:
-                print("Third-party confirmation not received.")
-                
+                logger.debug("Third-party confirmation not received.")
+
         return self.received_confirmation
 
 class BluetoothSetup:
@@ -108,7 +110,7 @@ class BluetoothSetup:
 
     def _log(self, message: str) -> None:
         if self.debug:
-            print(f"[BT-SETUP] {message}")
+            logger.debug("[BT-SETUP] %s", message)
 
     def _run_command(self, command: str, sudo: bool = False, timeout: int = 10) -> Tuple[bool, str, str]:
         """

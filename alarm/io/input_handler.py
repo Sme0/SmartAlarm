@@ -7,6 +7,7 @@ Design summary:
 """
 
 import time
+import logging
 from abc import abstractmethod, ABC
 from collections import deque
 from dataclasses import dataclass
@@ -19,6 +20,8 @@ from alarm.alarm_state import AlarmState
 from alarm.io.grovepi_lock import grovepi_lock
 from alarm.thingsboard_client import ThingsBoardClient
 
+logger = logging.getLogger(__name__)
+
 try:
     import msvcrt # Windows-only, used for non-blocking console input in debug mode
 except ImportError:
@@ -29,7 +32,7 @@ try:
     from grove_rgb_lcd import *
     import grovepi
 except ImportError:
-    print("Unable to import Pi libraries. Only an issue if connecting to raspberry pi components.")
+    logger.warning("Unable to import Pi libraries. Only an issue if connecting to raspberry pi components.")
 
 
 class InputEventType(Enum):
@@ -99,7 +102,7 @@ class InputHandler(ABC):
         Enqueue a normalized input event.
         """
         event = InputEvent(event_type=event_type, timestamp=time.time(), payload=payload)
-        print("Recognised: " + event.event_type.__str__())
+        logger.debug("Recognised: " + event.event_type.__str__())
         self._events.append(event)
         self.thingsboard_client.post({
             "input_event": event.event_type.__str__(),
@@ -314,7 +317,7 @@ class RaspberryPiInputHandler(InputHandler):
                 if event_type is not None and self._is_debounced(event_type):
                     self.push_event(event_type)
         except IOError:
-            print("Error")
+            logger.error("IOError")
 
     def read_joystick(self):
         """
@@ -331,7 +334,7 @@ class RaspberryPiInputHandler(InputHandler):
                 x = grovepi.analogRead(self.joystick_x)
                 y = grovepi.analogRead(self.joystick_y)
         except IOError:
-            print("ERROR: Error reading from joystick")
+            logger.error("Error reading from joystick")
             return JoystickDirection.NEUTRAL
 
         # Joystick press
