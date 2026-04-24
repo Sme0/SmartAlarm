@@ -81,6 +81,17 @@ class PuzzleTests(unittest.TestCase):
         self.assertEqual(exported["time_taken_seconds"], 4.5)
         self.assertEqual(exported["outcome_action"], "dismissed")
 
+    def test_base_puzzle_times_out_after_two_minutes_without_input(self):
+        """Base puzzles should fail after the two-minute timeout without input."""
+        output = _Output()
+        puzzle = SimplePuzzle(_Input(), output)
+
+        with patch("alarm.puzzles.puzzle.time.time", side_effect=[0.0, 121.0]):
+            timed_out = puzzle.run_puzzle()
+
+        self.assertFalse(timed_out)
+        self.assertIn("Puzzle timeout", output.text)
+
     def test_maths_puzzle_formats_problem_and_moves_selection(self):
         """Maths puzzles should format the prompt and move selection correctly."""
         puzzle = MathsPuzzle(_Input(), _Output())

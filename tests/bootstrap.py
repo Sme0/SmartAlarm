@@ -68,7 +68,12 @@ def stub_optional_device_dependencies():
         mathgenerator.mathgen = lambda *args, **kwargs: ("2 + 2", 4)
         sys.modules["mathgenerator"] = mathgenerator
 
-# Stub out serial and MQTT dependencies to avoid requiring hardware or network access for tests.
+    if "grovepi" not in sys.modules:
+        grovepi = types.ModuleType("grovepi")
+        grovepi.dht = lambda *args, **kwargs: (20.0, 50.0)
+        sys.modules["grovepi"] = grovepi
+
+    # Stub out device-side dependencies to avoid requiring hardware or network access for tests.
     if "serial" not in sys.modules:
         serial = types.ModuleType("serial")
 
@@ -122,3 +127,25 @@ def stub_optional_device_dependencies():
 
         mqtt_client.Client = _MqttClient
         sys.modules["paho.mqtt.client"] = mqtt_client
+
+    if "pexpect" not in sys.modules:
+        pexpect = types.ModuleType("pexpect")
+
+        class _Spawn:
+            def __init__(self, *args, **kwargs):
+                self.sent = []
+
+            def expect(self, patterns):
+                if isinstance(patterns, (list, tuple)):
+                    return len(patterns) - 1
+                return 0
+
+            def sendline(self, value):
+                self.sent.append(value)
+
+            def close(self):
+                return None
+
+        pexpect.spawn = _Spawn
+        pexpect.TIMEOUT = object()
+        sys.modules["pexpect"] = pexpect

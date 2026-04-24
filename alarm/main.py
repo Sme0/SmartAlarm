@@ -31,6 +31,7 @@ from alarm.device_cache import (
     save_cached_server_paired,
 )
 from alarm.alarm_controller import AlarmController
+from alarm.alarm_sync import parse_cached_alarms, resolve_alarm_refresh
 from alarm.alarm_state import AlarmState
 from alarm.thingsboard_client import ThingsBoardClient
 
@@ -146,12 +147,7 @@ def main_alarm_loop():
     # Preload cached alarms so alarms can still run before the first successful sync.
     cached_alarm_rows = get_cached_alarms()
     if cached_alarm_rows:
-        restored_alarms = []
-        for row in cached_alarm_rows:
-            parsed_alarm = flask_api_client.alarm_from_dict(row)
-            if parsed_alarm is not None:
-                restored_alarms.append(parsed_alarm)
-
+        restored_alarms = parse_cached_alarms(flask_api_client, cached_alarm_rows)
         if restored_alarms:
             alarm_controller.alarms = restored_alarms
             logger.info("[SETUP] Loaded %s alarms from local cache.", len(restored_alarms))
@@ -181,30 +177,21 @@ def main_alarm_loop():
         current_time = time.time()
         if current_time - last_update_time >= 15.0:
             success,latest_alarms = flask_api_client.get_alarms()
-            if success:
-                    alarm_controller.alarms = latest_alarms
-                    # Refresh local cache with the latest server-confirmed alarm list.
-                    save_cached_alarms([
-                        flask_api_client.alarm_to_dict(alarm)
-                        for alarm in latest_alarms
-                    ])
-            elif not alarm_controller.alarms:
-                # If sync fails and runtime has no alarms, restore from local cache.
-                fallback_alarms = []
-                for row in get_cached_alarms():
-                    parsed_alarm = flask_api_client.alarm_from_dict(row)
-                    if parsed_alarm is not None:
-                        fallback_alarms.append(parsed_alarm)
-
-                if fallback_alarms:
-                    alarm_controller.alarms = fallback_alarms
-                    logger.debug("Loaded %s cached alarms due to sync failure", len(fallback_alarms))
+            resolved_alarms, cache_rows = resolve_alarm_refresh(
+                flask_api_client,
+                alarm_controller.alarms,
+                success,
+                latest_alarms,
+                get_cached_alarms(),
+            )
+            alarm_controller.alarms = resolved_alarms
+            if cache_rows is not None:
+                # Refresh local cache with the latest server-confirmed alarm list.
+                save_cached_alarms(cache_rows)
             alarm_snapshot = (
                 [(alarm.id, alarm.time, alarm.day_of_week, alarm.puzzle_type) for alarm in alarm_controller.alarms],
                 [(alarm.id, alarm.time, alarm.day_of_week, alarm.puzzle_type) for alarm in alarm_controller.snooze_alarms],
             )
-            if not success:
-                logger.debug("Failed to refresh alarms, keeping existing ones")
             if alarm_snapshot != previous_alarm_snapshot:
                 logger.debug("Active alarms updated: %s, %s", alarm_controller.alarms, alarm_controller.snooze_alarms)
                 previous_alarm_snapshot = alarm_snapshot

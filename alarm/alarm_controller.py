@@ -82,6 +82,7 @@ class AlarmController:
         # Current time in 24-hour format
         self.current_time = 0
         self.last_displayed_minute = None
+        self.last_triggered_occurrence_key = None
 
         # Alarms in 24-hour format
         self.alarms: List[Alarm] = []
@@ -222,17 +223,26 @@ class AlarmController:
         Checks if there are any alarms due to trigger.
         :return: If an alarm has been triggered
         """
-        current_minute = _clock_now().minute
-        day_of_week = _get_current_day_of_week_number()
+        now = _clock_now()
+        current_minute = now.minute
+        day_of_week = now.weekday()
 
         # Check each alarm and trigger if needed
         alarms_to_check = (self.alarms or []) + (self.snooze_alarms or [])
         for alarm in alarms_to_check:
+            occurrence_key = (
+                str(alarm.id),
+                now.date().isoformat(),
+                alarm.time,
+            )
             if (
                 self.state == AlarmState.WAITING
+                and alarm.enabled
                 and day_of_week == alarm.day_of_week
                 and self.current_time == (alarm.time + ":00")
+                and occurrence_key != self.last_triggered_occurrence_key
             ):
+                self.last_triggered_occurrence_key = occurrence_key
                 self.trigger_alarm(alarm)
                 return True
 
