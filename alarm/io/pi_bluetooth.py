@@ -174,7 +174,7 @@ class BluetoothSetup:
         self._log(f"Scanning for {ARDUINO_MAC_ADDRESS}...")
         
         self._run_command("bluetoothctl scan on", sudo=True, timeout=2)
-        time.sleep(1) 
+        time.sleep(5)
         self._run_command("bluetoothctl scan off", sudo=True, timeout=2)
 
         # Verify device was found
