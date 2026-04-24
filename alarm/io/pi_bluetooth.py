@@ -245,37 +245,36 @@ class BluetoothSetup:
         self._log(f"Trust failed: {stderr}")
         return False
 
-    def _create_rfcomm_connection(self) -> bool:
+    def _create_rfcomm_connection(self, retries: int = 3, retry_delay: float = 2.0) -> bool:
         self._log(f"Creating rfcomm connection to {ARDUINO_MAC_ADDRESS}...")
 
-        # Release stale mapping for rfcomm0 if present.
-        self._run_command("rfcomm release 0", sudo=True, timeout=5)
-        time.sleep(1)
+        for attempt in range(1, retries + 1):
+            self._log(f"Attempt {attempt}/{retries}")
+            self._run_command("rfcomm release 0", sudo=True, timeout=5)
+            time.sleep(1)
 
-        # rfcomm connect is long-running by design; run it in background and poll for /dev/rfcomm0.
-        try:
-            self.rfcomm_process = subprocess.Popen(
-                ["sudo", "-n", "rfcomm", "connect", "0", ARDUINO_MAC_ADDRESS, "1"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-        except Exception as e:
-            self._log(f"Failed to start rfcomm process: {e}")
-            return False
+            try:
+                self.rfcomm_process = subprocess.Popen(
+                    ["sudo", "-n", "rfcomm", "connect", "0", ARDUINO_MAC_ADDRESS, "1"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+            except Exception as e:
+                self._log(f"Failed to start rfcomm process: {e}")
+                continue
 
-        for _ in range(20):
-            if self._rfcomm_exists():
-                self._log("rfcomm connection established")
-                self.is_connected = True
-                return True
-            time.sleep(0.5)
+            for _ in range(20):
+                if self._rfcomm_exists():
+                    self.is_connected = True
+                    return True
+                if self.rfcomm_process.poll() is not None:
+                    break  # died early, no point waiting
+                time.sleep(0.5)
 
-        stderr_output = ""
-        if self.rfcomm_process and self.rfcomm_process.poll() is not None:
-            _, stderr_output = self.rfcomm_process.communicate()
+            self._log(f"Attempt {attempt} failed, waiting {retry_delay}s...")
+            time.sleep(retry_delay)
 
-        self._log(f"rfcomm connection failed: {stderr_output or 'device did not appear'}")
         return False
         
         
