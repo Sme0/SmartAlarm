@@ -150,39 +150,41 @@ class BluetoothSetup:
         try:
             child = pexpect.spawn("bluetoothctl", encoding="utf-8", timeout=10)
 
-            child.expect("#")
+            child.expect([r"\[bluetooth\].*#", r"#"])
 
             child.sendline(f"remove {ARDUINO_MAC_ADDRESS}")
-            child.expect("#")
+            child.expect([r"\[bluetooth\].*#", r"#"])
 
             child.sendline("scan on")
             time.sleep(5)
 
             child.sendline("scan off")
-            child.expect("#")
+            child.expect([r"\[bluetooth\].*#", r"#"])
 
             child.sendline(f"pair {ARDUINO_MAC_ADDRESS}")
 
             i = child.expect([
-                "Enter PIN code:",
+                "Enter PIN code",
+                "Request PIN code",
                 "Pairing successful",
                 "Failed to pair",
+                "AuthenticationFailed",
                 pexpect.TIMEOUT
             ])
 
-            if i == 0:
+            if i in [0, 1]:
                 self._log("Sending PIN 1234")
                 child.sendline("1234")
                 child.expect("Pairing successful")
-            elif i == 1:
-                self._log("Already paired")
+            elif i == 2:
+                self._log("Already paired or pairing succeeded")
             else:
                 self._log("Pairing failed or timed out")
                 child.close()
                 return False
 
             child.sendline(f"trust {ARDUINO_MAC_ADDRESS}")
-            child.expect("#")
+            child.expect([r"\[bluetooth\].*#", r"#"])
 
             child.sendline("quit")
             child.close()
