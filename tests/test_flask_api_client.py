@@ -1,5 +1,6 @@
 """Client tests: response parsing, request failures, and alarm payload handling."""
 
+import os
 import sys
 import types
 import unittest
@@ -35,6 +36,47 @@ class _Resp:
 
 
 class FlaskApiClientTests(unittest.TestCase):
+    def test_post_uses_default_tls_verification(self):
+        """Client requests should rely on normal TLS verification by default."""
+        with patch.dict(os.environ, {"BASE_URL": "https://smartalarm.example"}, clear=False):
+            client = FlaskAPIClient("SERIAL-TLS-1")
+            response = object()
+
+            with patch("alarm.flask_api_client.requests.post", return_value=response) as post:
+                result = client._post("/api/device/pairing-status", {"serial_number": "SERIAL-TLS-1"})
+
+        self.assertIs(result, response)
+        self.assertEqual(post.call_args.args[0], "https://smartalarm.example/api/device/pairing-status")
+        self.assertNotIn("verify", post.call_args.kwargs)
+        self.assertEqual(post.call_args.kwargs["timeout"], 5)
+
+    def test_post_uses_configured_ca_bundle(self):
+        """Client requests should use the configured CA bundle when present."""
+        with patch.dict(
+            os.environ,
+            {
+                "BASE_URL": "https://smartalarm.example",
+                "REQUESTS_CA_BUNDLE": "/tmp/ca.pem",
+            },
+            clear=False,
+        ):
+            client = FlaskAPIClient("SERIAL-TLS-2")
+            response = object()
+
+            with patch("alarm.flask_api_client.requests.post", return_value=response) as post:
+                result = client._post("/api/device/get-alarms", {"serial_number": "SERIAL-TLS-2"})
+
+        self.assertIs(result, response)
+        self.assertEqual(post.call_args.args[0], "https://smartalarm.example/api/device/get-alarms")
+        self.assertEqual(post.call_args.kwargs["verify"], "/tmp/ca.pem")
+
+    def test_ssl_error_returns_invalid_pairing_status(self):
+        """SSL failures should be handled safely by returning an invalid pairing status."""
+        client = FlaskAPIClient("SERIAL-TLS-3")
+        client._post = Mock(side_effect=exceptions.SSLError("ssl failed"))
+
+        self.assertEqual(client.get_pairing_status(), PairingStatus.INVALID)
+
     def test_get_pairing_status_maps_json_response(self):
         """JSON pairing responses should map to the matching enum value."""
         client = FlaskAPIClient("SERIAL-1")
