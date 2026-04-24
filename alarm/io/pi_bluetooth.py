@@ -5,6 +5,7 @@ import logging
 from typing import Optional, Tuple
 
 import serial
+import pexpect
 
 '''
 Only a single character gets sent over bluetooth:
@@ -32,7 +33,7 @@ class Bluetooth:
 
     def process_incoming_message(self, message: str) -> str:
         return str(message).strip('b').strip(r"'").strip()
-            
+
     def send_message(self, message) -> None:
         if self.connection:
             self.connection.write(message.encode())
@@ -42,13 +43,13 @@ class Bluetooth:
             return None
 
         message = []
-            
+
         for _ in range(timeout // 2):
             incoming = self.process_incoming_message(self.connection.read())
             if incoming == r"\r":
                 return self.message_to_string(message)
             message.append(incoming)
-        
+
         self.send_message("2")
         return None
 
@@ -66,26 +67,26 @@ class BluetoothConfirmation:
         self.awaiting_confirmation = False
         self.received_confirmation = False
         self.received_message = ""
-        
+
         self.bluetooth_io = Bluetooth()
         self.reply_window = timeout
-        
+
         self.debug = debug
-        
-        
+
+
     def await_confirmation(self) -> None:
         if self.debug:
             logger.debug("Awaiting confirmation...")
 
         self.received_message = self.bluetooth_io.listen(self.reply_window)
-        
+
         if self.received_message and "1" in self.received_message:
             self.received_confirmation = True
-        
+
         else:
             self.received_confirmation = False
-        
-        
+
+
     def send_confirmation_request(self) -> None:
         self.received_confirmation = False
         self.bluetooth_io.send_message("0")
@@ -104,229 +105,131 @@ class BluetoothConfirmation:
 class BluetoothSetup:
 
     def __init__(self, debug: bool = False) -> None:
-        self.debug: bool = debug
-        self.is_connected: bool = False
+        self.debug = debug
+        self.is_connected = False
         self.rfcomm_process: Optional[subprocess.Popen] = None
 
     def _log(self, message: str) -> None:
         if self.debug:
             logger.debug("[BT-SETUP] %s", message)
 
-    def _run_command(self, command: str, sudo: bool = False, timeout: int = 10) -> Tuple[bool, str, str]:
+    def _start_rfcomm(self) -> bool:
         """
-        Execute a shell command and return success status, stdout, stderr.
+        Equivalent to:
+        sudo rfcomm connect hci0 MAC
         """
-        try:
-            if sudo:
-                # Use non-interactive sudo so we fail quickly instead of hanging for a password prompt.
-                full_command = f"sudo -n {command}"
-            else:
-                full_command = command
+        self._log("Starting rfcomm connection...")
 
-            self._log(f"Running: {full_command}")
-            result = subprocess.run(
-                full_command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=timeout
+        try:
+            self.rfcomm_process = subprocess.Popen(
+                ["sudo", "-n", "rfcomm", "connect", HCI_DEVICE, ARDUINO_MAC_ADDRESS],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
             )
-
-            success = result.returncode == 0
-            return success, result.stdout, result.stderr
-
-        except subprocess.TimeoutExpired:
-            self._log(f"Command timed out after {timeout}s")
-            return False, "", "Command timed out"
         except Exception as e:
-            self._log(f"Command failed: {str(e)}")
-            return False, "", str(e)
-
-    def _rfcomm_exists(self) -> bool:
-        if not os.path.exists(SERIAL):
-            self._log(f"{SERIAL} does not exist")
+            self._log(f"Failed to start rfcomm: {e}")
             return False
+
+        # Give it time to create /dev/rfcomm0
+        time.sleep(3)
+
+        if os.path.exists(SERIAL):
+            self._log(f"{SERIAL} exists → connection successful")
+            return True
+
+        self._log("rfcomm did not create serial device")
+        return False
+
+    def _manual_pair_sequence(self) -> bool:
+        """
+        Fully replicates manual bluetoothctl flow INCLUDING PIN entry.
+        """
+        self._log("Running manual bluetoothctl sequence with PIN handling...")
 
         try:
-            # Non-blocking open: avoid hanging waiting for incoming bytes on an idle serial link.
-            test_connection = serial.Serial(SERIAL, 9600, timeout=0.1)
-            test_connection.close()
-            self._log(f"{SERIAL} is available")
+            child = pexpect.spawn("bluetoothctl", encoding="utf-8", timeout=10)
+
+            child.expect("#")
+
+            child.sendline(f"remove {ARDUINO_MAC_ADDRESS}")
+            child.expect("#")
+
+            child.sendline("scan on")
+            time.sleep(5)
+
+            child.sendline("scan off")
+            child.expect("#")
+
+            child.sendline(f"pair {ARDUINO_MAC_ADDRESS}")
+
+            i = child.expect([
+                "Enter PIN code:",
+                "Pairing successful",
+                "Failed to pair",
+                pexpect.TIMEOUT
+            ])
+
+            if i == 0:
+                self._log("Sending PIN 1234")
+                child.sendline("1234")
+                child.expect("Pairing successful")
+            elif i == 1:
+                self._log("Already paired")
+            else:
+                self._log("Pairing failed or timed out")
+                child.close()
+                return False
+
+            child.sendline(f"trust {ARDUINO_MAC_ADDRESS}")
+            child.expect("#")
+
+            child.sendline("quit")
+            child.close()
+
             return True
+
         except Exception as e:
-            self._log(f"{SERIAL} exists but is not usable: {e}")
+            self._log(f"Pairing sequence failed: {e}")
             return False
 
-    def _is_device_paired(self) -> bool:
-        success, stdout, _ = self._run_command(
-            f"bluetoothctl info {ARDUINO_MAC_ADDRESS}",
-            timeout=5
-        )
-
-        if success and "Device" in stdout:
-            self._log(f"Device {ARDUINO_MAC_ADDRESS} is already paired")
-            return True
-
-        self._log(f"Device {ARDUINO_MAC_ADDRESS} is not paired yet")
-        return False
-    
-    def _scan_for_device(self):
-        self._log(f"Scanning for {ARDUINO_MAC_ADDRESS}...")
-        
-        self._run_command("bluetoothctl scan on", sudo=True, timeout=2)
-        time.sleep(5)
-        self._run_command("bluetoothctl scan off", sudo=True, timeout=2)
-
-        # Verify device was found
-        success, stdout, _ = self._run_command(
-            f"bluetoothctl info {ARDUINO_MAC_ADDRESS}",
-            timeout=5
-        )
-        
-        if success:
-            self._log(f"Found device {ARDUINO_MAC_ADDRESS}")
-            return True
-        
-        self._log(f"Failed to find device {ARDUINO_MAC_ADDRESS}")
-        return False
-
-    def _remove_old_connection(self) -> bool:
-        self._log(f"Attempting to remove old connection to {ARDUINO_MAC_ADDRESS}...")
-
-        success, _, _ = self._run_command(
-            f"bluetoothctl remove {ARDUINO_MAC_ADDRESS}",
-            sudo=True,
-            timeout=5
-        )
-
-        if success:
-            self._log("Old connection removed")
-            time.sleep(1)
-            return True
-
-        # Not finding an old connection is fine
-        self._log("No old connection to remove (this is OK)")
-        return True
-
-    def _pair_device(self) -> bool:
-        self._log(f"Pairing with {ARDUINO_MAC_ADDRESS}...")
-
-        # Attempt pairing
-        success, stdout, stderr = self._run_command(
-            f"bluetoothctl pair {ARDUINO_MAC_ADDRESS}",
-            sudo=True,
-            timeout=10
-        )
-
-        if not success:
-            self._log(f"Pairing failed: {stderr}")
-            return False
-
-        if "already paired" in stdout.lower() or "Pairing successful" in stdout:
-            self._log("Pairing successful")
-            return True
-
-        self._log(f"Pairing response: {stdout}")
-        return False
-    
-    def _trust_device(self) -> bool:
-        self._log(f"Trusting {ARDUINO_MAC_ADDRESS}...")
-
-        success, stdout, stderr = self._run_command(
-            f"bluetoothctl trust {ARDUINO_MAC_ADDRESS}",
-            sudo=True,
-            timeout=5
-        )
-
-        if success:
-            self._log("Device trusted")
-            return True
-
-        self._log(f"Trust failed: {stderr}")
-        return False
-
-    def _create_rfcomm_connection(self, retries: int = 3, retry_delay: float = 2.0) -> bool:
-        self._log(f"Creating rfcomm connection to {ARDUINO_MAC_ADDRESS}...")
-
-        for attempt in range(1, retries + 1):
-            self._log(f"Attempt {attempt}/{retries}")
-            self._run_command("rfcomm release 0", sudo=True, timeout=5)
-            time.sleep(1)
-
-            try:
-                self.rfcomm_process = subprocess.Popen(
-                    ["sudo", "-n", "rfcomm", "connect", "0", ARDUINO_MAC_ADDRESS, "1"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                )
-            except Exception as e:
-                self._log(f"Failed to start rfcomm process: {e}")
-                continue
-
-            for _ in range(20):
-                if self._rfcomm_exists():
-                    self.is_connected = True
-                    return True
-                if self.rfcomm_process.poll() is not None:
-                    break  # died early, no point waiting
-                time.sleep(0.5)
-
-            self._log(f"Attempt {attempt} failed, waiting {retry_delay}s...")
-            time.sleep(retry_delay)
-
-        return False
-        
-        
     def connect(self) -> bool:
         """
-        Establish Bluetooth connection to Arduino.
-        Returns True if successful, False otherwise.
+        Same outward behaviour as before.
+        Now mirrors your manual process exactly.
         """
-        self._log("=== Starting Bluetooth Connection Setup ===")
+        self._log("=== Bluetooth Setup Start ===")
 
-        # Check if connection already exists and is responsive
-        if self._rfcomm_exists():
-            self._log(f"{SERIAL} already connected")
+        # Step 1: try direct rfcomm (what you do first manually)
+        if self._start_rfcomm():
             self.is_connected = True
+            self._log("Connected immediately via rfcomm")
             return True
 
-        # If device is not paired, discover, pair, and trust it
-        if not self._is_device_paired():
-            # Scan for the Arduino device
-            if not self._scan_for_device():
-                self._log("Device discovery failed")
-                return False
-            
-            # Clear any old pairing data
-            self._remove_old_connection()
-            
-            # Pair with the Arduino
-            if not self._pair_device():
-                self._log("Pairing failed")
-                return False
-        
-            # Mark device as trusted for future connections
-            self._trust_device()
-            
-        # Create the virtual serial port (/dev/rfcomm0) and bind it to Arduino
-        if not self._create_rfcomm_connection():
-            self._log("Failed to create rfcomm connection")
-            return False
-        
-        # Connection successful
-        self._log("=== Bluetooth Connection Setup Complete ===")
-        return True
-    
-    def disconnect(self):
+        # Step 2: fallback to full pairing flow
+        self._log("Initial connect failed → running pairing sequence")
 
-        if self.is_connected:
-            self._log("Closing Bluetooth connection...")
-            self._run_command("rfcomm release 0", sudo=True, timeout=5)
-            self.is_connected = False
+        if not self._manual_pair_sequence():
+            self._log("Pairing failed")
+            return False
+
+        # Step 3: try rfcomm again
+        if self._start_rfcomm():
+            self.is_connected = True
+            self._log("Connected after pairing")
+            return True
+
+        self._log("Bluetooth connection failed completely")
+        return False
+
+    def disconnect(self):
         if self.rfcomm_process and self.rfcomm_process.poll() is None:
+            self._log("Terminating rfcomm process...")
             self.rfcomm_process.terminate()
             self.rfcomm_process = None
+
+        subprocess.run("sudo -n rfcomm release 0", shell=True)
+        self.is_connected = False
 
     
 # sample code
