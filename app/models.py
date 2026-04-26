@@ -38,6 +38,10 @@ class User(UserMixin, db.Model):
     email_address = db.Column(db.String(64), nullable=False, index=True, unique=True)
     preferred_name = db.Column(db.String(32), nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
+    collect_alarm_sessions = db.Column(db.Boolean, nullable=False, default=True)
+    collect_brainteaser_performance = db.Column(db.Boolean, nullable=False, default=True)
+    ask_waking_difficulty = db.Column(db.Boolean, nullable=False, default=True)
+    use_health_data = db.Column(db.Boolean, nullable=False, default=False)
 
     def set_password(self, password):
         """Hash and store the user's password."""

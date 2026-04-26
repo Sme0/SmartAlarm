@@ -3,7 +3,7 @@
 {% block title %}SmartAlarm - Accounts{% endblock %}
 
 {% block content %}
-    <div class="max-w-5xl mx-auto mt-8 flex gap-8 px-6">
+    <form class="max-w-5xl mx-auto mt-8 flex gap-8 px-6">
         
         <aside class="w-64 flex flex-col gap-0 bg-white border border-gray-200 rounded-lg overflow-hidden h-fit shadow-sm">
             <button data-target="change-details" class="nav-btn block w-full text-left px-5 py-3 text-sm font-medium border-b border-gray-100 text-gray-600 hover:bg-gray-50 transition-colors">Change account details</button>
@@ -109,20 +109,26 @@
 
             <section id="data-permissions" class="view-section">
                 <h2 class="text-lg font-bold mb-6 text-gray-900">Statistics Collection</h2>
-                <div class="space-y-4 mb-10 bg-gray-50 p-6 rounded-lg border border-gray-200">
+                <form method="POST" action="{{ url_for('update_data_permissions') }}" class="space-y-4 mb-10 bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    {{ data_permissions_form.hidden_tag() }}
                     <label class="flex items-center gap-3 text-sm font-medium text-gray-700 cursor-pointer">
-                        <input type="checkbox" checked class="accent-indigo-600 w-4 h-4 cursor-pointer">
-                        Collect completion time
+                        {{ data_permissions_form.collect_alarm_sessions(class_="accent-indigo-600 w-4 h-4 cursor-pointer") }}
+                        Collect alarm session data
                     </label>
                     <label class="flex items-center gap-3 text-sm font-medium text-gray-700 cursor-pointer">
-                        <input type="checkbox" checked class="accent-indigo-600 w-4 h-4 cursor-pointer">
-                        Collect snooze count
-                    </label>
-                    <label class="flex items-center gap-3 text-sm font-medium text-gray-700 cursor-pointer">
-                        <input type="checkbox" checked class="accent-indigo-600 w-4 h-4 cursor-pointer">
+                        {{ data_permissions_form.collect_brainteaser_performance(class_="accent-indigo-600 w-4 h-4 cursor-pointer") }}
                         Collect brainteaser performance
                     </label>
-                </div>
+                    <label class="flex items-center gap-3 text-sm font-medium text-gray-700 cursor-pointer">
+                        {{ data_permissions_form.ask_waking_difficulty(class_="accent-indigo-600 w-4 h-4 cursor-pointer") }}
+                        Ask for waking difficulty
+                    </label>
+                    <label class="flex items-center gap-3 text-sm font-medium text-gray-700 cursor-pointer">
+                        {{ data_permissions_form.use_health_data(class_="accent-indigo-600 w-4 h-4 cursor-pointer") }}
+                        Use imported health data for dynamic alarm
+                    </label>
+                    {{ data_permissions_form.submit(class_="bg-indigo-600 text-white font-medium rounded-md px-4 py-2 text-sm hover:bg-indigo-700 transition-colors shadow-sm") }}
+                </form>
 
                 <hr class="border-gray-100 mb-8">
 

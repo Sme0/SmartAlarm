@@ -182,3 +182,14 @@ class DeviceSettingsForm(FlaskForm):
     save = SubmitField('Save')
     unpair = SubmitField('Unpair')
 
+
+class DataPermissionsForm(FlaskForm):
+    """
+    Form for managing user data collection preferences.
+    """
+    collect_alarm_sessions = BooleanField('Collect alarm session data')
+    collect_brainteaser_performance = BooleanField('Collect brainteaser performance')
+    ask_waking_difficulty = BooleanField('Ask for waking difficulty')
+    use_health_data = BooleanField('Use imported health data for dynamic alarm')
+
+    submit = SubmitField('Save preferences')

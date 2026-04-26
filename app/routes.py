@@ -27,7 +27,7 @@ from app.forms import (
     RegistrationForm,
     ResetEmailAddressForm,
     ResetPreferredNameForm,
-    ResetPasswordForm,
+    ResetPasswordForm, DataPermissionsForm,
 )
 from app.models import (
     Alarm,
@@ -272,6 +272,7 @@ def account():
         reset_email_form = ResetEmailAddressForm(prefix="email")
         reset_password_form = ResetPasswordForm(prefix="password")
         delete_account_form = DeleteAccountForm()
+        data_permissions_form = DataPermissionsForm(obj=current_user)
         return render_template(
             "account.html",
             user=current_user,
@@ -279,6 +280,7 @@ def account():
             reset_email_form=reset_email_form,
             reset_password_form=reset_password_form,
             delete_account_form=delete_account_form,
+            data_permissions_form=data_permissions_form
         )
     except Exception:
         # Raise a 500 server error if something unexpected occurs
@@ -367,6 +369,25 @@ def account_change_password():
     flash("Password updated successfully.", "success")
     return redirect(url_for("account") + "#change-details")
 
+@app.route("/account/data-permissions", methods=["POST"])
+@login_required
+def update_data_permissions():
+    form = DataPermissionsForm()
+
+    if form.validate_on_submit():
+        try:
+            current_user.collect_alarm_sessions = bool(form.collect_alarm_sessions.data)
+            current_user.collect_brainteaser_performance = bool(form.collect_brainteaser_performance.data)
+            current_user.ask_waking_difficulty = bool(form.ask_waking_difficulty.data)
+            current_user.use_health_data = bool(form.use_health_data.data)
+
+            db.session.commit()
+            flash("Data preferences updated.", "success")
+        except Exception:
+            db.session.rollback()
+            flash("Failed to update data preferences.", "danger")
+
+    return redirect(url_for("account"))
 
 @app.route("/account/export-data", methods=["GET"])
 @login_required
