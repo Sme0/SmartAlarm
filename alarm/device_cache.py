@@ -76,3 +76,53 @@ def save_cached_server_paired(is_paired: bool) -> bool:
     return _save_cache(cache)
 
 
+# --- Permissions cache helpers ---
+def get_cached_permissions() -> dict:
+    """
+    Returns cached user data permissions.
+    Structure:
+    {
+        "collect_alarm_sessions": bool,
+        "collect_brainteaser_performance": bool,
+        "ask_waking_difficulty": bool,
+        "use_health_data": bool
+    }
+    """
+    cache = _load_cache()
+    permissions = cache.get("permissions", {})
+    return permissions if isinstance(permissions, dict) else {}
+
+
+def save_cached_permissions(permissions: dict) -> bool:
+    """
+    Saves user data permissions to cache.
+    """
+    cache = _load_cache()
+    cache["permissions"] = permissions
+    return _save_cache(cache)
+
+
+def get_permission_value(key: str, default: bool = False) -> bool:
+    """
+    Helper to safely fetch a single permission flag.
+    """
+    permissions = get_cached_permissions()
+    value = permissions.get(key)
+    return bool(value) if isinstance(value, bool) else default
+
+
+# --- Convenience wrappers for permission checks ---
+def can_collect_alarm_sessions() -> bool:
+    return get_permission_value("collect_alarm_sessions", True)
+
+
+def can_collect_brainteaser_performance() -> bool:
+    return get_permission_value("collect_brainteaser_performance", True)
+
+
+def can_ask_waking_difficulty() -> bool:
+    return get_permission_value("ask_waking_difficulty", True)
+
+
+def can_use_health_data() -> bool:
+    return get_permission_value("use_health_data", False)

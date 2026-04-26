@@ -16,6 +16,12 @@ from alarm.puzzles.maths_puzzle import MathsPuzzle
 from alarm.puzzles.memory_puzzle import MemoryPuzzle
 from alarm.puzzles.puzzle import Puzzle
 
+from device_cache import (
+    can_collect_alarm_sessions,
+    can_collect_brainteaser_performance,
+    can_ask_waking_difficulty,
+)
+
 logger = logging.getLogger(__name__)
 
 def _utc_now() -> datetime:
@@ -261,13 +267,20 @@ class AlarmController:
         self.current_triggered_alarm = current_alarm
 
         source_alarm_id = str(current_alarm.source_alarm_id or current_alarm.id)
-        self._pending_sessions.setdefault(
-            source_alarm_id,
-            {
-                "triggered_at": _utc_now().isoformat(),
-                "puzzle_sessions": [],
-            },
-        )
+
+        # Only create a session if permission is enabled at trigger time
+        if can_collect_alarm_sessions():
+            self._pending_sessions.setdefault(
+                source_alarm_id,
+                {
+                    "triggered_at": _utc_now().isoformat(),
+                    "puzzle_sessions": [],
+                    "permissions": {
+                        "collect_brainteaser_performance": can_collect_brainteaser_performance(),
+                        "ask_waking_difficulty": can_ask_waking_difficulty(),
+                    },
+                },
+            )
 
         self.output_handler.display_text(
             f"Alarm Triggered: {_clock_now().strftime('%H:%M')}"
@@ -290,8 +303,11 @@ class AlarmController:
             self.current_triggered_alarm.source_alarm_id
             or self.current_triggered_alarm.id
         )
-        session = self._pending_sessions[source_alarm_id]
-        session["puzzle_sessions"].append(puzzle.export_session(source_alarm_id))
+        session = self._pending_sessions.get(source_alarm_id)
+
+        # Only append puzzle session if both permissions are enabled AND session exists
+        if session and session.get("permissions", {}).get("collect_brainteaser_performance", True):
+            session["puzzle_sessions"].append(puzzle.export_session(source_alarm_id))
 
         if not solved:
             self.trigger_alarm(self.current_triggered_alarm)
@@ -321,7 +337,8 @@ class AlarmController:
 
         if choice == "snooze":
             # TODO: Make snooze time editable through web
-            session["puzzle_sessions"][-1]["outcome_action"] = "snoozed"
+            if session and session.get("puzzle_sessions"):
+                session["puzzle_sessions"][-1]["outcome_action"] = "snoozed"
             snooze_time = (_clock_now() + timedelta(minutes=5)).strftime("%H:%M")
             source_alarm_id = (
                 self.current_triggered_alarm.source_alarm_id
@@ -342,11 +359,18 @@ class AlarmController:
             self.stop_alarm()
 
         elif choice == "dismiss":
-            waking_difficulty = self._get_user_waking_difficulty()
-            session["puzzle_sessions"][-1]["outcome_action"] = "dismissed"
-            session["waking_difficulty"] = waking_difficulty
-            self._complete_sessions[source_alarm_id] = session
-            self._pending_sessions.pop(source_alarm_id, None)
+            waking_difficulty = None
+            if session and session.get("permissions", {}).get("ask_waking_difficulty", True):
+                waking_difficulty = self._get_user_waking_difficulty()
+
+            if session and session.get("puzzle_sessions"):
+                session["puzzle_sessions"][-1]["outcome_action"] = "dismissed"
+
+            if session:
+                session["waking_difficulty"] = waking_difficulty
+                self._complete_sessions[source_alarm_id] = session
+                self._pending_sessions.pop(source_alarm_id, None)
+
             self.stop_alarm()
 
         elif choice == "trigger":

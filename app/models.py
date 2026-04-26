@@ -387,6 +387,7 @@ class DifficultyModel(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     model_blob = db.Column(db.LargeBinary, nullable=False)
     last_trained = db.Column(db.DateTime(timezone=True), nullable=False)
+    uses_health_data = db.Column(db.Boolean, nullable=False, default=False)
 
 
 def resolve_effective_puzzle_type(alarm: Alarm, device: Device = None) -> str:

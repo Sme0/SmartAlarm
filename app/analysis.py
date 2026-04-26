@@ -235,7 +235,7 @@ def _advance_recent_sleep_window(
     return sleep_idx, list(recent_sleep_window)
 
 
-def _save_model(user_id, model):
+def _save_model(user_id, model, use_health_data : bool):
     """
     Serializes and persists a trained scikit-learn model to the database for the given user.
 
@@ -258,15 +258,17 @@ def _save_model(user_id, model):
     model_bytes.seek(0)
 
     # Store the model
-    user_model = DifficultyModel.query.filter_by(user_id=user_id).first()
+    user_model : DifficultyModel = DifficultyModel.query.filter_by(user_id=user_id).first()
     if user_model:
         user_model.model_blob = model_bytes.read()
         user_model.last_trained = datetime.now(timezone.utc)
+        user_model.uses_health_data = use_health_data
     else:
         user_model = DifficultyModel(
             user_id=user_id,
             model_blob=model_bytes.read(),
             last_trained=datetime.now(timezone.utc),
+            uses_health_data=use_health_data,
         )
         db.session.add(user_model)
     db.session.commit()
@@ -299,17 +301,27 @@ def _load_model(user_id) -> Pipeline | None:
 def should_retrain_model(
     user_id: int, max_age_days: int = MODEL_RETRAIN_AFTER_DAYS
 ) -> bool:
-    """Return True when a user's stored model is missing or older than max_age_days."""
+    """Return True when a user's stored model is missing, outdated, or mismatched with current data permissions."""
     user_model = DifficultyModel.query.filter_by(user_id=user_id).first()
     if not user_model:
         return True
 
+    # Check if model was trained with different health data setting
+    from app.models import User
+    user = User.query.get(user_id)
+    current_flag = bool(getattr(user, "use_health_data", False)) if user else False
+
+    if user_model.uses_health_data != current_flag:
+        return True
+
+    # Check model age
     last_trained_utc = as_utc(user_model.last_trained)
     model_age = datetime.now(timezone.utc) - last_trained_utc
+
     return model_age > timedelta(days=max_age_days)
 
 
-def _extract_features(user_id) -> list[dict] | None:
+def _extract_features(user_id, use_health_data: bool) -> list[dict] | None:
     """
     Extracts training features from alarm sessions, puzzle sessions, and sleep data for a given user.
 
@@ -335,7 +347,7 @@ def _extract_features(user_id) -> list[dict] | None:
     if not alarm_sessions:
         return None
 
-    sleep_sessions: list[SleepSession] = _load_user_sleep_sessions(user_id)
+    sleep_sessions: list[SleepSession] = _load_user_sleep_sessions(user_id) if use_health_data else []
 
     # Detects incomplete sleep sessions, places them at end of list
     none_end_count = sum(1 for s in sleep_sessions if s.end_date is None)
@@ -380,22 +392,28 @@ def _extract_features(user_id) -> list[dict] | None:
             reference_time_utc=when_utc,
         )
 
-        # Retrieve sleep data for previous sleep sessions
-        sleep_hours = [
-            float(sleep.total_duration) / 3600.0 for sleep in last_three_sleeps
-        ]
-        sleep_quality = [
-            sleep_quality_by_id.get(sleep.id, 0.0) for sleep in last_three_sleeps
-        ]
-        sleep_efficiency = [
-            sleep_efficiency_by_id.get(sleep.id, 0.0) for sleep in last_three_sleeps
-        ]
-        sleep_data_age_days = (
-            (when_utc - as_utc(last_three_sleeps[-1].end_date)).total_seconds()
-            / 86400.0
-            if last_three_sleeps
-            else 0.0
-        )
+        # Handle sleep features depending on use_health_data
+        if use_health_data:
+            sleep_hours = [
+                float(sleep.total_duration) / 3600.0 for sleep in last_three_sleeps
+            ]
+            sleep_quality = [
+                sleep_quality_by_id.get(sleep.id, 0.0) for sleep in last_three_sleeps
+            ]
+            sleep_efficiency = [
+                sleep_efficiency_by_id.get(sleep.id, 0.0) for sleep in last_three_sleeps
+            ]
+            sleep_data_age_days = (
+                (when_utc - as_utc(last_three_sleeps[-1].end_date)).total_seconds()
+                / 86400.0
+                if last_three_sleeps
+                else 0.0
+            )
+        else:
+            sleep_hours = []
+            sleep_quality = []
+            sleep_efficiency = []
+            sleep_data_age_days = 0.0
 
         # Collect all features
         features = _build_feature_dict(
@@ -440,7 +458,11 @@ def train_user_model(user_id) -> Pipeline | None:
     :param user_id: The user ID for whom to train the model.
     :return: The trained scikit-learn Pipeline model, or None if training data is unavailable.
     """
-    data = _extract_features(user_id)
+    from app.models import User
+    user = User.query.get(user_id)
+    use_health_data = bool(getattr(user, "use_health_data", False)) if user else False
+
+    data = _extract_features(user_id, use_health_data)
 
     if not data or len(data) < MIN_TRAINING_SAMPLES:
         print(
@@ -478,7 +500,7 @@ def train_user_model(user_id) -> Pipeline | None:
 
     # Train the model on collected data
     model.fit(X_arr, y_arr)
-    _save_model(user_id, model)
+    _save_model(user_id, model, use_health_data)
 
     print(f"Model trained for user: {user_id}.")
     return model

@@ -376,12 +376,38 @@ def update_data_permissions():
 
     if form.validate_on_submit():
         try:
+            old_flag = current_user.use_health_data
+
             current_user.collect_alarm_sessions = bool(form.collect_alarm_sessions.data)
             current_user.collect_brainteaser_performance = bool(form.collect_brainteaser_performance.data)
             current_user.ask_waking_difficulty = bool(form.ask_waking_difficulty.data)
             current_user.use_health_data = bool(form.use_health_data.data)
 
             db.session.commit()
+
+            user_id = current_user.id
+
+            from app.models import DifficultyModel
+            existing_model = DifficultyModel.query.filter_by(user_id=user_id).first()
+
+            needs_retrain = (
+                old_flag != current_user.use_health_data
+                or existing_model is None
+                or existing_model.uses_health_data != current_user.use_health_data
+            )
+
+            if needs_retrain:
+                def retrain_model():
+                    from app import app
+                    with app.app_context():
+                        try:
+                            from app.analysis import train_user_model
+                            train_user_model(user_id)
+                        except Exception:
+                            pass
+
+                Thread(target=retrain_model, daemon=True).start()
+
             flash("Data preferences updated.", "success")
         except Exception:
             db.session.rollback()
@@ -1643,7 +1669,17 @@ def api_get_alarms():
                         }
                     )
 
-    return jsonify({"alarms_by_day": result})
+    permissions = {
+        "collect_alarm_sessions": current_user.collect_alarm_sessions,
+        "collect_brainteaser_performance": current_user.collect_brainteaser_performance,
+        "ask_waking_difficulty": current_user.ask_waking_difficulty,
+        "use_health_data": current_user.use_health_data,
+    }
+
+    return jsonify({
+        "alarms_by_day": result,
+        "permissions": permissions
+    })
 
 
 @app.route("/api/alarms/create", methods=["POST"])
