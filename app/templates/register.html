@@ -72,6 +72,8 @@
                     {% endfor %}
                 </div>
 
+                {% include "permissions_form.html" %}
+
                 {{ register_form.submit(class_='w-full bg-indigo-600 text-white font-medium px-6 py-2 rounded-md hover:bg-indigo-700 transition-colors shadow-sm') }}
             </form>
 

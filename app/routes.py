@@ -1120,18 +1120,29 @@ def register():
         return redirect(url_for("dashboard"))
 
     form = RegistrationForm()
+    permissions_form = DataPermissionsForm(formdata=request.form if request.method == 'POST' else None)
+
+
     if form.validate_on_submit() and form.submit.data:
-        # Basic server-side checks (form validators already cover many cases)
         existing = User.query.filter_by(
             email_address=(form.email_address.data or "").strip().lower()
         ).first()
+
         if existing:
             flash("Email already registered.", "danger")
-            return render_template("register.html", register_form=form)
+            return render_template(
+                "register.html",
+                register_form=form,
+                permissions_form=permissions_form
+            )
 
         if form.password.data != form.repeated_password.data:
             flash("Passwords do not match.", "danger")
-            return render_template("register.html", register_form=form)
+            return render_template(
+                "register.html",
+                register_form=form,
+                permissions_form=permissions_form
+            )
 
         try:
             user = User.register(
@@ -1142,22 +1153,43 @@ def register():
                 else None,
             )
 
-            # Auto-login the new user and redirect to dashboard or `next` if provided
+            # Apply permissions from signup form (default False if unticked)
+            user.collect_alarm_sessions = bool(permissions_form.collect_alarm_sessions.data)
+            user.collect_brainteaser_performance = bool(permissions_form.collect_brainteaser_performance.data)
+            user.ask_waking_difficulty = bool(permissions_form.ask_waking_difficulty.data)
+            user.use_health_data = bool(permissions_form.use_health_data.data)
+            
+            db.session.commit()
+
             login_user(user)
+
             next_page = request.args.get("next") or request.form.get("next")
             if next_page and isinstance(next_page, str) and next_page.startswith("/"):
                 return redirect(next_page)
+
             return redirect(url_for("dashboard"))
+
         except ValueError as ve:
-            # Likely duplicate email surfaced from the model layer
             flash(str(ve) or "Email already registered.", "danger")
-            return render_template("register.html", register_form=form)
+            return render_template(
+                "register.html",
+                register_form=form,
+                permissions_form=permissions_form
+            )
+
         except Exception:
             flash("An error occurred during registration. Please try again.", "danger")
-            return render_template("register.html", register_form=form)
+            return render_template(
+                "register.html",
+                register_form=form,
+                permissions_form=permissions_form
+            )
 
-    # GET or validation errors
-    return render_template("register.html", register_form=form)
+    return render_template(
+        "register.html",
+        register_form=form,
+        permissions_form=permissions_form
+    )
 
 
 @app.route("/logout")
@@ -2110,6 +2142,13 @@ def dev_sample_data():
     user = User.query.filter_by(email_address=email).first()
     if not user:
         user = User.register(email, "samplepass", "Sample User")
+    # Ensure sample user has all permissions enabled for testing
+    user.collect_alarm_sessions = True
+    user.collect_brainteaser_performance = True
+    user.ask_waking_difficulty = True
+    user.use_health_data = True
+
+    db.session.commit()
     # Log in the user
     login_user(user)
     # Create or get devices
