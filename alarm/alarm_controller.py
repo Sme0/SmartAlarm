@@ -16,7 +16,7 @@ from alarm.puzzles.maths_puzzle import MathsPuzzle
 from alarm.puzzles.memory_puzzle import MemoryPuzzle
 from alarm.puzzles.puzzle import Puzzle
 
-from device_cache import (
+from alarm.device_cache import (
     can_collect_alarm_sessions,
     can_collect_brainteaser_performance,
     can_ask_waking_difficulty,

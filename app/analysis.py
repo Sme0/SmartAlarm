@@ -308,7 +308,7 @@ def should_retrain_model(
 
     # Check if model was trained with different health data setting
     from app.models import User
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     current_flag = bool(getattr(user, "use_health_data", False)) if user else False
 
     if user_model.uses_health_data != current_flag:
