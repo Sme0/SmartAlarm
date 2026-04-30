@@ -1,3 +1,5 @@
+"""Puzzle base class and shared run-loop behavior for alarm games."""
+
 import time
 from typing import Optional
 from abc import ABC, abstractmethod
@@ -6,6 +8,8 @@ from alarm.io.output_handler import OutputHandler
 
 
 class Puzzle(ABC):
+    """Abstract puzzle interface with a default joystick-driven run loop."""
+
     def __init__(self, input_handler: InputHandler, output_handler: OutputHandler):
         self.input_handler = input_handler
         self.output_handler = output_handler
@@ -26,7 +30,7 @@ class Puzzle(ABC):
 
         self.start_time = None
         self.end_time = None
-        self.time_limit = 120
+        self.time_limit = 120  # Seconds before auto-fail
 
     @abstractmethod
     def prepare_puzzle(self):  # could add difficulty option
@@ -80,7 +84,7 @@ class Puzzle(ABC):
         """
         return
 
-    def get_user_answer(self):
+    def get_user_answer(self) -> None:
         """
         By default, retrieves the currently selected answer. Must be overridden for puzzles that do
         not use selection as their mean of retrieving the user's answer.
@@ -92,8 +96,7 @@ class Puzzle(ABC):
 
     def handle_puzzle_event(self, event_type: InputEventType):
         """
-        Translates an `InputEventType` into an action for the puzzle. Modify
-        actions in
+        Translates an `InputEventType` into an action for the puzzle
         :param event_type:
         :return:
         """
@@ -110,14 +113,10 @@ class Puzzle(ABC):
             self.on_joystick_down()
             self.display_puzzle()
 
-    # TODO: Move to AlarmController
-    def check_snooze_cap(self):
-        return self.num_snoozes >= self.snooze_cap
-
-    def run_puzzle(self):
+    def run_puzzle(self) -> Optional[bool]:
         """
-        Default method to run a puzzle. May be overridden if logic for a specific puzzle is different
-        :return:
+        Run the default puzzle loop until solved, failed, or timed out.
+        :return: Puzzle success
         """
         # create and display question and possible answers (if applicable)
         self.prepare_puzzle()
@@ -160,12 +159,14 @@ class Puzzle(ABC):
                 self.handle_puzzle_event(event.event_type)
 
     def get_puzzle_type(self) -> str:
+        """Return a lowercase puzzle name derived from the class name."""
         class_name = self.__class__.__name__
         if class_name.endswith("Puzzle"):
             class_name = class_name[: -len("Puzzle")]
         return class_name.lower()
 
     def export_session(self, alarm_session_id: str, outcome_action: Optional[str] = None):
+        """Create a telemetry payload for the puzzle session."""
         time_taken_seconds = None
         if self.start_time is not None and self.end_time is not None:
             time_taken_seconds = self.end_time - self.start_time

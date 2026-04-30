@@ -1,3 +1,5 @@
+"""Alarm controller state machine for triggering alarms and running puzzles."""
+
 import os
 import time
 import logging
@@ -24,7 +26,9 @@ from alarm.device_cache import (
 
 logger = logging.getLogger(__name__)
 
+
 def _utc_now() -> datetime:
+    """Return timezone-aware UTC timestamp for session logging."""
     return datetime.now(timezone.utc)
 
 
@@ -50,7 +54,9 @@ def _resolve_clock_timezone():
 
 CLOCK_TIMEZONE = _resolve_clock_timezone()
 
+
 def _clock_now() -> datetime:
+    """Return current time in the resolved device timezone."""
     return datetime.now(CLOCK_TIMEZONE)
 
 
@@ -63,6 +69,8 @@ def _get_current_day_of_week_number():
 
 @dataclass
 class Alarm:
+    """Runtime alarm representation synced from the server."""
+
     id: str
     time: str
     enabled: bool
@@ -74,6 +82,8 @@ class Alarm:
 
 
 class AlarmController:
+    """Manage alarm state transitions, puzzles, and session telemetry."""
+
     def __init__(
         self,
         input_handler: InputHandler,
@@ -121,6 +131,7 @@ class AlarmController:
         return MathsPuzzle(self.input_handler, self.output_handler)
 
     def _decision_selection(self, options: List[str]) -> Optional[str]:
+        """Prompt a two-option choice on the LCD and return the selected label."""
         MAX_TIME = 30
         selected_idx = 0
         start_time = time.time()
@@ -169,6 +180,7 @@ class AlarmController:
                     update_display = True
 
     def _get_user_waking_difficulty(self):
+        """Ask the user for a 1-10 waking difficulty score via joystick input."""
         MAX_TIME = 60
         selected_value = 5
         start_time = time.time()
@@ -221,6 +233,7 @@ class AlarmController:
                     update_display = True
 
     def update(self):
+        """Update the cached current time string used by alarm checks."""
         # Update current time
         self.current_time = _clock_now().strftime("%H:%M:%S")
 
@@ -300,6 +313,7 @@ class AlarmController:
             print("Type 'dismiss' to solve puzzle.")
 
     def run_alarm_interaction(self):
+        """Handle puzzle flow, confirmation button, and snooze/dismiss choice."""
 
         if not self.current_triggered_alarm:
             return
@@ -405,13 +419,16 @@ class AlarmController:
             self.state = AlarmState.WAITING
 
     def pull_complete_sessions(self):
+        """Return and clear any completed session telemetry batches."""
         sessions = self._complete_sessions
         self._complete_sessions = {}
         return sessions
 
     def peek_complete_sessions(self):
+        """Return a copy of completed sessions without clearing them."""
         return dict(self._complete_sessions)
 
     def drop_complete_sessions(self, session_ids):
+        """Remove session IDs that were successfully uploaded."""
         for session_id in session_ids:
             self._complete_sessions.pop(session_id, None)

@@ -1,3 +1,5 @@
+"""Memory puzzle implementation that replays joystick direction sequences."""
+
 import random
 import time
 from typing import List
@@ -7,6 +9,8 @@ from alarm.puzzles.puzzle import Puzzle
 
 
 class MemoryPuzzle(Puzzle):
+    """Simon-style memory game using joystick direction sequences."""
+
     def __init__(self, input_handler, output_handler, puzzle_length: int = 5):
         super().__init__(input_handler, output_handler)
         self.puzzle_length = puzzle_length
@@ -14,6 +18,7 @@ class MemoryPuzzle(Puzzle):
         self.direction_values: List[JoystickDirection] = []
 
     def generatePattern(self):
+        """Generate a random sequence of joystick directions."""
         directions = [
             JoystickDirection.UP,
             JoystickDirection.DOWN,
@@ -26,6 +31,7 @@ class MemoryPuzzle(Puzzle):
         return instructions
 
     def prepare_puzzle(self):
+        """Create a new sequence and reset any prior player input."""
         self.instructions = self.generatePattern()
         self.solution = list(self.instructions)
         self.problem = "Memory game: Copy the order with the joystick."
@@ -33,10 +39,12 @@ class MemoryPuzzle(Puzzle):
         return self.instructions
 
     def display_puzzle(self):
+        """Render the instructions by playing the sequence on the display."""
         self.output_handler.display_text("  Memory Game")
         self.output_handler.play_memory_sequence(self.instructions)
 
     def _event_to_direction(self, event_type: InputEventType):
+        """Map a joystick event into a direction value, if applicable."""
         mapping = {
             InputEventType.JOYSTICK_UP: JoystickDirection.UP,
             InputEventType.JOYSTICK_DOWN: JoystickDirection.DOWN,
@@ -46,9 +54,11 @@ class MemoryPuzzle(Puzzle):
         return mapping.get(event_type)
 
     def get_user_answer(self):
+        """Return the sequence entered by the player."""
         return self.direction_values
 
     def run_puzzle(self):
+        """Override the base loop to compare after a full input sequence."""
         self.prepare_puzzle()
         self.display_puzzle()
 

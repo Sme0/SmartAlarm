@@ -1,3 +1,5 @@
+"""MQTT client wrapper for optional ThingsBoard telemetry uploads."""
+
 import json
 import time
 import logging
@@ -10,6 +12,8 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 class ThingsBoardClient:
+    """Publish telemetry to ThingsBoard when enabled via environment variables."""
+
     def __init__(self, host=None, token=None):
         # Check if ThingsBoard is enabled
         self.enabled = str(os.getenv("THINGSBOARD_ENABLED", "False")).lower() in ["true", "y", "yes"]
@@ -46,6 +50,7 @@ class ThingsBoardClient:
         #TODO: Send data somewhere (observer pattern?)
 
     def connect(self):
+        """Connect to the MQTT broker and start the background loop."""
         # Skip if ThingsBoard is disabled
         if not self.enabled:
             return
@@ -62,6 +67,7 @@ class ThingsBoardClient:
         self.client.loop_start()
 
     def disconnect(self):
+        """Disconnect from the broker and stop the background loop."""
         # Skip if ThingsBoard is disabled
         if not self.enabled or not self.client:
             return
@@ -70,6 +76,7 @@ class ThingsBoardClient:
         self.client.disconnect()
 
     def post(self, data: dict):
+        """Publish telemetry data to ThingsBoard."""
         # Skip if ThingsBoard is disabled
         if not self.enabled or not self.client:
             return
@@ -77,6 +84,7 @@ class ThingsBoardClient:
         self.client.publish('v1/devices/me/telemetry', json.dumps(data), qos=1)
 
     def request_shared_attributes(self, keys: list):
+        """Request shared attribute values for the given keys."""
         # Skip if ThingsBoard is disabled
         if not self.enabled or not self.client:
             return
@@ -87,20 +95,3 @@ class ThingsBoardClient:
             json.dumps(payload),
             qos=1
         )
-
-if __name__ == "__main__":
-    load_dotenv()
-    import random
-    thingsboard_client = ThingsBoardClient()
-    thingsboard_client.connect()
-
-    while True:
-        thingsboard_client.post({
-            "temperature": random.randint(0, 100),
-            "humidity": random.randint(0, 100),
-        })
-        time.sleep(1)
-
-
-
-

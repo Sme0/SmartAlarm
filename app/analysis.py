@@ -1,3 +1,5 @@
+"""Model training and dynamic alarm timing analysis utilities."""
+
 import io
 from collections import deque
 from datetime import datetime, timedelta, timezone
@@ -534,6 +536,7 @@ def _predict_user_model(user_id, prediction_data):
 
 
 def find_suitable_alarm(user_id: int, min_time: datetime, max_time: datetime):
+    """Return the best candidate alarm time within a window using the trained model."""
 
     # Convert time limits to UTC
     min_time_utc = as_utc(min_time)

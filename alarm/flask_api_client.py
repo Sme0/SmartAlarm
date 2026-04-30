@@ -1,3 +1,5 @@
+"""HTTP client for the Flask server device API."""
+
 from enum import Enum
 import os
 import logging
@@ -13,6 +15,7 @@ TIMEOUT = 5
 logger = logging.getLogger(__name__)
 
 class PairingStatus(Enum):
+    """Possible device pairing states returned by the server."""
     PAIRED = 0
     PAIRING = 1
     FAILED = 2
@@ -20,6 +23,7 @@ class PairingStatus(Enum):
 
 
 class FlaskAPIClient:
+    """REST client for pairing, alarm sync, and telemetry uploads."""
 
     def __init__(self, serial_number):
         # allow overriding base_url for testing
@@ -71,6 +75,7 @@ class FlaskAPIClient:
             return None
 
     def _post(self, path: str, payload: dict):
+        """POST JSON payloads to the Flask API with SSL handling."""
         url = f"{self.base_url}{path}"
         try:
             verify_path = os.getenv("REQUESTS_CA_BUNDLE")

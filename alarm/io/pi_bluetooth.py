@@ -1,3 +1,11 @@
+"""Bluetooth helpers for Raspberry Pi pairing with the Arduino confirmation button.
+
+Message protocol:
+- 0 (pi -> arduino): confirmation request, turns button LED on
+- 1 (arduino -> pi): confirmation response, turns button LED off
+- 2 (pi -> arduino): end of confirmation window, turns button LED off
+"""
+
 import os
 import subprocess
 import time
@@ -23,6 +31,8 @@ HCI_DEVICE = "hci0"
 logger = logging.getLogger(__name__)
 
 class Bluetooth:
+    """Thin wrapper around the rfcomm serial device."""
+
     def __init__(self):
         self.connection = None
         try:
@@ -32,13 +42,16 @@ class Bluetooth:
             logger.warning("A connection will be attempted when needed.")
 
     def process_incoming_message(self, message: str) -> str:
+        """Normalize raw serial bytes to a trimmed string."""
         return str(message).strip('b').strip(r"'").strip()
 
     def send_message(self, message) -> None:
+        """Send a one-character message over the serial connection."""
         if self.connection:
             self.connection.write(message.encode())
 
     def listen(self, timeout: int) -> Optional[str]:
+        """Listen for a response, returning the message string or None on timeout."""
         if not self.connection:
             return None
 
@@ -54,6 +67,7 @@ class Bluetooth:
         return None
 
     def message_to_string(self, message) -> Optional[str]:
+        """Join message parts from the serial buffer into one string."""
         string = ""
         if message is not None:
             for i in message:
@@ -63,6 +77,8 @@ class Bluetooth:
 
 
 class BluetoothConfirmation:
+    """Request and validate third-party confirmation over Bluetooth."""
+
     def __init__(self, timeout: int, debug: bool = False) -> None:
         self.awaiting_confirmation = False
         self.received_confirmation = False
@@ -75,6 +91,7 @@ class BluetoothConfirmation:
 
 
     def await_confirmation(self) -> None:
+        """Block until a response arrives or the timeout expires."""
         if self.debug:
             logger.debug("Awaiting confirmation...")
 
@@ -88,12 +105,14 @@ class BluetoothConfirmation:
 
 
     def send_confirmation_request(self) -> None:
+        """Send the confirmation request byte to the Arduino."""
         self.received_confirmation = False
         self.bluetooth_io.send_message("0")
         if self.debug:
             logger.debug("Sending confirmation request...")
 
     def check_confirmation(self) -> bool:
+        """Return True if a valid confirmation response was seen."""
         if self.debug:
             if self.received_confirmation:
                 logger.debug("Third-party confirmation received.")
@@ -103,6 +122,7 @@ class BluetoothConfirmation:
         return self.received_confirmation
 
 class BluetoothSetup:
+    """Manage pairing and rfcomm connection setup for the Arduino module."""
 
     def __init__(self, debug: bool = False) -> None:
         self.debug = debug
@@ -110,6 +130,7 @@ class BluetoothSetup:
         self.rfcomm_process: Optional[subprocess.Popen] = None
 
     def _log(self, message: str) -> None:
+        """Debug logging helper for setup steps."""
         if self.debug:
             logger.debug("[BT-SETUP] %s", message)
 
@@ -225,6 +246,7 @@ class BluetoothSetup:
         return False
 
     def disconnect(self):
+        """Release rfcomm and clean up any background process."""
         if self.rfcomm_process and self.rfcomm_process.poll() is None:
             self._log("Terminating rfcomm process...")
             self.rfcomm_process.terminate()
@@ -233,7 +255,7 @@ class BluetoothSetup:
         subprocess.run("sudo -n rfcomm release 0", shell=True)
         self.is_connected = False
 
-    
+
 # sample code
 # see top comment for details about messages
 
