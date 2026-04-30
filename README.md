@@ -131,7 +131,55 @@ http://localhost:<port>
 TODO: Explain how to run the project, including:	
 - Commands to start the application.
 - Instructions to run any included scripts or tools.
-- Examples of expected output or behavior.
+- Examples of expected output or behavior. 
+
+### Arduino setup:
+Load the `ArduinoBluetooth.ino` file onto the arduino and wait for `Finished bluetooth setup` to appear.
+
+### Raspberry Pi setup:
+On the pi, open a terminal window and run:  
+`git clone <repository-url>`  
+`cd SmartAlarm`
+
+Open another terminal window and run:  
+`bluetoothctl`  
+`remove 00:0E:EA:CF:6D:A5`  
+`scan on`  
+[wait for 00:0E:EA:CF:6D:A5 to show up]  
+`scan off`  
+`pair 00:0E:EA:CF:6D:A5`  
+[pin]: `1234`  
+`trust 00:0E:EA:CF:6D:A5`  
+`quit`  
+`sudo rfcomm connect hci0 00:0E:EA:CF:6D:A5`  
+
+This should confirm that bluetooth is connected. Do not close this terminal window.
+
+Return to the other terminal window and run:  
+`cp alarm/.env.example .env`
+
+Navigate to `pi/SmartAlarm/alarm` in the file explorer. Open the newly created .env file and fill in the following values:
+
+```
+DEVICE_DEBUG_MODE=False
+ENABLE_LOGGING=True
+
+BASE_URL= <the web app host ip>:<port>
+
+REQUESTS_CA_BUNDLE=
+
+SERIAL_NUMBER=<any integer>
+
+DEVICE_TIMEZONE=
+
+THINGSBOARD_ENABLED=True
+THINGSBOARD_HOST=thingsboard.cd.cf.ac.uk
+THINGSBOARD_ACCESS_TOKEN=abcdefghijklmnop
+```
+
+Save and exit this file. Return to the terminal window and run:  
+`python3 -m alarm.main`  
+If successful, this should run the alarm setup sequence, and the LCD should display a pairing code if the alarm is unpaired, or the time if it is.
 
 ## Third-Party Software and Frameworks
 TODO: Provide details of any third-party software, libraries, or frameworks used in the project. This includes:
