@@ -1,6 +1,7 @@
+"""LCD display helpers and puzzle formatting for the Raspberry Pi LCD."""
+
 import logging
 from typing import List
-from time import sleep
 from alarm.io.input_handler import JoystickDirection
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,7 @@ class Display:
     Class to control the Raspberry Pi LCD screen.
     """
     def __init__ (self, rgb_values: List[int] = None, text: str = "") -> None:
+        """Initialise the LCD with an optional backlight colour and text."""
         self.colour = rgb_values or [255, 255, 255]
         self.text = text
         
@@ -91,7 +93,7 @@ def format_memory_instruction(instruction: JoystickDirection) -> str:
     """
     Formats a joystick direction for the Raspberry Pi's LCD screen
     :param instruction: Joystick direction to be formatted
-    :return:  value
+    :return: value
     """
     if instruction == JoystickDirection.UP:
         return f"       {instruction.value}"
@@ -105,51 +107,3 @@ def format_memory_directions(directions: List[JoystickDirection]) -> List[str]:
     :return: List of formatted directions
     """
     return [format_memory_instruction(d) for d in directions]
-        
-# For debugging, will go once puzzles are fully integrated into the alarm
-def maths_sample_code():
-    # create new display object
-    d = Display()
-    
-    # format question with the currently selected option
-    selected_index = 0
-    options = [22, 30, 28, 25]
-    d.set_text(render_maths_question("4 x 7", options, selected_index))
-    sleep(1)
-    
-    # move selection left or right
-    selected_index = (selected_index - 1) % len(options)
-    d.set_text(render_maths_question("4 x 7", options, selected_index))
-    sleep(1)
-    selected_index = (selected_index + 1) % len(options)
-    d.set_text(render_maths_question("4 x 7", options, selected_index))
-    sleep(1)
-    
-    # set display colour to red
-    d.set_colour([255, 0, 0])
-    
-# For debugging, will go once puzzles are fully integrated into the alarm
-def simon_sample_code ():
-    # create new display object
-    d = Display()
-    
-    directions = format_memory_directions([
-        JoystickDirection.LEFT,
-        JoystickDirection.RIGHT,
-        JoystickDirection.UP,
-        JoystickDirection.DOWN,
-    ])
-    
-    # iterate through directions
-    for i in directions:
-        d.set_text(i)
-        sleep(1)
-
-
-if __name__ == "__main__":
-    simon_sample_code()
-    
-
-    
-
-        

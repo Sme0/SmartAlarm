@@ -56,6 +56,7 @@ alarm_controller = AlarmController(input_handler, output_handler, debug_mode=dev
 
 # Helper functions for debugging and main loop
 def _print_debug_help():
+    """Print available debug-mode console commands."""
     if str(os.getenv("DEVICE_DEBUG_MODE")).lower() != "true":
         return
 
@@ -73,6 +74,7 @@ def _flush_inputs_on_state_change(previous_state, current_state):
 
 
 def _handle_alarm_events():
+    """Handle dismiss/snooze events when the alarm is actively ringing."""
     events = input_handler.pop_events_by_type({
         InputEventType.ALARM_DISMISS,
         InputEventType.ALARM_SNOOZE,
@@ -87,6 +89,7 @@ def _handle_alarm_events():
             break
 
 def pairing_loop():
+    """Pair the device with the server, falling back to cached pairing state."""
     # Last known pairing state lets the device boot in offline mode without blocking.
     cached_paired = get_cached_server_paired()
     pairing_status = flask_api_client.get_pairing_status()
@@ -139,6 +142,7 @@ def pairing_loop():
 
 
 def main_alarm_loop():
+    """Run the main polling loop, syncing alarms and handling interactions."""
     last_update_time = time.time()
     previous_state = alarm_controller.state
     previous_alarm_snapshot = None

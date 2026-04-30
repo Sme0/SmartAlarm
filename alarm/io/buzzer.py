@@ -1,3 +1,5 @@
+"""Buzzer abstractions for Raspberry Pi hardware and debug environments."""
+
 import threading
 import logging
 from abc import ABC, abstractmethod
@@ -13,6 +15,8 @@ except ImportError:
     logger.warning("Unable to import Pi libraries. Only an issue if connecting to raspberry pi components.")
 
 class Buzzer(ABC):
+    """Abstract buzzer interface used by alarm output handlers."""
+
     def __init__(self, volume: int = 3) -> None:
         self.active = False
         self.volume = volume
@@ -94,6 +98,7 @@ class RaspberryPiBuzzer(Buzzer):
         """
         Internal method defining the alarm tune
         """
+        # Loop until the active flag is cleared by stop_alarm_sound()
         while self.active:
             for _ in range(4):
                 with grovepi_lock:

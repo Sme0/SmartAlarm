@@ -1,3 +1,5 @@
+"""Maths puzzle implementation using mathgenerator question types."""
+
 import mathgenerator as mg
 import random
 import logging
@@ -10,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 class MathsPuzzle(Puzzle):
+    """Multiple-choice arithmetic puzzle driven by joystick selection."""
+
     def __init__(self, input_handler: InputHandler, output_handler: OutputHandler):
         super().__init__(input_handler, output_handler)
 
@@ -24,14 +28,17 @@ class MathsPuzzle(Puzzle):
         self.current_selection = 0
 
     def _parse_solution_int(self, raw_solution):
+        """Normalize mathgenerator solution into an integer value."""
         return int(str(raw_solution).replace("$", "").strip())
 
     def _format_problem(self, raw_problem):
+        """Convert mathgenerator tokens into LCD-friendly operators."""
         problem = str(raw_problem).replace("$", "")
         problem = problem.replace("\\div", "/") #changed for display purposes
         return problem.replace("\\cdot", "x") #changed for display purposes
 
     def prepare_puzzle(self):
+        """Create a question and populate a list of selectable answers."""
         #generate maths puzzle
         self.problem, self.solution = mg.genById(random.choice(self.question_types))
         self.solution = self._parse_solution_int(self.solution)
@@ -58,24 +65,29 @@ class MathsPuzzle(Puzzle):
         return self.choices
 
     def move_selection_left(self):
+        """Shift selection left with wrap-around."""
         if not self.choices:
             return self.current_selection
         self.current_selection = (self.current_selection - 1) % len(self.choices)
         return self.current_selection
 
     def move_selection_right(self):
+        """Shift selection right with wrap-around."""
         if not self.choices:
             return self.current_selection
         self.current_selection = (self.current_selection + 1) % len(self.choices)
         return self.current_selection
 
     def on_joystick_left(self):
+        """Handle left joystick movement by changing selection."""
         self.move_selection_left()
 
     def on_joystick_right(self):
+        """Handle right joystick movement by changing selection."""
         self.move_selection_right()
 
     def display_puzzle(self):
+        """Render the current maths question and options to the display."""
         self.solution = self._parse_solution_int(self.solution)
         logger.debug(self.problem)
         logger.debug(self.choices)
@@ -84,9 +96,3 @@ class MathsPuzzle(Puzzle):
         if self.current_selection is None:
             self.current_selection = 0
         self.output_handler.display_maths_problem(self.problem, self.choices, self.current_selection)
-
-
-
-
-
-
