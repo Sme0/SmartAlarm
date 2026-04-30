@@ -31,7 +31,7 @@ from alarm.device_cache import (
     save_cached_server_paired,
 )
 from alarm.alarm_controller import AlarmController
-from alarm.alarm_sync import parse_cached_alarms, resolve_alarm_refresh
+from alarm.alarm_sync import parse_cached_alarms, resolve_alarm_refresh, prune_snooze_alarms
 from alarm.alarm_state import AlarmState
 from alarm.thingsboard_client import ThingsBoardClient
 
@@ -189,6 +189,11 @@ def main_alarm_loop():
                 get_cached_alarms(),
             )
             alarm_controller.alarms = resolved_alarms
+            if success:
+                alarm_controller.snooze_alarms = prune_snooze_alarms(
+                    alarm_controller.snooze_alarms,
+                    alarm_controller.alarms,
+                )
             if cache_rows is not None:
                 # Refresh local cache with the latest server-confirmed alarm list.
                 save_cached_alarms(cache_rows)

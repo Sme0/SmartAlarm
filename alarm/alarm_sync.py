@@ -51,3 +51,11 @@ def resolve_alarm_refresh(
 
     logger.debug("Failed to refresh alarms and no cached alarms were usable")
     return [], None
+
+
+def prune_snooze_alarms(snooze_alarms: List[Alarm], latest_alarms: List[Alarm]) -> List[Alarm]:
+    """Drop snoozes whose source alarm is no longer present after a successful sync."""
+    if not snooze_alarms or not latest_alarms:
+        return []
+    valid_ids = {alarm.id for alarm in latest_alarms}
+    return [alarm for alarm in snooze_alarms if alarm.source_alarm_id in valid_ids]

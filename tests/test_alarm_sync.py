@@ -20,7 +20,7 @@ exceptions.RequestException = Exception
 sys.modules.setdefault("requests.exceptions", exceptions)
 
 from alarm.alarm_controller import Alarm
-from alarm.alarm_sync import parse_cached_alarms, resolve_alarm_refresh
+from alarm.alarm_sync import parse_cached_alarms, resolve_alarm_refresh, prune_snooze_alarms
 from alarm.flask_api_client import FlaskAPIClient
 
 
@@ -149,6 +149,67 @@ class AlarmSyncTests(unittest.TestCase):
         self.assertEqual(len(alarms), 1)
         self.assertEqual(alarms[0].id, "server-alarm")
         self.assertEqual(cache_rows[0]["id"], "server-alarm")
+
+    def test_prune_snooze_alarms_drops_deleted_sources(self):
+        """Snoozed alarms should be removed if their source alarms were deleted."""
+        latest = [
+            Alarm(
+                id="alarm-keep",
+                time="07:00",
+                enabled=True,
+                day_of_week=1,
+                puzzle_type="maths",
+                max_snoozes=2,
+                snooze_count=0,
+                source_alarm_id="alarm-keep",
+            )
+        ]
+        snoozes = [
+            Alarm(
+                id="alarm-keep-Snooze-1",
+                time="07:05",
+                enabled=True,
+                day_of_week=1,
+                puzzle_type="maths",
+                max_snoozes=2,
+                snooze_count=1,
+                source_alarm_id="alarm-keep",
+            ),
+            Alarm(
+                id="alarm-drop-Snooze-1",
+                time="08:05",
+                enabled=True,
+                day_of_week=2,
+                puzzle_type="memory",
+                max_snoozes=2,
+                snooze_count=1,
+                source_alarm_id="alarm-drop",
+            ),
+        ]
+
+        pruned = prune_snooze_alarms(snoozes, latest)
+
+        self.assertEqual(len(pruned), 1)
+        self.assertEqual(pruned[0].source_alarm_id, "alarm-keep")
+
+    def test_prune_snooze_alarms_clears_when_no_latest(self):
+        """When all alarms are deleted, snoozes should be cleared too."""
+        snoozes = [
+            Alarm(
+                id="alarm-keep-Snooze-1",
+                time="07:05",
+                enabled=True,
+                day_of_week=1,
+                puzzle_type="maths",
+                max_snoozes=2,
+                snooze_count=1,
+                source_alarm_id="alarm-keep",
+            )
+        ]
+
+        pruned = prune_snooze_alarms(snoozes, [])
+
+        self.assertEqual(pruned, [])
 
 
 if __name__ == "__main__":

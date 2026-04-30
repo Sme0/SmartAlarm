@@ -244,7 +244,7 @@ TODO: Provide details of any third-party software, libraries, or frameworks used
 
 #### sqlalchemy 2.0.25
 - https://www.sqlalchemy.org/
-- Usede for database interaction
+- Used for database interaction
 
 ## Code Documentation
 TODO: Mention any in-line code comments, docstrings, or additional documentation files that explain the code in more detail.
