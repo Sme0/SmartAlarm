@@ -128,11 +128,6 @@ http://localhost:<port>
 
 ### Physical Device
 
-TODO: Explain how to run the project, including:	
-- Commands to start the application.
-- Instructions to run any included scripts or tools.
-- Examples of expected output or behavior. 
-
 ### Arduino setup:
 Load the `ArduinoBluetooth.ino` file onto the arduino and wait for `Finished bluetooth setup` to appear.
 
@@ -186,6 +181,70 @@ TODO: Provide details of any third-party software, libraries, or frameworks used
 - Names and versions of the software/frameworks.
 - Purpose of each third-party component.
 - Links to their official documentation.
+
+#### mathgenerator 1.5.0
+- https://lukew3.github.io/mathgenerator/mathgenerator.html
+- Used for generating maths questions for the alarm
+
+#### paho-mqtt 2.1.0
+- https://eclipse.dev/paho/files/paho.mqtt.python/html/client.html
+- Used to connect to the thingsboard dashboard for data collection and display
+
+#### requests 2.32.4
+- https://requests.readthedocs.io/en/latest/
+- Used to connect the client (alarm) to the server (web app)
+
+#### pytz
+- https://pythonhosted.org/pytz/
+- Used to support different timezones
+
+#### flask 3.0.0
+- https://flask.palletsprojects.com/en/stable/
+- Used for web app hosting
+
+#### flask-login 0.6.3
+- https://flask-login.readthedocs.io/en/latest/
+- Used for user account creation and login
+
+#### flask-wtf 1.2.2
+- https://flask-wtf.readthedocs.io/en/1.2.x/
+- Used for forms on the web app
+
+#### werkzeug 3.0.11
+- https://palletsprojects.com/contributing/
+- Used for password hashing and server error handling
+
+#### wtforms 3.1.2
+- https://wtforms.readthedocs.io/en/3.2.x/
+- Used for web app forms
+
+#### email_validator 2.1.1
+- https://pypi.org/project/email-validator/
+- Used for checking user email address validity
+
+#### gunicord 25.1.0
+- https://gunicorn.org/reference/settings/
+- Used to start the web app
+
+#### joblib 1.5.3
+- https://joblib.readthedocs.io/en/stable/
+- Used in user data analysis for converting the machine learning model to and from binary 
+
+#### pymysql 1.1.2
+- https://pymysql.readthedocs.io/en/latest/
+- Connects the web app to the sql server
+
+#### psycopg2-binary 2.9.10
+- https://www.psycopg.org/docs/
+- Adapts the database to python
+
+#### scikit-learn 1.8.0
+- https://scikit-learn.sourceforge.net/stable/documentation.html
+- Used for machine learning in user data analysis
+
+#### sqlalchemy 2.0.25
+- https://www.sqlalchemy.org/
+- Usede for database interaction
 
 ## Code Documentation
 TODO: Mention any in-line code comments, docstrings, or additional documentation files that explain the code in more detail.
