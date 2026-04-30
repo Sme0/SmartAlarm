@@ -19,6 +19,7 @@ load_dotenv()
 app = Flask(__name__,)
 
 def _missing_required(fields):
+    """Return a comma-separated list of missing config field names."""
     missing = [name for name, value in fields.items() if not value]
     return ", ".join(missing) if missing else ""
 
@@ -115,4 +116,3 @@ from app import models
 # Initialise database
 with app.app_context():
     database.create_all()
-

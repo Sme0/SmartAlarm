@@ -1,8 +1,11 @@
+"""Shared datetime and parsing helpers for the Flask application."""
+
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 def group_sleep_records(records: list[dict], night_gap_size=2):
+    """Group raw sleep stage records into nightly sessions by time gaps (hours)."""
     if not records:
         return []
 
@@ -67,6 +70,7 @@ def as_utc(value: datetime) -> datetime | None:
 
 
 def utc_now() -> datetime:
+    """Return a timezone-aware UTC timestamp."""
     return datetime.now(timezone.utc)
 
 
@@ -109,6 +113,7 @@ def safe_avg(values: list[float]) -> float:
 
 
 def resolve_timezone(tz_name: str):
+    """Resolve a timezone name, defaulting to UTC when unknown or missing."""
     if tz_name:
         try:
             return ZoneInfo(tz_name), tz_name

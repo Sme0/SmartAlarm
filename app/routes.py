@@ -52,6 +52,7 @@ from app.utils import (
 
 
 def _is_expired(value: datetime) -> bool:
+    """Return True if a datetime is in the past (UTC-normalized)."""
     normalized = as_utc(value)
     return normalized is not None and normalized < utc_now()
 
@@ -170,10 +171,12 @@ def _dynamic_alarm_ui_state(user_id: int) -> tuple[int, bool]:
 
 
 def _serialize_datetime(value):
+    """Serialize datetimes to ISO 8601 strings for export payloads."""
     return value.isoformat() if value is not None else None
 
 
 def _serialize_time(value):
+    """Serialize time values to HH:MM:SS strings for export payloads."""
     return value.strftime("%H:%M:%S") if value is not None else None
 
 

@@ -134,6 +134,7 @@ class Device(db.Model):
         return device
 
     def generate_pairing_code(self) -> tuple[str, datetime]:
+        """Generate a unique pairing code and persist its expiry timestamp."""
         while True:
             code = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
             if not Device.query.filter_by(pairing_code=code).first():
@@ -145,22 +146,26 @@ class Device(db.Model):
         return self.pairing_code, self.pairing_expiry
 
     def pair(self, user_id: int):
+        """Attach the device to a user and clear pairing state."""
         self.user_id = user_id
         self.pairing_code = None
         self.pairing_expiry = None
         db.session.commit()
 
     def update_heartbeat(self):
+        """Persist a heartbeat timestamp for online/offline detection."""
         self.last_seen = utc_now()
         db.session.commit()
 
     def is_online(self) -> bool:
+        """Return True when the device heartbeat is recent enough."""
         last_seen_utc = as_utc(self.last_seen)
         if not last_seen_utc:
             return False
         return utc_now() - last_seen_utc < timedelta(minutes=2)
 
     def get_alarms(self) -> List["Alarm"]:
+        """Return all alarms associated with this device and user."""
         return Alarm.query.filter_by(
             device_serial=self.serial_number, user_id=self.user_id
         ).all()
@@ -192,6 +197,7 @@ class Device(db.Model):
 
 
 class Alarm(db.Model):
+    """Alarm configuration row associated with a device and user."""
     __tablename__ = "alarms"
     id = db.Column(db.String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
     device_serial = db.Column(
@@ -222,6 +228,7 @@ class Alarm(db.Model):
         dynamic_start_time=None,
         dynamic_end_time=None,
     ):
+        """Create and persist a new alarm row."""
         alarm = Alarm()
         alarm.device_serial = device_serial
         alarm.user_id = user_id
@@ -240,6 +247,7 @@ class Alarm(db.Model):
 
 
 class AlarmSession(db.Model):
+    """Historical record of a triggered alarm and its outcome."""
     __tablename__ = "alarm_sessions"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
@@ -286,6 +294,7 @@ class AlarmSession(db.Model):
 
 
 class PuzzleSession(db.Model):
+    """One puzzle attempt recorded as part of an alarm session."""
     __tablename__ = "puzzle_sessions"
     id = db.Column(db.Integer, primary_key=True)
     alarm_session_id = db.Column(
@@ -349,6 +358,7 @@ class PuzzleSession(db.Model):
 
 
 class SleepSession(db.Model):
+    """Sleep session metadata imported from health data."""
     __tablename__ = "sleep_sessions"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
@@ -366,6 +376,7 @@ class SleepSession(db.Model):
 
 
 class SleepStage(db.Model):
+    """Sleep stage row associated with a SleepSession."""
     __tablename__ = "sleep_stages"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
@@ -382,6 +393,7 @@ class SleepStage(db.Model):
 
 
 class DifficultyModel(db.Model):
+    """Serialized ML model used for dynamic alarm difficulty predictions."""
     __tablename__ = "difficulty_models"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
