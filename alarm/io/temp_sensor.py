@@ -34,7 +34,8 @@ class RaspberryPiTempSensor(TempSensor):
     def get_temp_and_humidity(self) -> List[int]:
         """Return the latest temperature and humidity as integer values."""
         self.check_conditions()
-        return [int(self.temp), int(self.humidity)]
+        # Reducing temperature reading due to naturally warmer container :)
+        return [int(self.temp) - 6, int(self.humidity)]
 
 
 class DebugTempSensor(TempSensor):

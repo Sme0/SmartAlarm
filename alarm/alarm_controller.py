@@ -145,7 +145,7 @@ class AlarmController:
             if update_display:
                 rendered_options = options.copy()
                 rendered_options[selected_idx] = f">{options[selected_idx]}<"
-                self.output_handler.display_text("   ".join(rendered_options))
+                self.output_handler.display_text("\n".join(rendered_options))
                 update_display = False
 
             self.input_handler.check_inputs()
