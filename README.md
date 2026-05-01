@@ -169,7 +169,7 @@ DEVICE_TIMEZONE=
 
 THINGSBOARD_ENABLED=True
 THINGSBOARD_HOST=thingsboard.cd.cf.ac.uk
-THINGSBOARD_ACCESS_TOKEN=abcdefghijklmnop
+THINGSBOARD_ACCESS_TOKEN=abcdefghi
 ```
 
 Save and exit this file. Return to the terminal window and run:  

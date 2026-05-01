@@ -98,14 +98,17 @@ def pairing_loop():
     if pairing_status == PairingStatus.PAIRED:
         # Persist successful server pairing so future offline boots can continue.
         save_cached_server_paired(True)
+        thingsboard_client.post({"paired": True})
         return
 
     if pairing_status == PairingStatus.INVALID:
         if cached_paired:
             logger.info("[SETUP] Pairing status unavailable, using cached paired state.")
+            thingsboard_client.post({"paired": True})
             return
         logger.warning("[SETUP] Could not verify pairing and no cached paired state was found.")
         logger.warning("[SETUP] Device will continue in offline/unpaired mode.")
+        thingsboard_client.post({"paired": False})
         return
 
     pairing_code = flask_api_client.request_pairing_code()
@@ -120,14 +123,17 @@ def pairing_loop():
         if status == PairingStatus.PAIRED:
             save_cached_server_paired(True)
             logger.info("Successfully paired")
+            thingsboard_client.post({"paired": True})
             break
 
         if status == PairingStatus.INVALID:
             if cached_paired:
                 logger.info("[SETUP] Network lost, using cached paired state.")
+                thingsboard_client.post({"paired": True})
                 break
             output_handler.display_text("Unable to retrieve pairing status/code.")
             logger.warning("[SETUP] Pairing status unavailable. Continuing without pairing.")
+            thingsboard_client.post({"paired": False})
             break
 
         if status == PairingStatus.FAILED:
@@ -204,6 +210,12 @@ def main_alarm_loop():
             if alarm_snapshot != previous_alarm_snapshot:
                 logger.debug("Active alarms updated: %s, %s", alarm_controller.alarms, alarm_controller.snooze_alarms)
                 previous_alarm_snapshot = alarm_snapshot
+
+            thingsboard_client.post({
+                "last_sync_success": bool(success),
+                "alarm_count": len(alarm_controller.alarms),
+                "snooze_alarm_count": len(alarm_controller.snooze_alarms),
+            })
 
             complete_sessions = alarm_controller.peek_complete_sessions()
             if complete_sessions:

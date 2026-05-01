@@ -273,6 +273,10 @@ class AlarmController:
             self.last_displayed_minute = current_minute
 
             temp, humidity = self.sensor.get_temp_and_humidity()
+            self.input_handler.thingsboard_client.post({
+                "temp_c": int(temp),
+                "humidity_pct": int(humidity),
+            })
 
             self.output_handler.display_text(
                 f"     {_clock_now().strftime('%H:%M')}\n{temp}c {humidity}%"
@@ -304,6 +308,14 @@ class AlarmController:
                     },
                 },
             )
+            self.input_handler.thingsboard_client.post({
+                "alarm_event": "triggered",
+                "alarm_id": str(current_alarm.id),
+                "source_alarm_id": source_alarm_id,
+                "alarm_time": current_alarm.time,
+                "alarm_day_of_week": current_alarm.day_of_week,
+                "puzzle_type": current_alarm.puzzle_type,
+            })
 
         self.output_handler.display_text(
             f"Alarm Triggered: {_clock_now().strftime('%H:%M')}"
@@ -328,12 +340,22 @@ class AlarmController:
             or self.current_triggered_alarm.id
         )
         session = self._pending_sessions.get(source_alarm_id)
+        exported_session = None
 
         # Only append puzzle session if both permissions are enabled AND session exists
         if session and session.get("permissions", {}).get("collect_brainteaser_performance", True):
-            session["puzzle_sessions"].append(puzzle.export_session(source_alarm_id))
+            exported_session = puzzle.export_session(source_alarm_id)
+            session["puzzle_sessions"].append(exported_session)
 
         if not solved:
+            if session and exported_session is not None:
+                exported_session["outcome_action"] = "triggered"
+                self.input_handler.thingsboard_client.post({
+                    "puzzle_type": exported_session.get("puzzle_type"),
+                    "puzzle_time_taken_seconds": exported_session.get("time_taken_seconds"),
+                    "puzzle_is_correct": exported_session.get("is_correct"),
+                    "puzzle_outcome_action": exported_session.get("outcome_action"),
+                })
             self.trigger_alarm(self.current_triggered_alarm)
             return
 
@@ -363,6 +385,13 @@ class AlarmController:
             # TODO: Make snooze time editable through web
             if session and session.get("puzzle_sessions"):
                 session["puzzle_sessions"][-1]["outcome_action"] = "snoozed"
+                last_session = session["puzzle_sessions"][-1]
+                self.input_handler.thingsboard_client.post({
+                    "puzzle_type": last_session.get("puzzle_type"),
+                    "puzzle_time_taken_seconds": last_session.get("time_taken_seconds"),
+                    "puzzle_is_correct": last_session.get("is_correct"),
+                    "puzzle_outcome_action": last_session.get("outcome_action"),
+                })
             snooze_time = (_clock_now() + timedelta(minutes=5)).strftime("%H:%M")
             source_alarm_id = (
                 self.current_triggered_alarm.source_alarm_id
@@ -380,6 +409,13 @@ class AlarmController:
                     source_alarm_id=source_alarm_id,
                 )
             )
+            if can_collect_alarm_sessions():
+                self.input_handler.thingsboard_client.post({
+                    "alarm_event": "snoozed",
+                    "alarm_id": str(self.current_triggered_alarm.id),
+                    "source_alarm_id": source_alarm_id,
+                    "snooze_count": current_snooze_count + 1,
+                })
             self.stop_alarm()
 
         elif choice == "dismiss":
@@ -389,11 +425,28 @@ class AlarmController:
 
             if session and session.get("puzzle_sessions"):
                 session["puzzle_sessions"][-1]["outcome_action"] = "dismissed"
+                last_session = session["puzzle_sessions"][-1]
+                self.input_handler.thingsboard_client.post({
+                    "puzzle_type": last_session.get("puzzle_type"),
+                    "puzzle_time_taken_seconds": last_session.get("time_taken_seconds"),
+                    "puzzle_is_correct": last_session.get("is_correct"),
+                    "puzzle_outcome_action": last_session.get("outcome_action"),
+                })
 
             if session:
                 session["waking_difficulty"] = waking_difficulty
                 self._complete_sessions[source_alarm_id] = session
                 self._pending_sessions.pop(source_alarm_id, None)
+
+            if can_collect_alarm_sessions():
+                payload = {
+                    "alarm_event": "dismissed",
+                    "alarm_id": str(self.current_triggered_alarm.id),
+                    "source_alarm_id": source_alarm_id,
+                }
+                if session and session.get("permissions", {}).get("ask_waking_difficulty", True):
+                    payload["waking_difficulty"] = waking_difficulty
+                self.input_handler.thingsboard_client.post(payload)
 
             self.stop_alarm()
 
