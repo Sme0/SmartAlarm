@@ -377,6 +377,8 @@ class AlarmController:
         if not current_snooze_count >= max_snoozes:
             options.append("Snooze")
 
+        # Clear events before form
+        self.input_handler.pop_events()
         choice = self._decision_selection(options)
         if choice:
             choice = choice.lower()
