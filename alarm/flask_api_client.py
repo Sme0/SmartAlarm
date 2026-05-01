@@ -166,8 +166,12 @@ class FlaskAPIClient:
 
             data = response.json()
 
+            if data.get("response") == "failed":
+                logger.debug("Failed to get alarms: %s", data.get("message", "unknown reason"))
+                return False, []
+
             if response.status_code != 200:
-                logger.debug("Failed to get alarms:", data.get("reason", "unknown reason"))
+                logger.debug("Failed to get alarms: %s", data.get("reason", "unknown reason"))
                 return False, []
 
             alarms = []

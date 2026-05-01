@@ -187,6 +187,17 @@ def main_alarm_loop():
         current_time = time.time()
         if current_time - last_update_time >= 15.0:
             success,latest_alarms = flask_api_client.get_alarms()
+            if not success:
+                pairing_status = flask_api_client.get_pairing_status()
+                if pairing_status in {PairingStatus.PAIRING, PairingStatus.FAILED}:
+                    save_cached_server_paired(False)
+                    alarm_controller.alarms = []
+                    alarm_controller.snooze_alarms = []
+                    save_cached_alarms([])
+                    pairing_loop()
+                    last_update_time = current_time
+                    continue
+
             resolved_alarms, cache_rows = resolve_alarm_refresh(
                 flask_api_client,
                 alarm_controller.alarms,
