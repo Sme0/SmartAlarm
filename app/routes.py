@@ -180,6 +180,21 @@ def _serialize_time(value):
     return value.strftime("%H:%M:%S") if value is not None else None
 
 
+def _assign_default_device_name(user: User, device: Device) -> None:
+    """Assign a unique, friendly device name if none is already set."""
+    if device.name:
+        return
+    preferred_name = (getattr(user, "preferred_name", "") or "").strip()
+    base_name = f"{preferred_name}'s Alarm" if preferred_name else "My Alarm"
+    existing_names = {d.name for d in user.devices if d.name}
+    candidate = base_name
+    suffix = 2
+    while candidate in existing_names:
+        candidate = f"{base_name} ({suffix})"
+        suffix += 1
+    device.name = candidate
+
+
 # Return JSON 401 for API/AJAX requests, otherwise redirect to the login page.
 @login_manager.unauthorized_handler
 def unauthorized_callback():
@@ -1230,6 +1245,12 @@ def pair_device():
             return render_template("pair_device.html", pairing_form=pairing_form)
 
         device.pair(current_user.id)
+
+        previous_name = device.name
+        _assign_default_device_name(current_user, device)
+        if device.name != previous_name:
+            db.session.commit()
+
         flash("Device paired successfully.", "success")
         return redirect(url_for("account"))
 
@@ -2123,6 +2144,10 @@ def pair_device_debug(code=None):
         # Pair device with user
         user = User.query.filter_by(email_address="test@test.com").first()
         device.pair(user.id)
+        previous_name = device.name
+        _assign_default_device_name(user, device)
+        if device.name != previous_name:
+            db.session.commit()
         print("Device paired successfully.")
         return "Device paired successfully."
 
@@ -2251,7 +2276,7 @@ def dev_sample_data():
                     time_taken_seconds=time_taken_seconds,
                 )
             )
-            total_puzzle_rows += 1
+            total_puzzle_rows +=  1
 
     db.session.commit()
 
