@@ -13,7 +13,7 @@ from alarm.alarm_state import AlarmState
 from alarm.io.input_handler import InputEventType, InputHandler
 from alarm.io.output_handler import DebugOutputHandler, OutputHandler
 from alarm.io.pi_bluetooth import BluetoothConfirmation
-from alarm.io.temp_sensor import TempSensor
+from alarm.io.temp_sensor import DebugTempSensor, RaspberryPiTempSensor
 from alarm.puzzles.maths_puzzle import MathsPuzzle
 from alarm.puzzles.memory_puzzle import MemoryPuzzle
 from alarm.puzzles.puzzle import Puzzle
@@ -114,7 +114,7 @@ class AlarmController:
 
         self.bluetooth_connection = BluetoothConfirmation(20, True)
 
-        self.sensor = TempSensor()
+        self.sensor = DebugTempSensor() if self.debug_mode else RaspberryPiTempSensor()
 
     def _build_puzzle_for_current_alarm(self) -> Puzzle:
         """

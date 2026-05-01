@@ -1,12 +1,19 @@
 """Temperature and humidity sensor access for the Grove DHT module."""
 
+from abc import ABC, abstractmethod
 from math import isnan
 from typing import List
 
-import grovepi
+
+class TempSensor(ABC):
+    """Abstract temperature/humidity sensor interface."""
+
+    @abstractmethod
+    def get_temp_and_humidity(self) -> List[int]:
+        """Return the latest temperature and humidity as integer values."""
 
 
-class TempSensor:
+class RaspberryPiTempSensor(TempSensor):
     """Reads temperature and humidity from a Grove DHT sensor on a fixed port."""
 
     def __init__(self) -> None:
@@ -16,14 +23,23 @@ class TempSensor:
 
     def check_conditions(self) -> None:
         """Read the latest temperature and humidity from the sensor."""
+        import grovepi
+
         temp, humidity = grovepi.dht(self.sensor, 0)
         if isnan(temp) or isnan(humidity):
-            pass
-        else:
-            self.temp = temp
-            self.humidity = humidity
+            return
+        self.temp = temp
+        self.humidity = humidity
 
     def get_temp_and_humidity(self) -> List[int]:
         """Return the latest temperature and humidity as integer values."""
         self.check_conditions()
         return [int(self.temp), int(self.humidity)]
+
+
+class DebugTempSensor(TempSensor):
+    """Debug sensor that always reports zeroed values."""
+
+    def get_temp_and_humidity(self) -> List[int]:
+        """Return placeholder temperature and humidity values."""
+        return [0, 0]
