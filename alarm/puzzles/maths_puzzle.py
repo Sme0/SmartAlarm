@@ -95,4 +95,17 @@ class MathsPuzzle(Puzzle):
 
         if self.current_selection is None:
             self.current_selection = 0
-        self.output_handler.display_maths_problem(self.problem, self.choices, self.current_selection)
+        try:
+            self.output_handler.display_maths_problem(
+                self.problem, self.choices, self.current_selection
+            )
+        except (OSError, IOError) as exc:
+            logger.warning("I/O error displaying maths puzzle, regenerating: %s", exc)
+            self.prepare_puzzle()
+            try:
+                self.output_handler.display_maths_problem(
+                    self.problem, self.choices, self.current_selection
+                )
+            except (OSError, IOError) as exc:
+                logger.error("Repeated I/O error displaying maths puzzle: %s", exc)
+                return
