@@ -45,9 +45,8 @@ class ThingsBoardClient:
 
     def _on_message(self, client, userdata, msg):
         logger.debug("Payload: " + str(msg.payload))
-        #TODO: Sort via msg.topic
         data = json.loads(msg.payload)
-        #TODO: Send data somewhere (observer pattern?)
+
 
     def connect(self):
         """Connect to the MQTT broker and start the background loop."""

@@ -24,7 +24,6 @@ class Puzzle(ABC):
         # For puzzles that require selecting from a set of choices
         self.current_selection = None
 
-        # TODO: Move snooze logic to AlarmController
         self.num_snoozes = 0
         self.snooze_cap = 3
 

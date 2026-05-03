@@ -384,7 +384,6 @@ class AlarmController:
             choice = choice.lower()
 
         if choice == "snooze":
-            # TODO: Make snooze time editable through web
             if session and session.get("puzzle_sessions"):
                 session["puzzle_sessions"][-1]["outcome_action"] = "snoozed"
                 last_session = session["puzzle_sessions"][-1]

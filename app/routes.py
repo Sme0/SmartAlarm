@@ -439,7 +439,6 @@ def account_export_data():
     user_id = current_user.id
     user = db.session.get(User, user_id)
     paired_devices = Device.query.filter_by(user_id=user_id).all()
-    paired_serials = [device.serial_number for device in paired_devices]
 
     alarms = Alarm.query.filter_by(user_id=user_id).all()
     alarm_sessions = (
@@ -461,7 +460,6 @@ def account_export_data():
             "id": user.id,
             "email_address": user.email_address,
             "preferred_name": user.preferred_name,
-            "password_hash": user.password_hash,
         },
         "devices": [
             {
