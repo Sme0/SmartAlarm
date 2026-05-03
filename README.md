@@ -1,4 +1,4 @@
-# Smart Alarm (Group 8)
+# SmartAlarm (Group 8)
 
 ### Overview
 SmartAlarm is an alarm system designed to ensure you wake up on time through cognitive verification. It consists of two main components:
