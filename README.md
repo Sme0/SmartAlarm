@@ -123,6 +123,36 @@ Ensure a flask secret key is entered for the application to run.
 
 #### Physical Device
 
+Below is the component list required for the project:
+```
+- Raspberry Pi + Grove Pi Plus module
+- Joystick
+- Buzzer
+- LCD display
+- LED button x2
+- Arduino + Grove module
+```
+
+Below are the instructions to set up the components for the Raspberry Pi:
+
+```
+1. Attach the Grove Pi module to the top of the Raspberry Pi
+2. Connect the LCD display to the I2C-1 port on the Grove Pi.
+3. Connect the joystick to the A0 port on the Grove Pi
+4. Connect the buzzer to the D5 port on the Grove Pi
+5. Connect the button to the D3 port on the Grove Pi
+6. (Optional) connect the HDMI cable to the Pi and a monitor
+7. Connect the power cable to the Pi and a socket
+```
+
+Below are the instructions to set up the components for the Arduino:
+```
+1. Connect the Grove module to the top of the Arduino
+2. Connect the bluetooth serial module to the D8 port on the Grove module
+3. Connect the LED button to the D3 port on the Grove module
+4. Connect the Arduino to a laptop or other power source via the usb cable
+```
+
 Copy the example environment file as the basis for its .env:
 ```commandline
 cp alarm/.env.example .env
