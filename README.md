@@ -1,10 +1,33 @@
 # Smart Alarm (Group 8)
 
 ### Overview
-TODO: Add overview of project
+SmartAlarm is an alarm system designed to ensure you wake up on time through cognitive verification. It consists of two main components:
+- **Flask Web Application (`/app`)**: A web app where users can create accounts, schedule alarms, pair devices, and view sleep analytics.
+- **Alarm Device (`/alarm`)**: A Python-based service running on a Raspberry Pi that monitors scheduled alarms, controls hardware (LCD, buzzer, joystick), and triggers puzzles that must be solved to dismiss the alarm.
 
 ## Folder and File Structure
-TODO: A detailed description of the directory layout and the purpose of each folder and file. This helps others understand how the project is organized.
+The project is organized into three main directories:
+
+- **`/app` (Flask Web Application)**
+  - `__init__.py`: App factory and database initialisation.
+  - `run.py`: Entry point for the Flask application.
+  - `models.py`: Database schemas for Users, Devices, Alarms, and Sessions.
+  - `routes.py`: Logic for and not limited to authentication, device pairing, alarm management, and API routes.
+  - `forms.py`: Web forms for user interaction.
+  - `analysis.py`: Implementation for the dynamic alarm ML model.
+  - `utils.py`: Utility functions for time data and data parsing.
+  - `templates/` & `static/`: HTML templates and assets (CSS/JS).
+- **`/alarm` (Raspberry Pi Alarm Device)**
+  - `main.py`: Entry point and main event loop for the hardware.
+  - `alarm_controller.py`: Core state machine managing alarm lifecycle.
+  - `flask_api_client.py`: Handles communication with the Flask server.
+  - `thingsboard_client.py`: Handles communication with the ThingsBoard server.
+  - `alarm_sync.py`: Handles synchronisation between the alarm, server, and local caching.
+  - `device_cache.py`: Manages local caching for offline functionality.
+  - `ArduinoBluetooth.ino`: Script for Arduino Bluetooth connection.
+  - `io/`: Hardware abstraction layer for GrovePi components (LCD, Buzzer, Input).
+  - `puzzles/`: Logic for various wake-up games (Maths, Memory, etc.).
+- **`/tests`**: Comprehensive unit and integration tests using `pytest`.
 
 ## Setup Instructions
 ### Prerequisites
@@ -20,7 +43,9 @@ The following software is required to run the project:
 
 #### Physical Device
 
-TODO: List any software, libraries, or frameworks that need to be installed before setting up the project.
+- **Python 3.7.3+** - The Python version on the IoT kit's Raspberry Pi
+- **pip** - required to install dependencies
+- **Git (optional)** - for cloning the repository
 
 ### Installation
 
@@ -34,13 +59,26 @@ git clone <repository-url>
 cd <repository-root-folder>
 ```
 All dependencies will be automatically installed if running with Docker. If you are not running with Docker, 
-install the python dependencies manually:
+install the Python package dependencies manually:
 ```commandline
 pip install -r app/requirements.txt
 ```
 
 #### Physical Device
-TODO: Detailed commands and steps to install dependencies and set up the environment.
+
+Download the project or clone the project repository, and navigate to the downloaded folder:
+```commandline
+git clone <repository-url>
+cd <repository-root-folder>
+```
+
+Install the Python package dependencies (not including Grove libraries):
+```commandline
+pip install -r alarm/requirements.txt
+```
+
+Please ensure, if you are not running on debug mode, that all relevant Grove libraries are installed.
+
 
 ### Configuration
 
@@ -84,7 +122,26 @@ FLASK_HOST_PORT=5000
 Ensure a flask secret key is entered for the application to run.
 
 #### Physical Device
-TODO: Instructions on how to configure the project, including any environment variables or configuration files that need to be set.
+
+Copy the example environment file as the basis for its .env:
+```commandline
+cp alarm/.env.example .env
+```
+
+This file contains configuration values such as:
+
+- Server URL
+- Device serial number
+- Timezone information
+
+Here is a minimal example .env file for running the alarm:
+```dotenv
+DEVICE_DEBUG_MODE=False
+BASE_URL=http://10.3.182.184:5000
+SERIAL_NUMBER=<random string>
+```
+The above are **example** values, ensure the `SERIAL_NUMBER` is unique and the `BASE_URL` is valid.
+Instructions for using other settings in the .env are all provided above each setting.
 
 ## Running the Project
 
@@ -99,7 +156,7 @@ To run docker-compose with the local MySQL server, run:
 docker compose up --build
 ```
 
-To run only Docker file and use another database of your choice, run (assuming ports are 5000):
+To run only the Docker file and use another database of your choice, run (assuming ports are 5000):
 ```commandline
 docker build -t alarm-app .
 docker run -p 5000:5000 --env-file .env alarm-app
@@ -110,7 +167,7 @@ Assuming no errors occur, you may access the web application, for example using:
 ```
 http://localhost:<port>
 ```
-This will however depend on where the docker is being run, and the port you have entered into the .env file.
+This will however depend on where the docker is being run and the port you have entered into the .env file.
 
 #### Running directly with Python (Without Docker)
 
@@ -128,59 +185,39 @@ http://localhost:<port>
 
 ### Physical Device
 
-### Arduino setup:
-Load the `ArduinoBluetooth.ino` file onto the arduino and wait for `Finished bluetooth setup` to appear.
+#### Arduino setup:
+Load the `ArduinoBluetooth.ino` file onto the Arduino and wait for `Finished bluetooth setup` to appear.
 
-### Raspberry Pi setup:
-On the pi, open a terminal window and run:  
-`git clone <repository-url>`  
-`cd SmartAlarm`
+#### Raspberry Pi setup:
 
-Open another terminal window and run:  
-`bluetoothctl`  
-`remove 00:0E:EA:CF:6D:A5`  
-`scan on`  
+Open a new terminal window and run the following commands in order (replacing the Bluetooth address with the one from the Arduino):  
+```commandline
+bluetoothctl
+remove 00:0E:EA:CF:6D:A5
+scan on
 [wait for 00:0E:EA:CF:6D:A5 to show up]  
-`scan off`  
-`pair 00:0E:EA:CF:6D:A5`  
-[pin]: `1234`  
-`trust 00:0E:EA:CF:6D:A5`  
-`quit`  
-`sudo rfcomm connect hci0 00:0E:EA:CF:6D:A5`  
-
-This should confirm that bluetooth is connected. Do not close this terminal window.
-
-Return to the other terminal window and run:  
-`cp alarm/.env.example .env`
-
-Navigate to `pi/SmartAlarm/alarm` in the file explorer. Open the newly created .env file and fill in the following values:
-
-```
-DEVICE_DEBUG_MODE=False
-ENABLE_LOGGING=True
-
-BASE_URL= <the web app host ip>:<port>
-
-REQUESTS_CA_BUNDLE=
-
-SERIAL_NUMBER=<any integer>
-
-DEVICE_TIMEZONE=
-
-THINGSBOARD_ENABLED=True
-THINGSBOARD_HOST=thingsboard.cd.cf.ac.uk
-THINGSBOARD_ACCESS_TOKEN=abcdefghi
+scan off
+pair 00:0E:EA:CF:6D:A5  
+[pin]: 1234  
+trust 00:0E:EA:CF:6D:A5  
+quit
+sudo rfcomm connect hci0 00:0E:EA:CF:6D:A5 
 ```
 
-Save and exit this file. Return to the terminal window and run:  
-`python3 -m alarm.main`  
+
+This should confirm that Bluetooth is connected. Do not close this terminal window.
+
+Assuming all dependencies have already been installed (as per above instructions), return to the original terminal window
+and run the dedicated python script.
+Please note some operating systems use `python3` instead of `python`.
+
+```commandline
+python -m alarm.main
+```
+
 If successful, this should run the alarm setup sequence, and the LCD should display a pairing code if the alarm is unpaired, or the time if it is.
 
 ## Third-Party Software and Frameworks
-TODO: Provide details of any third-party software, libraries, or frameworks used in the project. This includes:
-- Names and versions of the software/frameworks.
-- Purpose of each third-party component.
-- Links to their official documentation.
 
 #### mathgenerator 1.5.0
 - https://lukew3.github.io/mathgenerator/mathgenerator.html
@@ -247,7 +284,12 @@ TODO: Provide details of any third-party software, libraries, or frameworks used
 - Used for database interaction
 
 ## Code Documentation
-TODO: Mention any in-line code comments, docstrings, or additional documentation files that explain the code in more detail.
+The codebase follows standard Python documentation practices:
+- **Docstrings**: Most classes and methods include docstrings explaining their purpose and parameters.
+- **In-line Comments**: Complicated logic, such as data analysis, is clarified with in-line comments.
 
 ## Troubleshooting
-TODO: Common issues that might arise during setup or usage and their solutions.
+- **GrovePi I/O Errors**: If you encounter `IOError` when running on the Pi, ensure the GrovePi is properly seated and the firmware is up to date. Check for pin conflicts in `alarm/io/input_handler.py`.
+- **Timezone Mismatch**: If alarms fire at the wrong time, ensure `DEVICE_TIMEZONE` is correctly set in your `.env` file (e.g., `Europe/London`), or that the Pi is running in the correct timezone.
+- **Pairing Issues**: If the device doesn't pair, verify that the `SERIAL_NUMBER` in `alarm/.env` is unique and the `BASE_URL` is accessible from the Pi.
+- **Bluetooth Issues**: If Bluetooth is not working, ensure the Arduino is on and loaded with its bluetooth script, and follow the bluetooth pairing instructions above.
