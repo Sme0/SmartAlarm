@@ -334,14 +334,14 @@ def _extract_features(user_id, use_health_data: bool) -> list[dict] | None:
     - Recent behavior: average snoozes, puzzle solve time, and puzzle attempts over last 10 alarms
     - Contextual behavior: same-day and same-time behavioural patterns from prior sessions
 
-    Each sample is regressed on the observed average puzzle solve time, allowing the trained
-    model to predict expected difficulty/latency for a given alarm context.
+    Each sample is regressed on the observed waking difficulty score, allowing the trained model to predict expected grogginess for a given alarm context.
 
     :param user_id: The user ID for whom to extract features.
+    :param use_health_data: Whether to include health-related features.
     :return: A list of dictionaries, each containing:
         - alarm_session_id: ID of the AlarmSession
         - features: Dictionary mapping feature_names to float values
-        - target: Average puzzle solve time in seconds (regression target)
+        - target: Waking difficulty score (1-10) (regression target)
     """
 
     # Load all data
@@ -448,7 +448,7 @@ def _extract_features(user_id, use_health_data: bool) -> list[dict] | None:
 
 def train_user_model(user_id) -> Pipeline | None:
     """
-    Trains a RandomForest regression model to predict puzzle solve time for a given user.
+    Trains a RandomForest regression model to predict waking difficulty for a given user.
 
     Extracts features from the user's historical alarm and sleep data using _extract_features,
     constructs a feature matrix in the canonical feature_names order, and trains a scikit-learn
@@ -519,7 +519,7 @@ def _predict_user_model(user_id, prediction_data):
     :param user_id: The user ID whose trained model should be used.
     :param prediction_data: A numpy array or array-like feature matrix, with shape (n_samples, n_features).
                             Columns must correspond to the order of feature_names.
-    :return: An array of predicted puzzle solve times (in seconds) for each sample, or None if no model is found.
+    :return: An array of predicted waking difficulty scores (1-10 scale) for each sample, or None if no model is found.
     """
     model: Pipeline | None = None
 
@@ -668,12 +668,12 @@ def find_suitable_alarm(user_id: int, min_time: datetime, max_time: datetime):
 
     # Extract predicted data
     for item, pred in zip(candidate_payload, predictions):
-        item["predicted_puzzle_time_seconds"] = float(pred)
+        item["predicted_waking_difficulty"] = float(pred)
 
     # Find the best candidate (lowest difficulty score)
     best_candidate = min(
         candidate_payload,
-        key=lambda row: row.get("predicted_puzzle_time_seconds", float("inf")),
+        key=lambda row: row.get("predicted_waking_difficulty", float("inf")),
     )
 
     return {
